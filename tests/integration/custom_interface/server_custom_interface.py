@@ -1,4 +1,4 @@
-"""Custom-interface integration test — server using a runtime-compiled proto."""
+"""Custom-interface integration test --- server using a runtime-compiled proto."""
 import sys
 from pathlib import Path
 
@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent))  # enable: import _proto_setup
 # pylint: disable=wrong-import-position
 import _proto_setup  # side-effect: compiles + registers custom proto
 from tests.integration._server_base import IntegrationServer
+from tests.integration._interface import get_args
 # pylint: enable=wrong-import-position
 
 _proto_setup.ensure_loaded()
@@ -23,5 +24,6 @@ class GrpcServerCustom(IntegrationServer):
         return super().on_receive(peer, request)  # handles pipeline/exit
 
 if __name__ == "__main__":
-    s = GrpcServerCustom(49999)
+    args = get_args("Custom interface test")
+    s = GrpcServerCustom(args.port)
     s.serve_forever()

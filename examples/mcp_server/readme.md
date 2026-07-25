@@ -1,7 +1,7 @@
 # mcp_server example
 
 Autonomous LLM agent demo. An LLM (via LM Studio) drives file operations and
-code execution entirely through gRPC — it never touches the filesystem directly.
+code execution entirely through gRPC --- it never touches the filesystem directly.
 The agent's task is to generate and launch a Flask "aero glass" dashboard app.
 
 ---
@@ -28,7 +28,7 @@ The server is a plain `BaseServer`. All domain logic lives in the three clients.
 
 | File | Role |
 |---|---|
-| `GrpcServer.py` | Plain `BaseServer` — routes messages, no custom logic |
+| `GrpcServer.py` | Plain `BaseServer` --- routes messages, no custom logic |
 | `FileOperationClient.py` | Executes `mcp.file.*` operations sandboxed to `BASE_DIR` |
 | `RunnerClient.py` | Creates a venv, installs deps, runs `main.py`; reports output |
 | `LlmBridgeClient.py` | Autonomous agent: queries LLM → emits tool calls → feeds results back |
@@ -41,7 +41,7 @@ The server is a plain `BaseServer`. All domain logic lives in the three clients.
 | `mcp.file.edit`     | LLM → FileOperationClient | `path`, `content`, `encoding` (opt.)    |
 | `mcp.file.delete`   | LLM → FileOperationClient | `path`                                  |
 | `mcp.file.response` | FileOperationClient → LLM | `ok`, `operation`, `path`, `error`      |
-| `mcp.run.execute`   | LLM → RunnerClient        | _(empty — runs `main.py` in BASE_DIR)_  |
+| `mcp.run.execute`   | LLM → RunnerClient        | _(empty --- runs `main.py` in BASE_DIR)_  |
 | `mcp.run.response`  | RunnerClient → LLM        | `ok`, `timed_out`, `output`             |
 
 All messages use `payload.structPayload`.
@@ -50,10 +50,10 @@ All messages use `payload.structPayload`.
 
 ## Security
 
-- All paths are resolved with `Path.resolve()` + `relative_to(BASE_DIR)` — `..` traversal is rejected.
+- All paths are resolved with `Path.resolve()` + `relative_to(BASE_DIR)` --- `..` traversal is rejected.
 - File content is capped at **1 MB**.
 - Writes are atomic: temp file → `os.replace()`.
-- `BASE_DIR` is `<system_tmp>/mcp_server/` — no project files are ever touched.
+- `BASE_DIR` is `<system_tmp>/mcp_server/` --- no project files are ever touched.
 
 ---
 

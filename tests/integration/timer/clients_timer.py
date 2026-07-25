@@ -1,4 +1,4 @@
-"""Timer Test — Clients
+"""Timer Test --- Clients
 ======================
 Shows how ``grpchook/timer.py``'s ``timer()`` function drives a gRPC client.
 
@@ -91,7 +91,7 @@ if __name__ == "__main__":
     drive_thread = threading.Thread(target=_drive_ticks, daemon=True)
     drive_thread.start()
 
-    # receive all ticks on the main thread — spin(timeout=5) blocks until
+    # receive all ticks on the main thread --- spin(timeout=5) blocks until
     # one message arrives or 5 s elapses
     for i in range(N_TICKS):
         got = receiver.spin(timeout=5.0)

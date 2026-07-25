@@ -4,9 +4,9 @@ Interactive Windows-Aero-styled live web dashboard for the gRPC Watchdog demo.
 
 Architecture
 ------------
-* ``WatchdogPoller`` — gRPC client that periodically requests stats and
+* ``WatchdogPoller`` --- gRPC client that periodically requests stats and
   exposes a ``send_ui_event(text)`` method for keyboard-driven messages.
-* Flask app — serves the interactive dashboard at ``/`` and two JSON APIs.
+* Flask app --- serves the interactive dashboard at ``/`` and two JSON APIs.
 
 Usage
 -----
@@ -192,7 +192,7 @@ def create_app(stats_client: WatchdogPoller, alpha_clients: dict) -> Flask:
     def api_fire():
         """Fire a random AlphabetClient or a specific letter.
 
-        Optional JSON body: ``{"letter": "a"}`` — omit for a random pick.
+        Optional JSON body: ``{"letter": "a"}`` --- omit for a random pick.
         """
         if not alpha_clients:
             return jsonify({"error": "clients not ready"}), 503
@@ -492,19 +492,19 @@ footer{
     <div class="header-sub">Aero Live Dashboard</div>
   </div>
   <div class="hchip" style="margin-left:.6rem">
-    <span class="v" id="h-clients">—</span>
+    <span class="v" id="h-clients">---</span>
     <span class="l">clients</span>
   </div>
   <div class="hchip">
-    <span class="v" id="h-events">—</span>
+    <span class="v" id="h-events">---</span>
     <span class="l">events</span>
   </div>
   <div class="hchip">
-    <span class="v" id="h-msgs">—</span>
+    <span class="v" id="h-msgs">---</span>
     <span class="l">messages</span>
   </div>
   <div class="hchip">
-    <span class="v" id="h-rate">—</span>
+    <span class="v" id="h-rate">---</span>
     <span class="l">msg/s</span>
   </div>
   <div class="live-badge" style="margin-left:auto">
@@ -558,9 +558,9 @@ footer{
   <span id="status-msg" style="opacity:0"> </span>
   <span class="hint">Enter ↵ to send</span>
   <button id="send-btn"
-          title="Send the text as a 'ui_event' gRPC message — appears as a gold row in the event feed">TRANSMIT ▶</button>
+          title="Send the text as a 'ui_event' gRPC message --- appears as a gold row in the event feed">TRANSMIT ▶</button>
   <button id="fire-btn"
-          title="Pick a random alphabet client (a–z) and fire it with a generated payload — simulates sensor/agent traffic">⚡ RANDOM</button>
+          title="Pick a random alphabet client (a–z) and fire it with a generated payload --- simulates sensor/agent traffic">⚡ RANDOM</button>
 </footer>
 
 <script>
@@ -603,8 +603,8 @@ function renderClients(clients) {
   keys.sort().forEach(id => {
     const info    = clients[id];
     const count   = info.msg_count  || 0;
-    const connAt  = info.connected_at ? new Date(info.connected_at).toLocaleTimeString() : '—';
-    const lastAt  = info.last_seen    ? new Date(info.last_seen).toLocaleTimeString()    : '—';
+    const connAt  = info.connected_at ? new Date(info.connected_at).toLocaleTimeString() : '---';
+    const lastAt  = info.last_seen    ? new Date(info.last_seen).toLocaleTimeString()    : '---';
     const pct     = Math.round((count / maxMsgs) * 100);
     const sClass  = senderClass(id);
 
@@ -645,7 +645,7 @@ function appendEventRow(ev, animate) {
   feed.appendChild(row);
 
   // prune old rows to keep DOM lean
-  // NOTE: use firstElementChild, NOT firstChild — firstChild can be a text node
+  // NOTE: use firstElementChild, NOT firstChild --- firstChild can be a text node
   // (whitespace between tags) which has no classList and would throw a TypeError.
   while (feed.children.length > MAX_ROWS + 1) {
     const first = feed.firstElementChild;
@@ -668,7 +668,7 @@ function renderEvents(events, total) {
   }
   empty.style.display = 'none';
 
-  // Capture scroll state before DOM changes — scrollHeight grows when rows are added
+  // Capture scroll state before DOM changes --- scrollHeight grows when rows are added
   const atBottom = lastTotal < 0 ||
     (feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80);
 
@@ -678,7 +678,7 @@ function renderEvents(events, total) {
   lastTotal = total;
 
   if (prev < 0) {
-    // first render — populate without animation
+    // first render --- populate without animation
     [...feed.querySelectorAll('.ev-row')].forEach(n => n.remove());
     events.forEach(ev => appendEventRow(ev, false));
   } else if (total > prev) {
@@ -928,7 +928,7 @@ def _keyboard_loop(
         if ch == "!":
             burst = list(clients)
             random.shuffle(burst)
-            print(f"  ⚡ BURST — firing all {len(burst)} clients …")
+            print(f"  ⚡ BURST --- firing all {len(burst)} clients …")
             for ch_burst in burst:
                 try:
                     clients[ch_burst].fire(_random_payload(ch_burst))
@@ -949,7 +949,7 @@ def _keyboard_loop(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Watchdog Aero dashboard — interactive gRPC UI demo"
+        description="Watchdog Aero dashboard --- interactive gRPC UI demo"
     )
     parser.add_argument("--port",    type=int,  default=49999,       help="gRPC server port")
     parser.add_argument("--ip",      type=str,  default="localhost",  help="gRPC server host")
@@ -972,7 +972,7 @@ if __name__ == "__main__":
     poll_thread = threading.Thread(target=_poll_loop, args=(poller,), daemon=True)
     poll_thread.start()
 
-    # ── alphabet_clients dict — created early so Flask can reference it ──────
+    # ── alphabet_clients dict --- created early so Flask can reference it ──────
     alphabet_clients: dict[str, AlphabetClient] = {}
 
     # ── Flask in a background thread (main thread drives keyboard input) ──────

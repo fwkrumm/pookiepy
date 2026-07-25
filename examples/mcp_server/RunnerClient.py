@@ -1,5 +1,5 @@
 """
-RunnerClient — gRPC client that builds and runs the agent-generated main.py.
+RunnerClient --- gRPC client that builds and runs the agent-generated main.py.
 
 Detection order:
   1. uv   → uv venv .venv  +  uv pip install -r requirements.txt  +  venv python
@@ -29,7 +29,7 @@ RUN_REQUEST    = "mcp.run.execute"
 RUN_RESPONSE   = "mcp.run.response"
 
 SETUP_TIMEOUT  = 120  # seconds for venv creation + package install
-RUN_TIMEOUT    = 10   # seconds — time allowed before we assume the server started
+RUN_TIMEOUT    = 10   # seconds --- time allowed before we assume the server started
 MAX_OUTPUT     = 8192  # chars kept from stdout / stderr (tail)
 
 
@@ -48,7 +48,7 @@ class RunnerClient(BaseClient):
 
     def on_init(self):
         self.logger.info(
-            "RunnerClient ready — cwd: %s  setup_timeout: %ds  run_timeout: %ds",
+            "RunnerClient ready --- cwd: %s  setup_timeout: %ds  run_timeout: %ds",
             BASE_DIR.resolve(), SETUP_TIMEOUT, RUN_TIMEOUT,
         )
         threading.Thread(target=self.spin_forever, daemon=True).start()
@@ -135,7 +135,7 @@ class RunnerClient(BaseClient):
 
         runner = self._detect_runner()
         if runner is None:
-            msg = "No uv or Python installation found — test yourself."
+            msg = "No uv or Python installation found --- test yourself."
             self.logger.warning(msg)
             return {"ok": False, "stdout": "", "timed_out": False,
                     "stderr": msg, "exit_code": None}
@@ -172,7 +172,7 @@ class RunnerClient(BaseClient):
                     proc.kill()
                     stdout, stderr = proc.communicate()
                     self.logger.info(
-                        "Process still alive after %ds — clean start assumed", RUN_TIMEOUT
+                        "Process still alive after %ds --- clean start assumed", RUN_TIMEOUT
                     )
                     return {
                         "ok": True,
@@ -201,7 +201,7 @@ class RunnerClient(BaseClient):
         self.send_data(response)
 
         status = "OK" if result["ok"] else "FAIL"
-        self.logger.info("Run %s — timed_out=%s  exit_code=%s",
+        self.logger.info("Run %s --- timed_out=%s  exit_code=%s",
                          status, result["timed_out"], result.get("exit_code"))
         return True
 

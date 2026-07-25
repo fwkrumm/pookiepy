@@ -1,5 +1,5 @@
 """
-Exception-Handling Test — Server
+Exception-Handling Test --- Server
 ==================================
 
 Basic server for the exception-handling integration test.
@@ -11,7 +11,7 @@ from tests.integration._server_base import IntegrationServer
 
 
 class ExceptionHandlingServer(IntegrationServer):
-    """Plain pass-through server — exception handling is client-side."""
+    """Plain pass-through server --- exception handling is client-side."""
 
     def __init__(self, port: int):
         super().__init__(port)

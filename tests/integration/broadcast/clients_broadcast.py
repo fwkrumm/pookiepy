@@ -1,5 +1,5 @@
 """
-Broadcast Test — Clients
+Broadcast Test --- Clients
 =========================
 
 Three independent clients all subscribe to ``"broadcast"``.  Demonstrates
@@ -58,7 +58,17 @@ if __name__ == "__main__":
                 data = client.get_data(timeout=TIMEOUT)
             except GrpcEmpty:
                 break
-            counter = int(data.payload.bytePayload.decode())
+
+            # Connection welcome/metadata messages can arrive on this queue.
+            # Only count actual broadcast payload frames.
+            if data.metaInfo.messageName != "broadcast":
+                continue
+
+            payload_text = data.payload.bytePayload.decode().strip()
+            if not payload_text:
+                continue
+
+            counter = int(payload_text)
             received[client.name].append(counter)
 
     # assertions
@@ -68,7 +78,7 @@ if __name__ == "__main__":
             f"{client.name} received only {len(msgs)} messages "
             f"(expected >= {MIN_MESSAGES})"
         )
-        # counters must be consecutive (no gaps larger than 1 — server sends at fixed rate)
+        # counters must be consecutive (no gaps larger than 1 --- server sends at fixed rate)
         for a, b in zip(msgs, msgs[1:]):
             assert b >= a, f"{client.name}: non-monotonic counter {a} -> {b}"
         clients[0].logger.info(
@@ -80,7 +90,7 @@ if __name__ == "__main__":
     sets = [set(received[c.name]) for c in clients]
     overlap = sets[0].intersection(*sets[1:])
     assert len(overlap) > 0, (
-        "No counter overlap between clients — messages were not broadcast to all"
+        "No counter overlap between clients --- messages were not broadcast to all"
     )
     clients[0].logger.info(
         "OK: %d counter values received by all %d clients (fan-out confirmed)",

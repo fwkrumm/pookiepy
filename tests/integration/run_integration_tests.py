@@ -10,6 +10,7 @@ NOTE that logs will be scrambled due to subprocess usage. You can however still 
 import os
 import sys
 import time
+import socket
 import subprocess
 from pathlib import Path
 
@@ -26,6 +27,7 @@ _env["PYTHONPATH"] = str(PROJECT_ROOT) + (os.pathsep + _existing if _existing el
 # not finish within this window, treat it as a hang and fail fast instead of
 # letting CI spin forever.
 EXAMPLE_TIMEOUT_S = 120
+SERVER_STARTUP_WAIT_S = 1.0
 
 # examples/integration tests to execute
 EXAMPLES = [
@@ -52,7 +54,7 @@ EXAMPLES = [
     # --- new examples ---
     {
         "name": "server_off",
-        "server": None,  # no server — client must raise GrpcConnectionError cleanly
+        "server": None,  # no server --- client must raise GrpcConnectionError cleanly
         "client": ROOT / "server_off" / "clients_server_off.py",
     },
     {
@@ -100,6 +102,16 @@ EXAMPLES = [
         "server": ROOT / "request_response" / "server_request_response.py",
         "client": ROOT / "request_response" / "clients_request_response.py",
     },
+    {
+        "name": "compression",
+        "server": ROOT / "compression" / "server_compression.py",
+        "client": ROOT / "compression" / "clients_compression.py",
+    },
+    {
+        "name": "payload_limits_sweep",
+        "server": None,  # client script orchestrates per-case server subprocesses
+        "client": ROOT / "payload_limits_sweep" / "clients_payload_limits_sweep.py",
+    },
 ]
 
 def _exists(p: Path) -> bool:
@@ -145,6 +157,33 @@ def _terminate(proc: subprocess.Popen, name: str):
             pass
 
 
+def _pick_unused_port() -> int:
+    """Ask OS for a currently unused TCP port.
+
+    This avoids reusing a single fixed port across sequential integration
+    subprocesses, which is flaky on Windows because a recently closed port can
+    stay temporarily unavailable for rebinding.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _wait_for_server_startup(server_path: Path, srv: subprocess.Popen, port: int):
+    """Wait briefly for server to either stay alive or fail fast.
+
+    Many startup errors, including bind failures, surface immediately. Catch
+    them before launching the client so the harness reports the real server
+    failure instead of a downstream client error.
+    """
+    time.sleep(SERVER_STARTUP_WAIT_S)
+    if srv.poll() is not None:
+        raise RuntimeError(
+            f"Server '{server_path.name}' exited during startup with code {srv.returncode} "
+            f"on port {port}."
+        )
+
+
 def run_example_pair(server_path: Path, client_path: Path):
     """
     run examples and check if they terminate cleanly. If one example
@@ -160,24 +199,23 @@ def run_example_pair(server_path: Path, client_path: Path):
     print(f"\n=== Example: {client_path.parent.name} ===")
 
     srv = None
+    port = _pick_unused_port()
     if server_path is not None:
         if not _exists(server_path):
             # usually should not happen
             print(f"Server script not found: {server_path}, skipping example")
             return
 
-        srv_cmd = [sys.executable, str(server_path)]
+        srv_cmd = [sys.executable, str(server_path), "--port", str(port)]
         print(f"Starting server: {srv_cmd}")
         srv = subprocess.Popen(  # pylint: disable=consider-using-with
             srv_cmd,
             cwd=str(ROOT),
             env=_env,
         )
-
-        # give the server a moment to start
-        time.sleep(1.0)
+        _wait_for_server_startup(server_path, srv, port)
     else:
-        print("(client-only test — no server started)")
+        print("(client-only test --- no server started)")
 
     if not _exists(client_path):
         # usually should not happen
@@ -186,7 +224,7 @@ def run_example_pair(server_path: Path, client_path: Path):
         _terminate(srv, "server")
         return
 
-    cli_cmd = [sys.executable, str(client_path)]
+    cli_cmd = [sys.executable, str(client_path), "--port", str(port)]
     print(f"Starting client: {cli_cmd}")
     cli = subprocess.Popen(  # pylint: disable=consider-using-with
         cli_cmd,
@@ -240,7 +278,7 @@ def run_example_pair(server_path: Path, client_path: Path):
 
     except KeyboardInterrupt:
         # fallback if there is any freeze or early exit desired.
-        print("Keyboard interrupt received — shutting down example processes...")
+        print("Keyboard interrupt received --- shutting down example processes...")
         _terminate(cli, "client")
         _terminate(srv, "server")
         # small pause to allow clean shutdown
@@ -248,7 +286,7 @@ def run_example_pair(server_path: Path, client_path: Path):
 
 
 def main():
-    print("run_examples.py — sequentially runs bundled examples")
+    print("run_examples.py --- sequentially runs bundled examples")
     for ex in EXAMPLES:
         run_example_pair(ex.get("server"), ex["client"])
 

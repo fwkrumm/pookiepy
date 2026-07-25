@@ -21,12 +21,14 @@ class GrpcLogger(logging.Logger):
     """Logger subclass that adds INTERNAL_INFO (7) and INTERNAL_DEBUG (5) levels below DEBUG."""
 
     def iinfo(self, message, *args, **kwargs):
-        """Log at INTERNAL_INFO level (7) — framework lifecycle events, below DEBUG."""
+        """Log at INTERNAL_INFO level (7) --- framework lifecycle events, below DEBUG."""
         if self.isEnabledFor(INTERNAL_INFO):
             self._log(INTERNAL_INFO, message, args, **kwargs)
 
     def idebug(self, message, *args, **kwargs):
-        """Log at INTERNAL_DEBUG level (5) — fine-grained framework tracing, below INTERNAL_INFO."""
+        """
+        Log at INTERNAL_DEBUG level (5) --- fine-grained framework tracing, below INTERNAL_INFO.
+        """
         if self.isEnabledFor(INTERNAL_DEBUG):
             self._log(INTERNAL_DEBUG, message, args, **kwargs)
 
@@ -43,10 +45,9 @@ logging.setLoggerClass(GrpcLogger)
 def get_logger(
     name: str = "default",
     *,
-    log_level: int = logging.INFO,
+    console_log_level: int | None = logging.INFO,
     log_dir: str = None,
-    enable_file_logging: bool = True,
-    enable_console_logging: bool = True,
+    file_log_level: int | None = INTERNAL_DEBUG,
     use_colored_output: bool = True
 ) -> GrpcLogger:
     """
@@ -56,14 +57,12 @@ def get_logger(
     ----------
     name : str
         Logger name (default: "default")
-    log_level : int
-        Base logging level (default: logging.INFO)
+    console_log_level : int | None
+        Console handler level. Set to None to disable console logging.
     log_dir : str
         Directory for log files. If None, uses system temp dir.
-    enable_file_logging : bool
-        Whether to enable file logging (default: True)
-    enable_console_logging : bool
-        Whether to enable console logging (default: True)
+    file_log_level : int | None
+        File handler level. Set to None to disable file logging.
     use_colored_output : bool
         Whether to use colored console output (default: True)
 
@@ -80,6 +79,11 @@ def get_logger(
 
     # Avoid adding handlers multiple times
     if logger.handlers:
+        warnings.warn(
+            f"Logger '{name}' already configured; returning cached logger "\
+                "and ignoring new settings.",
+            stacklevel=2
+        )
         return logger
 
     # Logger level must be INTERNAL to allow file handler to capture everything
@@ -100,11 +104,11 @@ def get_logger(
     )
 
     # Console handler with coloredlogs
-    if enable_console_logging:
+    if console_log_level is not None:
         if use_colored_output:
             # coloredlogs installs directly on the logger with field-level colors
             coloredlogs.install(
-                level=log_level,
+                level=console_log_level,
                 logger=logger,
                 fmt="%(asctime)s.%(msecs)03d %(hostname)s %(name)s[%(process)d] "\
                     "%(levelname)s %(message)s",
@@ -129,12 +133,12 @@ def get_logger(
             )
         else:
             console_handler = logging.StreamHandler()
-            console_handler.setLevel(log_level)
+            console_handler.setLevel(console_log_level)
             console_handler.setFormatter(file_formatter)
             logger.addHandler(console_handler)
 
     # File handler with rotation
-    if enable_file_logging:
+    if file_log_level is not None:
         try:
             log_location.mkdir(parents=True, exist_ok=True)
 
@@ -150,7 +154,7 @@ def get_logger(
                 backupCount=30,  # Keep 30 days of logs
                 encoding="utf-8"
             )
-            file_handler.setLevel(INTERNAL_DEBUG)
+            file_handler.setLevel(file_log_level)
             file_handler.setFormatter(file_formatter)
             logger.addHandler(file_handler)
             logger.info("Logging files to %s", log_location)

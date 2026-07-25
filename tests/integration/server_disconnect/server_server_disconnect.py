@@ -1,5 +1,5 @@
 """
-Server-Disconnect Test — Server
+Server-Disconnect Test --- Server
 ================================
 
 Auto-shuts down 1 second after the first client connects. Used together with
@@ -30,7 +30,7 @@ class ServerDisconnectServer(IntegrationServer):
         if not self._shutdown_scheduled:
             self._shutdown_scheduled = True
             self.logger.info(
-                "First client '%s' connected — scheduling shutdown in %.1fs",
+                "First client '%s' connected --- scheduling shutdown in %.1fs",
                 data.metaInfo.clientInfo.name,
                 SHUTDOWN_AFTER,
             )

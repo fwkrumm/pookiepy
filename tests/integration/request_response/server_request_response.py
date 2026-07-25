@@ -1,4 +1,4 @@
-"""Request-response correlation test — server.
+"""Request-response correlation test --- server.
 
 Passthrough server: routes messages between clients without modification.
 """

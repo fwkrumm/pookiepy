@@ -15,12 +15,12 @@ grpchook/timer.py                 # high-precision periodic timer (multiprocessi
 grpchook/schema_version.py        # SHA-256 proto fingerprint for compat check
 grpchook/custom_interface.py      # runtime .proto compile+load
 grpchook/message.proto         # proto source (one service, one bidirectional RPC)
-grpchook/message_pb2*.py       # generated — DO NOT EDIT
+grpchook/message_pb2*.py       # generated --- DO NOT EDIT
 ```
 
 Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. grpchook/message.proto`
 
-## Proto — Message fields
+## Proto --- Message fields
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -31,7 +31,7 @@ Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.
 | `payload` | `Payload` | `bytes bytePayload` or `Struct structPayload` |
 | `history` | `repeated DataPoint` | per-hop timestamps + perf_counter |
 
-## BaseServer — [grpchook/BaseServer.py](grpchook/BaseServer.py)
+## BaseServer --- [grpchook/BaseServer.py](grpchook/BaseServer.py)
 
 ```python
 BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None)
@@ -45,16 +45,16 @@ Schema check: reads `SCHEMA_VERSION_METADATA_KEY` from metadata → `FAILED_PREC
 **Hooks:**
 | Method | Signature | Return |
 |---|---|---|
-| `on_init` | `()` | — |
-| `on_shutdown` | `()` | — |
+| `on_init` | `()` | --- |
+| `on_shutdown` | `()` | --- |
 | `on_client_connect` | `(request, context)` | `bool` True=accept |
-| `on_client_accepted` | `(peer, request)` | — |
-| `on_client_disconnect` | `(peer)` | — |
+| `on_client_accepted` | `(peer, request)` | --- |
+| `on_client_disconnect` | `(peer)` | --- |
 | `on_receive` | `(peer, request)` | `bool` True=fan-out |
 
 **Other:** `serve_forever()`, `shutdown()`, `_add_static_data(name, msg)`, `_get_static_data(name)`
 
-## BaseClient — [grpchook/BaseClient.py](grpchook/BaseClient.py)
+## BaseClient --- [grpchook/BaseClient.py](grpchook/BaseClient.py)
 
 ```python
 BaseClient(identifier, port, provides=None, requires=None, ip="localhost",
@@ -82,7 +82,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 **Context manager:** `with client:` → `__enter__` reconnects if disconnected, `__exit__` disconnects. Reusable.
 
-## DataRegister — [grpchook/data_register.py](grpchook/data_register.py)
+## DataRegister --- [grpchook/data_register.py](grpchook/data_register.py)
 
 `dict[messageName → dict[clientId → queue.Queue]]`. Thread-safe: `_meta_lock` + per-messageName locks.
 
@@ -92,7 +92,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `remove_notification_queues_for_client(client_id)` | deregister on disconnect |
 | `add_data_for_message_name(client_id, message_name, data, target_client_id=None)` | fan-out, skip sender; `target_client_id`=unicast |
 
-## Exceptions — [grpchook/exceptions.py](grpchook/exceptions.py)
+## Exceptions --- [grpchook/exceptions.py](grpchook/exceptions.py)
 
 | Exception | Raised when |
 |---|---|
@@ -110,7 +110,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 **Tools** (`grpchook/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `Message`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
-**Timer** (`grpchook/timer.py`): `timedevent(s, n)` context manager — drift-compensated, RT priority.
+**Timer** (`grpchook/timer.py`): `timedevent(s, n)` context manager --- drift-compensated, RT priority.
 ```python
 with timedevent(s=0.01, n=100) as te:
     for tick in te: ...
@@ -118,14 +118,14 @@ with timedevent(s=0.01, n=100) as te:
 
 **Schema version** (`grpchook/schema_version.py`): SHA-256 `FileDescriptorProto` → `SCHEMA_VERSION_METADATA_KEY`.
 
-**Custom interface** (`grpchook/custom_interface.py`): `compile_proto(proto_path, out_dir)` + `load_module(...)` — runtime proto compile/load without touching `grpchook/`.
+**Custom interface** (`grpchook/custom_interface.py`): `compile_proto(proto_path, out_dir)` + `load_module(...)` --- runtime proto compile/load without touching `grpchook/`.
 
 ## Design Patterns
 
-1. One `DataChannel` stream per client — all data through it.
+1. One `DataChannel` stream per client --- all data through it.
 2. `provides`/`requires` → `DataRegister` fan-out routing.
 3. `messageName` = routing key (string), not separate RPCs.
-4. Hook subclassing — override `on_receive`, `on_client_connect`, etc.
+4. Hook subclassing --- override `on_receive`, `on_client_connect`, etc.
 5. `with client:` auto-reconnects; new UUID each connect.
 
 ## Dependencies

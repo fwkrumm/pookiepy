@@ -154,7 +154,7 @@ class DataRegister():
                     "No notification queue exists for message_name: %s", message_name
                 )
                 return ((), ())
-            subscribers = dict(client_dict)  # shallow copy — puts happen outside the lock
+            subscribers = dict(client_dict)  # shallow copy --- puts happen outside the lock
 
         if target_client_id:
             self._logger.debug("Adding data for message_name %s for target client %s",

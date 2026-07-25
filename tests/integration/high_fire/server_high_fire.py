@@ -1,4 +1,4 @@
-"""High-Fire Test — Server
+"""High-Fire Test --- Server
 ==========================
 Plain relay server; all stress-test logic lives in the client.
 """

@@ -1,4 +1,4 @@
-# Weekly compatibility check — wider grpc/protobuf range than the static pin.
+# Weekly compatibility check --- wider grpc/protobuf range than the static pin.
 # Used by .github/workflows/weekly-grpc-compat.yml only.
 # uv/pip resolves these to the latest matching version at run time.
 grpcio>=1.81,<2

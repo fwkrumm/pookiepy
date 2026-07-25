@@ -58,7 +58,7 @@ def _iter_stream(prompt: str, base_url: str, model: str):
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     payload = {"model": model, "messages": _build_messages(prompt), "stream": True}
-    log = get_logger("LMProxyClient", log_level=logging.DEBUG)
+    log = get_logger("LMProxyClient", console_log_level=logging.DEBUG)
     sess = _session or requests
     log.debug("stream POST %s model=%s", url, model)
     n_chunks = 0
@@ -102,7 +102,7 @@ def _fetch_sync(prompt: str, base_url: str, model: str) -> str:
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     payload = {"model": model, "messages": _build_messages(prompt)}
-    log = get_logger("LMProxyClient", log_level=logging.DEBUG)
+    log = get_logger("LMProxyClient", console_log_level=logging.DEBUG)
     sess = _session or requests
     log.debug("sync POST %s model=%s", url, model)
     r = sess.post(url, json=payload, headers=headers, timeout=30)

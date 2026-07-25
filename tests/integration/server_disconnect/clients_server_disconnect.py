@@ -1,5 +1,5 @@
 """
-Server-Disconnect Test — Client
+Server-Disconnect Test --- Client
 ================================
 
 Demonstrates that when the server shuts down mid-stream the client detects it
@@ -26,7 +26,7 @@ from tests.integration._interface import get_args
 
 # Must be longer than SHUTDOWN_AFTER (1.0 s) on the server
 SPIN_TIMEOUT = 3.0
-# Hard upper bound — if the whole flow takes longer we consider it a freeze
+# Hard upper bound --- if the whole flow takes longer we consider it a freeze
 MAX_WAIT = 8.0
 
 
@@ -55,14 +55,14 @@ if __name__ == "__main__":
         # shortly after that and no further messages will arrive.
         client.spin(timeout=SPIN_TIMEOUT)
     except GrpcEmpty:
-        pass  # expected — server went away before timeout elapsed or at timeout
+        pass  # expected --- server went away before timeout elapsed or at timeout
     except (GrpcConnectionError, ClientExit, RuntimeError) as exc:
-        # Any stream-level error is acceptable — the server went away
+        # Any stream-level error is acceptable --- the server went away
         client.logger.info("spin() raised %s: %s", type(exc).__name__, exc)
 
     elapsed_spin = time.monotonic() - t0
     assert elapsed_spin < MAX_WAIT, (
-        f"spin() took {elapsed_spin:.1f}s — possible freeze (limit={MAX_WAIT}s)"
+        f"spin() took {elapsed_spin:.1f}s --- possible freeze (limit={MAX_WAIT}s)"
     )
     client.logger.info("OK: spin() returned in %.2fs", elapsed_spin)
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     client.disconnect()
     elapsed_disconnect = time.monotonic() - t1
     assert elapsed_disconnect < 5.0, (
-        f"disconnect() took {elapsed_disconnect:.1f}s — possible hang"
+        f"disconnect() took {elapsed_disconnect:.1f}s --- possible hang"
     )
 
     # post-disconnect invariants

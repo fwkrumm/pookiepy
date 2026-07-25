@@ -1,10 +1,10 @@
 """
-Server-Off Test — Client connects, no freeze
+Server-Off Test --- Client connects, no freeze
 =============================================
 
 Demonstrates that when no server is reachable, ``BaseClient.__init__`` raises
 ``GrpcConnectionError`` promptly (2-second timeout) and the process can exit
-cleanly — no frozen threads, no hanging.
+cleanly --- no frozen threads, no hanging.
 
 Run
 ---
@@ -35,7 +35,7 @@ if __name__ == "__main__":
 
     try:
         client = TestClient(PORT)
-        # If we reach here the connection succeeded — that is a test failure
+        # If we reach here the connection succeeded --- that is a test failure
         client.disconnect()
         logger.error("ERROR: expected GrpcConnectionError but connection succeeded")
         sys.exit(1)

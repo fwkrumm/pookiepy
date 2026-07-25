@@ -1,5 +1,5 @@
 """
-Config-Client Test — Clients
+Config-Client Test --- Clients
 ==============================
 
 Demonstrates runtime control of the server from a dedicated config client.
@@ -87,13 +87,13 @@ if __name__ == "__main__":
     try:
         worker.spin(timeout=SPIN_TIMEOUT)
     except GrpcEmpty:
-        pass  # expected — no data arriving after disconnect
+        pass  # expected --- no data arriving after disconnect
     except (GrpcConnectionError, ClientExit, GrpcTimeoutError, RuntimeError) as exc:
         config.logger.info("worker spin() raised %s: %s", type(exc).__name__, exc)
 
     elapsed = time.monotonic() - t0
     assert elapsed < MAX_WAIT, (
-        f"worker.spin() took {elapsed:.1f}s — possible freeze (limit={MAX_WAIT}s)"
+        f"worker.spin() took {elapsed:.1f}s --- possible freeze (limit={MAX_WAIT}s)"
     )
     config.logger.info("OK: worker.spin() completed in %.2fs after server-side disconnect", elapsed)
 

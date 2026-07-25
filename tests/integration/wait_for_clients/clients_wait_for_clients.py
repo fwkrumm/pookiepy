@@ -1,5 +1,5 @@
 """
-Wait-for-Clients Test — Clients
+Wait-for-Clients Test --- Clients
 =================================
 
 Demonstrates a coordinator that blocks (on the server side) until all required
@@ -51,7 +51,7 @@ class CoordinatorClient(BaseClient):
 
 
 class WorkerClient(BaseClient):
-    """A provider of worker_data — its presence satisfies the server condition."""
+    """A provider of worker_data --- its presence satisfies the server condition."""
 
     def __init__(self, name: str, port: int):
         super().__init__(
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     # send check_ready and flush it to gRPC before connecting workers
     coordinator.send_data(generate_message("check_ready"))
     coordinator.wait_done()
-    coordinator.logger.info("INFO: check_ready sent — server is now waiting for workers")
+    coordinator.logger.info("INFO: check_ready sent --- server is now waiting for workers")
 
     # track result from background receiver thread
     received_signal: list[message_pb2.Message] = []

@@ -9,6 +9,7 @@ sys.path.insert(0, str(project_root))  # pylint: disable=wrong-import-position
 # pylint: disable=wrong-import-position  # project path must be set before importing project modules
 
 from tests.integration._server_base import IntegrationServer
+from tests.integration._interface import get_args
 from grpchook.baseserver import Peer
 from grpchook import message_pb2
 
@@ -32,5 +33,6 @@ class HistoryServer(IntegrationServer):
 
 
 if __name__ == "__main__":
-    s = HistoryServer(49999)
+    args = get_args("History feature test")
+    s = HistoryServer(args.port)
     s.serve_forever()

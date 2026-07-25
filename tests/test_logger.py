@@ -44,7 +44,7 @@ class TestGrpcLoggerSetLevel(unittest.TestCase):
         logger = None
         try:
             logger = get_logger(name=_unique("setlevel"), log_dir=tmpdir,
-                                enable_console_logging=False)
+                                console_log_level=None)
             self.assertTrue(logger.handlers, "Expected at least one handler after get_logger")
             logger.setLevel(logging.DEBUG)
             for handler in logger.handlers:
@@ -70,7 +70,7 @@ class TestGetLoggerCustomDir(unittest.TestCase):
         logger = None
         try:
             logger = get_logger(name=_unique("customdir"), log_dir=tmpdir,
-                                enable_console_logging=False)
+                                console_log_level=None)
             file_handlers = [h for h in logger.handlers
                              if hasattr(h, "baseFilename")]
             self.assertTrue(file_handlers, "Expected a file handler when log_dir is provided")
@@ -90,7 +90,7 @@ class TestGetLoggerCustomDir(unittest.TestCase):
         logger = None
         try:
             logger = get_logger(name=_unique("customdir_type"), log_dir=tmpdir,
-                                enable_console_logging=False)
+                                console_log_level=None)
             self.assertIsInstance(logger, GrpcLogger)
         finally:
             if logger:
@@ -104,7 +104,7 @@ class TestGetLoggerNoColor(unittest.TestCase):
     def test_no_color_installs_plain_stream_handler(self):
         """use_colored_output=False adds a plain StreamHandler (not coloredlogs)."""
         logger = get_logger(name=_unique("nocolor"), use_colored_output=False,
-                            enable_file_logging=False)
+                            file_log_level=None)
         stream_handlers = [
             h for h in logger.handlers
             if isinstance(h, logging.StreamHandler) and not hasattr(h, "baseFilename")
@@ -115,9 +115,9 @@ class TestGetLoggerNoColor(unittest.TestCase):
         )
 
     def test_no_color_handler_level_matches_log_level(self):
-        """The plain StreamHandler's level equals the requested log_level."""
+        """The plain StreamHandler's level equals the requested console_log_level."""
         logger = get_logger(name=_unique("nocolor_level"), use_colored_output=False,
-                            enable_file_logging=False, log_level=logging.WARNING)
+                    file_log_level=None, console_log_level=logging.WARNING)
         stream_handlers = [
             h for h in logger.handlers
             if isinstance(h, logging.StreamHandler) and not hasattr(h, "baseFilename")
@@ -134,14 +134,14 @@ class TestGetLoggerPermissionError(unittest.TestCase):
         with patch.object(Path, "mkdir", side_effect=PermissionError("access denied")):
             with self.assertWarns(UserWarning):
                 get_logger(name=_unique("permerr"), log_dir="/fake/no/permission",
-                           enable_console_logging=False)
+                           console_log_level=None)
 
     def test_os_error_on_mkdir_emits_user_warning(self):
         """OSError during log dir creation emits a UserWarning."""
         with patch.object(Path, "mkdir", side_effect=OSError("disk full")):
             with self.assertWarns(UserWarning):
                 get_logger(name=_unique("oserr"), log_dir="/fake/disk/full",
-                           enable_console_logging=False)
+                           console_log_level=None)
 
 
 class TestGetLoggerCaching(unittest.TestCase):
@@ -150,16 +150,18 @@ class TestGetLoggerCaching(unittest.TestCase):
     def test_second_call_returns_same_logger(self):
         """Calling get_logger twice with the same name returns the identical object."""
         name = _unique("cached")
-        l1 = get_logger(name=name, enable_file_logging=False)
-        l2 = get_logger(name=name, enable_file_logging=False)
+        l1 = get_logger(name=name, file_log_level=None)
+        with self.assertWarns(UserWarning):
+            l2 = get_logger(name=name, file_log_level=None)
         self.assertIs(l1, l2)
 
     def test_second_call_does_not_add_extra_handlers(self):
         """Second call with the same name does not duplicate handlers."""
         name = _unique("no_dup")
-        l1 = get_logger(name=name, enable_file_logging=False)
+        l1 = get_logger(name=name, file_log_level=None)
         count_after_first = len(l1.handlers)
-        get_logger(name=name, enable_file_logging=False)
+        with self.assertWarns(UserWarning):
+            get_logger(name=name, file_log_level=None)
         self.assertEqual(len(l1.handlers), count_after_first)
 
 

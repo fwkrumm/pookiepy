@@ -1,5 +1,5 @@
 """
-Request-Response Correlation Test — Clients
+Request-Response Correlation Test --- Clients
 ============================================
 
 Demonstrates ``messageId``-based request/response correlation between two clients

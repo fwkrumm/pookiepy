@@ -5,7 +5,7 @@ build-backend = "pdm.backend"
 [project]
 name = "grpchook"
 dynamic = ["version"]
-description = "grpchook (grpc + hook) is an asynchronous Python gRPC bidirectional-streaming framework. Subclass BaseServer/BaseClient, override hooks — the base handles all gRPC plumbing."
+description = "grpchook (grpc + hook) is an asynchronous Python gRPC bidirectional-streaming framework. Subclass BaseServer/BaseClient, override hooks --- the base handles all gRPC plumbing."
 readme = "readme.md"
 requires-python = ">=3.10"
 authors = [

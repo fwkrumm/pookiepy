@@ -1,5 +1,5 @@
 """
-Wait-for-Clients Test — Server
+Wait-for-Clients Test --- Server
 ================================
 
 Demonstrates a server that defers a response until all required providers are
@@ -54,7 +54,7 @@ class WaitForClientsServer(IntegrationServer):
             )
             if count >= REQUIRED_WORKER_COUNT:
                 self._ready_event.set()
-                self.logger.info("all required workers connected — ready!")
+                self.logger.info("all required workers connected --- ready!")
         return True
 
     def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
@@ -64,7 +64,7 @@ class WaitForClientsServer(IntegrationServer):
 
             def _wait_and_respond():
                 self.logger.info(
-                    "check_ready from '%s' — waiting for %d workers",
+                    "check_ready from '%s' --- waiting for %d workers",
                     peer.name,
                     REQUIRED_WORKER_COUNT,
                 )

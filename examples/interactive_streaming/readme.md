@@ -10,9 +10,9 @@ TextClient  ──lm_request──►  GrpcServer  ──lm_request──►  LM
             ◄─lm_response_stream──────────────────────────  (HTTP → LM Studio)
 ```
 
-- **GrpcServer** — plain `BaseServer`, no custom logic.
-- **LMProxyClient** — receives `lm_request`, calls LM Studio `/v1/chat/completions` (streaming), sends back `lm_response_stream` chunks with a `done` flag.
-- **TextClient** — interactive CLI; reads user input, sends `lm_request`, prints streaming chunks as they arrive.
+- **GrpcServer** --- plain `BaseServer`, no custom logic.
+- **LMProxyClient** --- receives `lm_request`, calls LM Studio `/v1/chat/completions` (streaming), sends back `lm_response_stream` chunks with a `done` flag.
+- **TextClient** --- interactive CLI; reads user input, sends `lm_request`, prints streaming chunks as they arrive.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ TextClient  ──lm_request──►  GrpcServer  ──lm_request──►  LM
 
 ## How to run
 
-**Option A — two separate terminals:**
+**Option A --- two separate terminals:**
 
 ```
 # Terminal 1: server + proxy together
@@ -33,7 +33,7 @@ python examples/interactive_streaming/run_server_proxy.py
 python examples/interactive_streaming/run_text_client.py
 ```
 
-**Option B — three separate processes:**
+**Option B --- three separate processes:**
 
 ```
 python examples/interactive_streaming/GrpcServerExample.py

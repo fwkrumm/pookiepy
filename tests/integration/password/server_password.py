@@ -1,4 +1,4 @@
-"""Password Auth Test — Server
+"""Password Auth Test --- Server
 ==============================
 Demonstrates simple password-based client authentication using gRPC call metadata.
 
@@ -24,7 +24,7 @@ class PasswordServer(IntegrationServer):
 
         Args:
             data: First message from the connecting client (carries clientInfo).
-            context: gRPC servicer context — used to read call metadata.
+            context: gRPC servicer context --- used to read call metadata.
 
         Returns:
             True if the password matches, False to reject the connection.
@@ -33,7 +33,7 @@ class PasswordServer(IntegrationServer):
         provided = metadata.get(PASSWORD_METADATA_KEY, "")
         if provided != CORRECT_PASSWORD:
             self.logger.warning(
-                "Client '%s' presented wrong/missing password — rejecting",
+                "Client '%s' presented wrong/missing password --- rejecting",
                 data.metaInfo.clientInfo.name,
             )
             return False

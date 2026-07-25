@@ -1,4 +1,4 @@
-"""Test package — ensures the project root is on sys.path for all test modules."""
+"""Test package --- ensures the project root is on sys.path for all test modules."""
 import sys
 from pathlib import Path
 

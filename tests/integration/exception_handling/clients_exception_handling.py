@@ -1,12 +1,12 @@
 """
-Exception-Handling Test — Clients
+Exception-Handling Test --- Clients
 ===================================
 
 Demonstrates that when ``on_receive`` raises an exception:
 
 * ``spin()`` propagates the exception to the caller (not swallowed).
 * The client can still be ``disconnect()``-ed cleanly afterwards.
-* ``receive_thread`` is joined — no ghost threads left behind.
+* ``receive_thread`` is joined --- no ghost threads left behind.
 * The process exits with code 0 (everything was handled properly).
 
 Flow
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     # spin() must propagate the ValueError raised inside on_receive
     try:
         receiver.spin(timeout=TIMEOUT)
-        # on_receive raised — should not reach here
+        # on_receive raised --- should not reach here
         sender.logger.error("ERROR: expected ValueError from spin(), got no exception")
         sys.exit(1)
     except ValueError as exc:
@@ -85,7 +85,7 @@ if __name__ == "__main__":
         sender.logger.info("OK: spin() propagated ValueError as expected: '%s'", exc)
 
     # --- assert clean state before disconnect ---
-    # receive_thread is the gRPC receive loop — still alive (it runs independently)
+    # receive_thread is the gRPC receive loop --- still alive (it runs independently)
     assert receiver.receive_thread.is_alive(), (
         "receive_thread should still be alive before disconnect"
     )

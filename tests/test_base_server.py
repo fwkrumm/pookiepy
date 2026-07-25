@@ -14,8 +14,10 @@ Covered:
 import threading
 import unittest
 
+import grpc
+
 from grpchook import message_pb2
-from grpchook.baseserver import BaseServer, Peer
+from grpchook.baseserver import BaseServer, Peer, ServerConfig
 
 
 def _make_server(**kwargs) -> BaseServer:
@@ -177,6 +179,30 @@ class TestServerName(unittest.TestCase):
         """Server stores a custom name when explicitly provided."""
         server = BaseServer(port=50089, name="my-server")
         self.assertEqual(server.name, "my-server")
+
+
+class TestServerConfig(unittest.TestCase):
+    """Tests for ServerConfig defaults and compression field."""
+
+    def test_compression_default_is_none(self):
+        """ServerConfig.compression defaults to None (no compression)."""
+        self.assertIsNone(ServerConfig().compression)
+
+    def test_compression_gzip_accepted(self):
+        """ServerConfig accepts grpc.Compression.Gzip."""
+        cfg = ServerConfig(compression=grpc.Compression.Gzip)
+        self.assertEqual(cfg.compression, grpc.Compression.Gzip)
+
+    def test_compression_deflate_accepted(self):
+        """ServerConfig accepts grpc.Compression.Deflate."""
+        cfg = ServerConfig(compression=grpc.Compression.Deflate)
+        self.assertEqual(cfg.compression, grpc.Compression.Deflate)
+
+    def test_compression_passed_to_server(self):
+        """BaseServer stores the config compression field for use in serve_forever."""
+        cfg = ServerConfig(compression=grpc.Compression.Gzip)
+        server = BaseServer(port=50088, config=cfg)
+        self.assertEqual(server.config.compression, grpc.Compression.Gzip)
 
 
 if __name__ == "__main__":

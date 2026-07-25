@@ -1,11 +1,11 @@
 """
-run_example.py — starts all four processes in-process for the mcp_server example.
+run_example.py --- starts all four processes in-process for the mcp_server example.
 
 Start order:
-  1. GrpcServer      — routing / monitoring choke point
-  2. FileOperationClient — executes sandboxed file ops, replies via gRPC
-  3. RunnerClient    — executes `uv run python main.py`, replies via gRPC
-  4. LlmBridgeClient — drives the LLM agentic loop; disconnects when done
+  1. GrpcServer      --- routing / monitoring choke point
+  2. FileOperationClient --- executes sandboxed file ops, replies via gRPC
+  3. RunnerClient    --- executes `uv run python main.py`, replies via gRPC
+  4. LlmBridgeClient --- drives the LLM agentic loop; disconnects when done
 
 The main thread blocks until LlmBridgeClient finishes or Ctrl+C is pressed.
 """
@@ -60,7 +60,7 @@ def main():
     file_client   = FileOperationClient(PORT)
     runner_client = RunnerClient(PORT)
 
-    # ── LLM agent — starts its agentic loop in on_init ────────────────────────
+    # ── LLM agent --- starts its agentic loop in on_init ────────────────────────
     bridge = LlmBridgeClient(PORT)
 
     # Block until the bridge finishes (it calls disconnect() → clears run_event)
@@ -78,7 +78,7 @@ def main():
     if bridge.run_succeeded:
         print()
         print("=" * 60)
-        print("  Task finished — Flask app is running.")
+        print("  Task finished --- Flask app is running.")
         print("  Open http://localhost:5000 in your browser.")
         print(f"  Generated files are in: {BASE_DIR}")
         print("=" * 60)
@@ -86,7 +86,7 @@ def main():
     else:
         print()
         print("=" * 60)
-        print("  Task did not complete — agent aborted or was interrupted.")
+        print("  Task did not complete --- agent aborted or was interrupted.")
         print(f"  Generated files (if any) are in: {BASE_DIR}")
         print("=" * 60)
         print()

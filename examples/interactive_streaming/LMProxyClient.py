@@ -32,7 +32,7 @@ class LMProxyClient(BaseClient):
                 _lm_http._session = sess
                 self.logger.debug("persistent HTTP session created")
         else:
-            self.logger.warning("requests not installed — HTTP calls will fail")
+            self.logger.warning("requests not installed --- HTTP calls will fail")
 
         threading.Thread(target=self.spin_forever, daemon=True).start()
 

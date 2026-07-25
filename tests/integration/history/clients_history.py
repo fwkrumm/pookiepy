@@ -32,8 +32,8 @@ from grpchook.exceptions import GrpcValueError
 from grpchook.tools import evaluate_history, generate_message
 from grpchook.baseclient import BaseClient
 from grpchook import message_pb2
+from tests.integration._interface import get_args
 
-PORT = 49999
 N_ROUNDS = 3  # each round trip adds 4 transits; 3 rounds -> 12 transits
 TIMEOUT = 1.0 # seconds
 
@@ -49,14 +49,15 @@ class PongClient(BaseClient):
 
 
 if __name__ == "__main__":
-    ping = PingClient(PORT)
-    pong = PongClient(PORT)
+    args = get_args("History feature test")
+    ping = PingClient(args.port)
+    pong = PongClient(args.port)
 
     expected_hops = 1 + 4 * N_ROUNDS
     expected_transits = 4 * N_ROUNDS
 
     ping.logger.info(
-        "History demo — %d round trips — ping <-> server <-> pong  "
+        "History demo --- %d round trips --- ping <-> server <-> pong  "
         "(expected hops: %d  transits: %d)",
         N_ROUNDS, expected_hops, expected_transits,
     )

@@ -1,5 +1,5 @@
 """
-Broadcast Test — Server
+Broadcast Test --- Server
 ========================
 
 Server that initiates messages to all connected clients without being triggered
@@ -46,7 +46,7 @@ class BroadcastServer(IntegrationServer):
     def _broadcast_loop(self):
         """Push one broadcast message per interval until server shuts down."""
         # Block until all NUM_CLIENTS clients have connected and registered
-        # their requires — prevents broadcasting into an empty DataRegister.
+        # their requires --- prevents broadcasting into an empty DataRegister.
         self._clients_ready.wait()
 
         while not self._global_exit_event.is_set():

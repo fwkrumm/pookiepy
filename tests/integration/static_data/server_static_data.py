@@ -9,6 +9,7 @@ sys.path.insert(0, str(project_root))  # pylint: disable=wrong-import-position
 # pylint: disable=wrong-import-position  # project path must be set before importing project modules
 
 from tests.integration._server_base import IntegrationServer
+from tests.integration._interface import get_args
 from grpchook.baseserver import Peer
 from grpchook.exceptions import GrpcValueError
 from grpchook import message_pb2
@@ -93,5 +94,6 @@ class StaticDataServer(IntegrationServer):
         return False  # routing handled manually above
 
 if __name__ == "__main__":
-    s = StaticDataServer(49999)
+    args = get_args("Static data test")
+    s = StaticDataServer(args.port)
     s.serve_forever()

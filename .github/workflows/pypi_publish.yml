@@ -6,7 +6,7 @@ on:
       - master
 
 # Minimal token permissions.
-# id-token: write is required for PyPI Trusted Publishing (OIDC — no stored secrets needed).
+# id-token: write is required for PyPI Trusted Publishing (OIDC --- no stored secrets needed).
 permissions:
   contents: read
   id-token: write
@@ -42,7 +42,7 @@ jobs:
         run: uv build
 
       - name: Publish to PyPI via Trusted Publishing
-        # Uses OIDC — no PYPI_API_TOKEN secret required.
+        # Uses OIDC --- no PYPI_API_TOKEN secret required.
         # Configure the trusted publisher once at:
         # https://pypi.org/manage/project/<your-package>/settings/publishing/
         uses: pypa/gh-action-pypi-publish@release/v1

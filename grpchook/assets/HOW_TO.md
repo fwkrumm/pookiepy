@@ -1,4 +1,4 @@
-# HOW_TO.md — Developer API Reference
+# HOW_TO.md --- Developer API Reference
 
 ## Core Concept
 
@@ -177,7 +177,7 @@ config = ClientConfig(
 BaseClient(..., config=config)
 ```
 
-Example — injecting an auth token without subclassing:
+Example --- injecting an auth token without subclassing:
 
 ```python
 client = MyClient(port=50051, config=ClientConfig(
@@ -200,7 +200,7 @@ client = MyClient(port=50051, config=ClientConfig(
 
 ## Custom Interface (Runtime Proto)
 
-Use a custom `.proto` instead of the bundled one — without modifying `grpchook/`.
+Use a custom `.proto` instead of the bundled one --- without modifying `grpchook/`.
 The proto must define the same message/service structure (`Message`, `ClientProvides`, `ServerProvides`, `StreamStub`, `StreamServicer`).
 
 ### Compile and register at startup
@@ -245,7 +245,7 @@ compile_and_register(
 `server.py` / `client.py`:
 
 ```python
-import _proto_setup  # must be first — registers custom proto before grpchook imports
+import _proto_setup  # must be first --- registers custom proto before grpchook imports
 from grpchook.baseserver import BaseServer
 ```
 
@@ -349,10 +349,21 @@ with client:
 
 ## Logging
 
+If your class inherits from `BaseServer` or `BaseClient`, prefer the built-in instance logger:
+
+```python
+class MyServer(BaseServer):
+    def on_receive(self, peer, request):
+        self.logger.info("received %s", request.metaInfo.messageName)
+        return True
+```
+
+Use `get_logger(...)` mainly in static methods or helper modules where `self` is not available:
+
 ```python
 from grpchook.logger import get_logger
 logger = get_logger(name="MyComponent")   # returns GrpcLogger
 logger.setLevel("DEBUG")   # syncs console + file handler; use "INFO" by default
 ```
 
-Default console level: `INFO`. File logs at `INTERNAL_DEBUG` (level 5) written to `%TEMP%/grpcLogs/<name>_YYYYMMDD.log`.
+Default console level: `INFO`. File logs by default at `INTERNAL_DEBUG` (level 5) written to `%TEMP%/grpcLogs/<name>_YYYYMMDD.log`.

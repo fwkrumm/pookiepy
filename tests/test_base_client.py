@@ -4,7 +4,7 @@ Unit tests for baseclasses/BaseClient.py
 BaseClient.__init__ always calls self.run(), which opens a real gRPC channel.
 To keep tests pure-unit (no network), run() is patched to a no-op.  All
 gRPC-facing setup (channel, stub) that happens before run() is lazy and does
-not cause I/O — so only the patched run() call needs suppressing.
+not cause I/O --- so only the patched run() call needs suppressing.
 
 Covered:
 - send_data: type guard, provides-list guard, happy-path enqueue.
@@ -19,6 +19,8 @@ import threading
 import unittest
 from unittest.mock import MagicMock, patch
 
+import grpc
+
 from grpchook import message_pb2
 from grpchook.baseclient import BaseClient, ClientConfig
 from grpchook.exceptions import ClientExit, GrpcValueError
@@ -29,7 +31,7 @@ from grpchook.exceptions import ClientExit, GrpcValueError
 # ---------------------------------------------------------------------------
 
 def _client(provides=None, requires=None) -> BaseClient:
-    """Return a BaseClient with run() suppressed — no network required."""
+    """Return a BaseClient with run() suppressed --- no network required."""
     with patch.object(BaseClient, "run", lambda self: None):
         c = BaseClient(
             name="test",
@@ -160,7 +162,7 @@ class TestDisconnect(unittest.TestCase):
         self.client.stream = mock_stream
         self.client.disconnect()
         call_count = mock_stream.cancel.call_count
-        self.client.disconnect()  # second call — run_event already cleared
+        self.client.disconnect()  # second call --- run_event already cleared
         self.assertEqual(mock_stream.cancel.call_count, call_count)
 
 
@@ -246,6 +248,27 @@ class TestClientConfig(unittest.TestCase):
         with patch.object(BaseClient, "run", lambda self: None):
             client = BaseClient(name="meta-test", port=50099, config=cfg)
         self.assertEqual(client.config.ext_metadata, [("x-token", "abc")])
+
+    def test_compression_default_is_none(self):
+        """ClientConfig.compression defaults to None (no compression)."""
+        self.assertIsNone(ClientConfig().compression)
+
+    def test_compression_gzip_accepted(self):
+        """ClientConfig accepts grpc.Compression.Gzip."""
+        cfg = ClientConfig(compression=grpc.Compression.Gzip)
+        self.assertEqual(cfg.compression, grpc.Compression.Gzip)
+
+    def test_compression_deflate_accepted(self):
+        """ClientConfig accepts grpc.Compression.Deflate."""
+        cfg = ClientConfig(compression=grpc.Compression.Deflate)
+        self.assertEqual(cfg.compression, grpc.Compression.Deflate)
+
+    def test_compression_passed_to_client(self):
+        """BaseClient stores the config compression field for use in _connect."""
+        cfg = ClientConfig(compression=grpc.Compression.Gzip)
+        with patch.object(BaseClient, "run", lambda self: None):
+            client = BaseClient(name="comp-test", port=50099, config=cfg)
+        self.assertEqual(client.config.compression, grpc.Compression.Gzip)
 
 
 # ---------------------------------------------------------------------------

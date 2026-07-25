@@ -1,5 +1,5 @@
 """
-LlmBridgeClient — autonomous LLM agent that drives file operations via gRPC.
+LlmBridgeClient --- autonomous LLM agent that drives file operations via gRPC.
 
 The LLM (OpenAI-compatible endpoint, e.g. LM Studio) receives a task and a
 system prompt describing available tools.  It emits <tool>JSON</tool> blocks;
@@ -8,7 +8,7 @@ the server to FileOperationClient / RunnerClient, and feeds the result back to
 the LLM.  The loop continues until the LLM outputs <done/> or MAX_ITERATIONS
 is reached.
 
-Every action passes through the gRPC server — the LLM never touches the
+Every action passes through the gRPC server --- the LLM never touches the
 filesystem directly.  The BaseServer's on_receive() is therefore a natural
 monitoring / gating choke point.
 """
@@ -43,7 +43,7 @@ LMSTUDIO_BASE = 'http://127.0.0.1:1234/v1'
 
 MAX_ITERATIONS = 40   # absolute safety cap
 MAX_DEAD_TURNS = 3    # consecutive turns with no tool executed → abort
-LLM_TIMEOUT    = 120  # seconds — max wait for a single LLM response
+LLM_TIMEOUT    = 120  # seconds --- max wait for a single LLM response
 GRPC_TIMEOUT   = 180  # max wait for a gRPC tool response (uv install on first run can be slow)
 MAX_CTX_TURNS  = 12   # keep at most this many assistant+user pairs in context
 
@@ -104,7 +104,7 @@ class LlmBridgeClient(BaseClient):
 
     def on_init(self):
         self.logger.info(
-            'LlmBridgeClient connected — model=%s  base=%s',
+            'LlmBridgeClient connected --- model=%s  base=%s',
             self.model, self.lmstudio_base,
         )
         self.logger.info('Task:\n%s', TASK.strip())
@@ -123,7 +123,7 @@ class LlmBridgeClient(BaseClient):
             'temperature': 0.2,
             'stream':      False,
         }
-        self.logger.debug('LLM call — %d messages in context', len(messages))
+        self.logger.debug('LLM call --- %d messages in context', len(messages))
         resp = self._http.post(url, json=payload, headers=headers, timeout=LLM_TIMEOUT)
         resp.raise_for_status()
         data = resp.json()
@@ -185,7 +185,7 @@ class LlmBridgeClient(BaseClient):
         if not msg_name:
             return f"ERROR: unknown tool '{name}'. Valid tools: {list(_TOOL_TO_MSG)}"
 
-        # Build payload — run_program needs no payload fields
+        # Build payload --- run_program needs no payload fields
         payload_dict: dict = {}
         if name in ('create_file', 'edit_file'):
             payload_dict = {
@@ -247,8 +247,8 @@ class LlmBridgeClient(BaseClient):
         # file operation
         path = result.get('path', '?')
         if ok:
-            return f"{tool_name}: OK — path='{path}'"
-        return f"{tool_name}: FAILED — path='{path}'  error={result.get('error','?')}"
+            return f"{tool_name}: OK --- path='{path}'"
+        return f"{tool_name}: FAILED --- path='{path}'  error={result.get('error','?')}"
 
     # ── Agentic loop ──────────────────────────────────────────────────────────
 
@@ -302,7 +302,7 @@ class LlmBridgeClient(BaseClient):
 
             # ── Check for completion ──
             if '<done/>' in reply:
-                self.logger.info('LLM signalled <done/> — task complete.')
+                self.logger.info('LLM signalled <done/> --- task complete.')
                 self.run_succeeded = True
                 break
 
@@ -316,7 +316,7 @@ class LlmBridgeClient(BaseClient):
                 )
                 if dead_turns >= MAX_DEAD_TURNS:
                     self.logger.error(
-                        'Stuck: %d consecutive turns with no tool call — aborting.',
+                        'Stuck: %d consecutive turns with no tool call --- aborting.',
                         dead_turns,
                     )
                     break
@@ -325,7 +325,7 @@ class LlmBridgeClient(BaseClient):
                     'content': (
                         'Your reply contained no <tool> block. '
                         'You MUST call exactly one tool or output <done/>. '
-                        'Do not explain — just act now.'
+                        'Do not explain --- just act now.'
                     ),
                 })
                 continue

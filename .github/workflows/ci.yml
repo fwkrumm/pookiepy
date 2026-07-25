@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   test:
-    # if: false  # disabled — tests already passing; re-enable when needed
+    # if: false  # disabled --- tests already passing; re-enable when needed
     name: Test (py${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:

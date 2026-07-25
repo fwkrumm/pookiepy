@@ -1,4 +1,4 @@
-"""Basic connectivity integration test — server."""
+"""Basic connectivity integration test --- server."""
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

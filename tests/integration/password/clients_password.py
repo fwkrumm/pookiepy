@@ -1,4 +1,4 @@
-"""Password Auth Test — Clients
+"""Password Auth Test --- Clients
 ================================
 .. warning::
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             password="wrong_password",
             config=ClientConfig(connection_check_timeout=1.5),
         )
-        assert False, "Expected GrpcConnectionError for wrong password — none raised"
+        assert False, "Expected GrpcConnectionError for wrong password --- none raised"
     except GrpcConnectionError as exc:
         _log.info("OK: unauthorised client rejected as expected: %s", exc)
     finally:
@@ -93,10 +93,10 @@ if __name__ == "__main__":
             password=CORRECT_PASSWORD,
         )
         assert auth_client.server_session_id, (
-            "No server_session_id — authorised connection failed"
+            "No server_session_id --- authorised connection failed"
         )
         assert auth_client.run_event.is_set(), (
-            "run_event not set — client not properly connected"
+            "run_event not set --- client not properly connected"
         )
         auth_client.logger.info(
             "OK: authorised client connected (sessionId=%s...)",
@@ -110,6 +110,6 @@ if __name__ == "__main__":
             auth_client.disconnect()
 
     assert not auth_client.run_event.is_set(), (
-        "run_event still set after disconnect — client not properly shut down"
+        "run_event still set after disconnect --- client not properly shut down"
     )
     _log.info("password: all assertions passed")

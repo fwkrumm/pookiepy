@@ -33,7 +33,7 @@ def _process_escape(raw: str, i: int, out: list) -> int:
             out.append('\\u')
             out.append(hex4)
             return i + 6
-    # Malformed \uXXXX or completely invalid escape — escape the backslash
+    # Malformed \uXXXX or completely invalid escape --- escape the backslash
     out.append('\\\\')
     return i + 1
 

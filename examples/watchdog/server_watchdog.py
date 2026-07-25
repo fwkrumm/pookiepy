@@ -6,7 +6,7 @@ Tracks per-client connection statistics and a rolling event log; responds to
 ``"watchdog_request"`` messages with a full snapshot.
 
 Unlike the integration-test server this one does **not** shut down on
-``"server-exit"`` — it runs until you press Ctrl+C.
+``"server-exit"`` --- it runs until you press Ctrl+C.
 
 Run
 ---
@@ -51,7 +51,7 @@ class WatchdogServer(BaseServer):
             context: gRPC servicer context.
 
         Returns:
-            Always True — all clients are accepted.
+            Always True --- all clients are accepted.
         """
         name = data.metaInfo.clientInfo.name
         now = datetime.now(timezone.utc).isoformat()
@@ -143,7 +143,7 @@ def _payload_preview(data: message_pb2.Message) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Watchdog Aero demo server — press Ctrl+C to stop"
+        description="Watchdog Aero demo server --- press Ctrl+C to stop"
     )
     parser.add_argument("--port", type=int, default=49999)
     args = parser.parse_args()

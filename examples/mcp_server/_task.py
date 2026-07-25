@@ -11,10 +11,10 @@ Required files:
 
   main.py
     The HTML must live as a module-level triple-quoted constant (HTML = \\"\\"\\"...\\"\\"\\"").
-    No f-strings, no Jinja2 variables — pure static HTML/CSS/JS served via
+    No f-strings, no Jinja2 variables --- pure static HTML/CSS/JS served via
     render_template_string(HTML).
 
-    Visual style — aero / glassmorphism:
+    Visual style --- aero / glassmorphism:
       - Full-page dark gradient background: deep navy to deep purple
         (e.g. linear-gradient(135deg, #0a0a2e, #1a0533, #0d1b4b))
       - Card panels with:
@@ -26,8 +26,8 @@ Required files:
       - All text: white or rgba(255,255,255,0.85), sans-serif (Inter or system-ui)
       - Smooth CSS transitions (0.25s ease) on all interactive elements
 
-    3-D charts — use Plotly.js loaded from CDN (cdn.plot.ly/plotly-latest.min.js):
-      Chart 1 — 3D Surface
+    3-D charts --- use Plotly.js loaded from CDN (cdn.plot.ly/plotly-latest.min.js):
+      Chart 1 --- 3D Surface
         - Plot z = sin(sqrt(x*x + y*y)) / sqrt(x*x + y*y)  (sinc function)
           over a 40×40 grid with x,y in [-6, 6].
         - type: 'surface', colorscale: 'Viridis', showscale: false
@@ -35,7 +35,7 @@ Required files:
         - White axis title text, white tick labels
         - Title: "Sinc Surface"
 
-      Chart 2 — 3D Scatter / Helix
+      Chart 2 --- 3D Scatter / Helix
         - Generate 300 points: t from 0 to 6π,
           x = cos(t), y = sin(t), z = t / (2*Math.PI)
         - type: 'scatter3d', mode: 'markers'
@@ -43,7 +43,7 @@ Required files:
         - Same transparent background and white axis styling
         - Title: "Helix Scatter"
 
-    Buttons — place in a centered row below the charts:
+    Buttons --- place in a centered row below the charts:
       "Refresh Data"    → re-randomise a ±0.15 noise offset on both datasets
                           and call Plotly.react() to redraw
       "Toggle Glow"     → toggle a CSS class on both chart cards that adds a
@@ -55,8 +55,8 @@ Required files:
         color: white; border: none; border-radius: 8px
         padding: 12px 28px; font-size: 14px; letter-spacing: 1.5px; text-transform: uppercase
         cursor: pointer; transition: all 0.25s ease
-        :hover — box-shadow: 0 0 20px rgba(124,58,237,0.7), translateY(-2px)
-        :active — transform: scale(0.97)
+        :hover --- box-shadow: 0 0 20px rgba(124,58,237,0.7), translateY(-2px)
+        :active --- transform: scale(0.97)
 
     Layout:
       - Centered page header: large title ("Aero Dashboard") + subtitle
@@ -87,7 +87,7 @@ Required files:
     List every Python package that main.py imports (one per line).
 
 Once both files are created, call run_program to verify the server starts.
-timed_out=true means the server is running — that is success.
+timed_out=true means the server is running --- that is success.
 Call <done/> only after run_program confirms success.
 """
 
@@ -118,7 +118,7 @@ Critical rules:
   1. Paths are relative to the working directory; never use ..
   2. ALWAYS use triple-quoted strings (\\"\\"\\"...\\"\\"\\") for any multi-line content
      in Python code.  NEVER write multi-line HTML/CSS/JS as a regular \\"...\\" string
-     with \\n escapes — that will break the page.
+     with \\n escapes --- that will break the page.
   3. In the JSON content field escape every double-quote as \\" and every
      backslash as \\\\.  Represent newlines as \\n (do not embed raw newlines
      inside the JSON string value).

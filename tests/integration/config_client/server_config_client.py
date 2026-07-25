@@ -1,5 +1,5 @@
 """
-Config-Client Test — Server
+Config-Client Test --- Server
 =============================
 
 Demonstrates runtime server control via a dedicated "config" client.

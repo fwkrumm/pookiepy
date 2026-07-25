@@ -106,7 +106,7 @@ class TestInstalledCLI(unittest.TestCase):
     """
 
     # ------------------------------------------------------------------
-    # Class-level fixtures — venv created / destroyed once per test run
+    # Class-level fixtures --- venv created / destroyed once per test run
     # ------------------------------------------------------------------
 
     _venv_dir: Path
@@ -146,7 +146,7 @@ class TestInstalledCLI(unittest.TestCase):
         ``uv pip install`` resolves and installs packages faster than pip.
         """
         print(
-            f"\n[setUpClass] uv found ({uv}) — "
+            f"\n[setUpClass] uv found ({uv}) --- "
             f"creating venv in {cls._venv_dir} ...",
             flush=True,
         )
@@ -192,7 +192,7 @@ class TestInstalledCLI(unittest.TestCase):
         on first run when build dependencies are not yet cached.
         """
         print(
-            f"\n[setUpClass] uv not found — falling back to venv+pip. "
+            f"\n[setUpClass] uv not found --- falling back to venv+pip. "
             f"Creating venv in {cls._venv_dir} ...",
             flush=True,
         )
@@ -229,7 +229,7 @@ class TestInstalledCLI(unittest.TestCase):
         shutil.rmtree(cls._venv_dir, ignore_errors=True)
 
     # ------------------------------------------------------------------
-    # Per-test fixtures — fresh working directory for every test method
+    # Per-test fixtures --- fresh working directory for every test method
     # ------------------------------------------------------------------
 
     def setUp(self) -> None:
@@ -366,17 +366,17 @@ class TestInstalledCLI(unittest.TestCase):
         On the second run the CLI must print "[skip]" and leave the file
         contents unchanged.
         """
-        # First run — file is created.
+        # First run --- file is created.
         first = self._run("--generate-server")
         self.assertEqual(first.returncode, 0, msg=first.stderr)
 
         skeleton = self._work_dir / "server_skeleton.py"
 
         # Overwrite the file with sentinel content so we can detect any change.
-        sentinel = "# sentinel — must not be overwritten\n"
+        sentinel = "# sentinel --- must not be overwritten\n"
         skeleton.write_text(sentinel, encoding="utf-8")
 
-        # Second run — must skip the file.
+        # Second run --- must skip the file.
         second = self._run("--generate-server")
         self.assertEqual(second.returncode, 0, msg=second.stderr)
         self.assertIn(

@@ -8,6 +8,7 @@ transport-layer plumbing for bidirectional streaming.  Consumers subclass
 ``on_client_connect``, ``on_receive``).
 """
 
+import os
 import queue
 import threading
 import time
@@ -38,6 +39,12 @@ class ServerConfig():
     max_workers: int | None = None
     # interval in seconds for the serve_forever shutdown-detection watchdog
     shutdown_poll_interval: float = 0.1
+    # gRPC compression algorithm applied to server-sent messages.
+    # Must be enabled on BOTH server and client to compress both directions.
+    # If only the server sets this, only server->client messages are compressed;
+    # client->server messages remain uncompressed (no error, just partial compression).
+    # Example: grpc.Compression.Gzip
+    compression: grpc.Compression = None
     server_options: list = field(default_factory=lambda: [
         ("grpc.keepalive_time_ms", 180000),  # 3 minutes
         ("grpc.keepalive_timeout_ms", 10000),  # 10 seconds
@@ -49,6 +56,17 @@ class ServerConfig():
         #("grpc.http2.write_buffer_size", 64 * 1024 * 1024),  # 64MB
         #("grpc.http2.max_frame_size", 16384)  # Minimum allowed frame size
     ])
+
+    @property
+    def effective_max_workers(self) -> int:
+        """Resolve the effective thread-pool size.
+
+        Returns ``max_workers`` when set explicitly, otherwise mirrors
+        ``ThreadPoolExecutor``'s own default: ``min(32, cpu_count + 4)``.
+        """
+        if self.max_workers is not None:
+            return self.max_workers
+        return min(32, (os.cpu_count() or 1) + 4)
 
 
 @dataclass
@@ -95,6 +113,9 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self._config = config or ServerConfig()
         self._port = port
         self._ip = ip
+
+        self._connected_clients = 0
+        self._connected_clients_lock = threading.Lock()
 
         self.on_init()
 
@@ -250,47 +271,63 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
         exit_event = threading.Event()
 
+        with self._connected_clients_lock:
+            self._connected_clients += 1
+            current_count = self._connected_clients
+
+        if current_count >= self._config.effective_max_workers:
+            self.logger.warning(
+                "Connected clients (%d) reached max_workers (%d). "
+                "The next client will stall until a slot opens. "
+                "Set ServerConfig.max_workers explicitly to handle more concurrent clients.",
+                current_count, self._config.effective_max_workers
+            )
+
         self.logger.idebug("%s: connected to DataChannel. Checking permissions", peer)
 
-        # Verify proto schema compatibility before processing any messages
-        metadata = dict(context.invocation_metadata())
-        client_schema = metadata.get(SCHEMA_VERSION_METADATA_KEY)
-        if client_schema is not None and client_schema != SCHEMA_VERSION:
-            self.logger.error(
-                "%s: schema mismatch — server=%s client=%s. Rejecting connection.",
-                peer, SCHEMA_VERSION, client_schema
-            )
-            context.abort(
-                grpc.StatusCode.FAILED_PRECONDITION,
-                f"Proto schema mismatch: server={SCHEMA_VERSION}, client={client_schema}"
-            )
-            return
-
-        # Process messages
-        t = threading.Thread(
-            target=self._handle_client_receive,
-            args=(request_iterator, context, peer, notification_queue, exit_event),
-            daemon=True,
-        )
-        t.start()
         try:
-            while not (exit_event.is_set() or self._global_exit_event.is_set()):
-                self.logger.idebug("%s: main thread running", peer)
-                try:
-                    data =  notification_queue.get(timeout=1)  # wait for data to send to client
-                    if data.history:
-                        data.history[-1].perfCounter = (
-                            time.perf_counter() - data.history[-1].perfCounter
-                        )
-                        data.history[-1].sendTimestamp = datetime.now(timezone.utc)
-                    yield data
-                    self.logger.idebug("%s: sent notification", peer)
-                except queue.Empty:
-                    continue
+            # Verify proto schema compatibility before processing any messages
+            metadata = dict(context.invocation_metadata())
+            client_schema = metadata.get(SCHEMA_VERSION_METADATA_KEY)
+            if client_schema is not None and client_schema != SCHEMA_VERSION:
+                self.logger.error(
+                    "%s: schema mismatch - server=%s client=%s. Rejecting connection.",
+                    peer, SCHEMA_VERSION, client_schema
+                )
+                context.abort(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    f"Proto schema mismatch: server={SCHEMA_VERSION}, client={client_schema}"
+                )
+                return
+
+            # Process messages
+            t = threading.Thread(
+                target=self._handle_client_receive,
+                args=(request_iterator, context, peer, notification_queue, exit_event),
+                daemon=True,
+            )
+            t.start()
+            try:
+                while not (exit_event.is_set() or self._global_exit_event.is_set()):
+                    self.logger.idebug("%s: main thread running", peer)
+                    try:
+                        data =  notification_queue.get(timeout=1)  # wait for data to send to client
+                        if data.history:
+                            data.history[-1].perfCounter = (
+                                time.perf_counter() - data.history[-1].perfCounter
+                            )
+                            data.history[-1].sendTimestamp = datetime.now(timezone.utc)
+                        yield data
+                        self.logger.idebug("%s: sent notification", peer)
+                    except queue.Empty:
+                        continue
+            finally:
+                self._data_register.remove_notification_queues_for_client(peer.client_id)
+                self.on_client_disconnect(peer)
+                self.logger.iinfo("%s: disconnected", peer)
         finally:
-            self._data_register.remove_notification_queues_for_client(peer.client_id)
-            self.on_client_disconnect(peer)
-            self.logger.iinfo("%s: disconnected", peer)
+            with self._connected_clients_lock:
+                self._connected_clients -= 1
 
     def shutdown(self):
         if not self._global_exit_event.is_set():
@@ -305,10 +342,16 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         Start the server and wait for termination
         """
         executor = futures.ThreadPoolExecutor(max_workers=self._config.max_workers)
+        self.logger.iinfo(
+            "max_workers set to %d (effective). "
+            "Each connected client occupies one thread for its full connection lifetime.",
+            self._config.effective_max_workers
+        )
         server = grpc.server(
             executor,
-                options=self._config.server_options
-            )
+            options=self._config.server_options,
+            compression=self._config.compression,
+        )
         message_pb2_grpc.add_StreamServicer_to_server(self, server)
         if self._ssl_credentials is None:
             server.add_insecure_port(f"{self._ip}:{self._port}")
@@ -347,6 +390,11 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
     def global_exit_event(self) -> threading.Event:
         """The server's global exit event (read-only)."""
         return self._global_exit_event
+
+    @property
+    def config(self) -> "ServerConfig":
+        """Server configuration (read-only)."""
+        return self._config
 
     def on_init(self):
         """

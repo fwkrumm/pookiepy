@@ -2,8 +2,8 @@
 High-precision periodic timer backed by a ``multiprocessing.Process``.
 
 Public surface:
-- :func:`timer` — fire an event *n* times at interval *s*.
-- :class:`TimedEvent` — context manager that iterates once per tick.
+- :func:`timer` --- fire an event *n* times at interval *s*.
+- :class:`TimedEvent` --- context manager that iterates once per tick.
 """
 import itertools
 import logging
@@ -105,7 +105,7 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
     compensation_strength = None
 
     if logger_level is not None:
-        process_logger = get_logger("timer", log_level=logger_level, enable_file_logging=False)
+        process_logger = get_logger("timer", console_log_level=logger_level, file_log_level=None)
     else:
         process_logger = None
 
@@ -245,7 +245,7 @@ class TimedEvent:
 
         After each yield (i.e. after the task body has finished), the event
         is checked again.  If it is already set the timer has fired the next
-        tick while the task was still running — a timer overrun.  A warning
+        tick while the task was still running --- a timer overrun.  A warning
         is printed and ``self.overrun_count`` is incremented.
 
         Deadlock prevention
@@ -277,7 +277,7 @@ class TimedEvent:
                 yield i
                 i += 1
                 # Stop after n ticks (mirrors the timer process cycle count).
-                # Checked here — after the task body returns — so the last
+                # Checked here --- after the task body returns --- so the last
                 # yield is never skipped even if the process has already exited.
                 if self.n != -1 and i >= self.n:
                     return

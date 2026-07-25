@@ -6,7 +6,7 @@ class McpGrpcServer(BaseServer):
     """
     Plain gRPC server for the mcp_server example.
 
-    No custom routing logic needed — the default on_receive() returns True
+    No custom routing logic needed --- the default on_receive() returns True
     so every message is fanned out via DataRegister to all subscribers.
     """
 

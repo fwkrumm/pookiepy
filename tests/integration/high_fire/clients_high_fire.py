@@ -1,4 +1,4 @@
-"""High-Fire Test — Clients
+"""High-Fire Test --- Clients
 ===========================
 Stress-tests the gRPC framework by sending a high volume of messages as fast
 as possible and asserting that all of them arrive at the receiving client.
@@ -101,7 +101,7 @@ if __name__ == "__main__":
     mb_per_s    = (HIGH_FIRE_COUNT * PAYLOAD_SIZE) / (elapsed * 1024 * 1024)
 
     sender.logger.info(
-        "OK: %d × %d-byte messages received — %d msg/s  (%.2f MB/s)  "
+        "OK: %d × %d-byte messages received --- %d msg/s  (%.2f MB/s)  "
         "send=%.3fs  total=%.3fs",
         HIGH_FIRE_COUNT, PAYLOAD_SIZE, msgs_per_s, mb_per_s,
         t_sent - t0, elapsed,

@@ -1,4 +1,4 @@
-"""Custom-interface integration test — clients using a runtime-compiled proto."""
+"""Custom-interface integration test --- clients using a runtime-compiled proto."""
 import sys
 from pathlib import Path
 
@@ -7,6 +7,7 @@ sys.path.insert(0, str(Path(__file__).parent))  # enable: import _proto_setup
 import _proto_setup  # side-effect: compiles + registers custom proto
 from grpchook.tools import generate_message
 from grpchook.baseclient import BaseClient
+from tests.integration._interface import get_args
 # pylint: enable=wrong-import-position
 
 _proto_setup.ensure_loaded()
@@ -26,9 +27,10 @@ class GrpcTestClientCustom(BaseClient):
 
 
 if __name__ == "__main__":
+    args = get_args("Custom interface test")
     # start two clients and exchange a test message
-    client1 = GrpcTestClientCustom("client1", 49999)
-    client2 = GrpcTestClientCustom("client2", 49999)
+    client1 = GrpcTestClientCustom("client1", args.port)
+    client2 = GrpcTestClientCustom("client2", args.port)
 
     message1 = generate_message(message_name="test_message")
     message2 = generate_message(message_name="test_message")

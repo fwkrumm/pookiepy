@@ -1,6 +1,6 @@
 # grpchook
 
-**grpchook** (gRPC + hook) is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need — the framework handles all gRPC plumbing.
+**grpchook** (gRPC + hook) is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
 
 [![PyPI](https://img.shields.io/pypi/v/grpchook)](https://pypi.org/project/grpchook/)
 [![Python](https://img.shields.io/pypi/pyversions/grpchook)](https://pypi.org/project/grpchook/)
@@ -9,6 +9,7 @@
 > **Status: Work in Progress.**
 > The project is open source and will remain open source.
 > Treat with caution. If you depend on it, **pin your version**.
+> Semantic versioning will only begin with the first official release, starting at version **1.0.0**.
 
 ---
 
@@ -39,7 +40,7 @@
 
 ## Disclaimer
 
-Core concept by a human developer. AI was used to assist with unit and integration tests, examples, documentation, and selected code sections. Core logic has been reviewed by a human; the test suite has not been fully audited — there may be AI-introduced oversights. Please report any issues you find.
+Core architecture and design were created by a human developer. AI was used extensively for unit and integration test creation, examples, documentation, refinements, and selected code sections. Core logic was human-reviewed, but the full test suite has not been fully audited --- AI-introduced oversights may still exist. Please report any issues you find.
 
 This software is provided **"as is"**, without warranty of any kind. The developer is not responsible for any damage, data loss, security vulnerabilities, or other issues that may arise from using this software. **You use it at your own risk.** See [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt) for the full BSD 3-Clause terms.
 
@@ -55,7 +56,7 @@ This software is provided **"as is"**, without warranty of any kind. The develop
 - You want a framework that can be extended with custom hooks for specific events.
 - You want to distribute clients to many different machines (e.g. voice recorder, voice to text, text to LLM, and vice versa until the final response is replayed)
 
-  **Example — four clients on four machines, all routed through one grpchook server:**
+  **Example --- four clients on four machines, all routed through one grpchook server:**
 
   > 💡 Diagram requires the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension to render in VS Code.
 
@@ -96,7 +97,7 @@ This software is provided **"as is"**, without warranty of any kind. The develop
 ## Requirements
 
 - Python 3.10 or later
-- A dedicated virtual environment is **strongly recommended** — gRPC version conflicts with other packages are common when using grpchook.
+- A dedicated virtual environment is **strongly recommended** --- gRPC version conflicts with other packages are common when using grpchook.
 
 ---
 <a name="installation"></a>
@@ -191,10 +192,10 @@ examples:
 
 ## Minimal Examples
 
-### Ultra-minimal — no subclassing required
+### Ultra-minimal --- no subclassing required
 
 The simplest possible working setup: start a server, connect two clients, exchange a message.
-Everything runs in a single script — no subclassing or hook overrides needed.
+Everything runs in a single script --- no subclassing or hook overrides needed.
 
 ```python
 # example_minimal.py
@@ -223,7 +224,7 @@ client_b.disconnect()
 server.shutdown()
 ```
 
-### Request / response — subclass with hooks
+### Request / response --- subclass with hooks
 
 For real workloads, subclass `BaseServer` to control routing and `BaseClient` to react to messages
 via the `on_receive` hook.
@@ -295,8 +296,8 @@ python client.py
 
 Runnable examples are available in two locations:
 
-- `examples/` — self-contained, scenario-focused examples
-- `tests/integration/` — integration test scenarios covering a broad range of use cases
+- `examples/` --- self-contained, scenario-focused examples
+- `tests/integration/` --- integration test scenarios covering a broad range of use cases
 
 Run them on a machine with adequate resources; some scenarios are resource-intensive.
 
@@ -404,7 +405,7 @@ Contributions are welcome. Please open an issue first for major changes so the a
 
 ## License
 
-BSD 3-Clause — see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt).
+BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt).
 
 ---
 <a name="release-history"></a>
@@ -423,3 +424,5 @@ BSD 3-Clause — see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/mast
 | 0.0.6                      | Update how-to markdown to include custom interface description. |
 | 0.0.7                      | Fix race condition which allowed clients to put data before welcome message. |
 | 0.0.8                      | Fix link in readme for pypi page. |
+| 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
+

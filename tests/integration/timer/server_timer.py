@@ -1,4 +1,4 @@
-"""Timer Test — Server
+"""Timer Test --- Server
 ====================
 Plain relay server; all timer-driving logic lives in the client.
 """

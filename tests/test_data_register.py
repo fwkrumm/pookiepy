@@ -56,7 +56,7 @@ class TestRegisterClient(unittest.TestCase):
 
 
 class TestAddDataFanOut(unittest.TestCase):
-    """Tests for add_data_for_messageName — broadcast and targeted delivery."""
+    """Tests for add_data_for_messageName --- broadcast and targeted delivery."""
 
     def setUp(self):
         self.dr = DataRegister(logging.getLogger("test"))
