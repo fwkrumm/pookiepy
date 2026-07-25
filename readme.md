@@ -374,6 +374,13 @@ message Payload {
 
 ## ToDos and Roadmap
 
+### General
+- Consider separate id for answerToId to not having to overwrite the message id
+- Simplify answering a request because this might be a common use case; automatic tracking?
+- Clients should log their uid at startup
+- Server should log its name
+- add on_data_sent hook to client and server?
+
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
 - Verify behavior when connections are interrupted mid-stream; ensure no ghost threads or queue deadlocks occur.
