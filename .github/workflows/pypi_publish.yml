@@ -50,28 +50,10 @@ jobs:
           # repository-url: https://test.pypi.org/legacy/ # for testing
           skip_existing: true
 
-      - name: Read version from root __init__.py
-        id: version
-        if: success() && github.ref_name == 'master'
-        run: |
-          VERSION="$(python - <<'PY'
-          import pathlib
-          import re
-
-          text = pathlib.Path('__init__.py').read_text(encoding='utf-8')
-          match = re.search(r'^__version__\s*=\s*[\"\']([^\"\']+)[\"\']\s*$', text, re.MULTILINE)
-          if not match:
-              raise SystemExit('Could not find __version__ in __init__.py')
-          print(match.group(1))
-          PY
-          )"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Create and push release tag
         if: success() && github.ref_name == 'master'
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
         run: |
+          VERSION="$(python -c "import pathlib,re; t=pathlib.Path('__init__.py').read_text(encoding='utf-8'); m=re.search(r'^__version__\\s*=\\s*[\\\"\\\']([^\\\"\\\']+)[\\\"\\\']\\s*$', t, re.MULTILINE); assert m, 'Could not find __version__ in __init__.py'; print(m.group(1))")"
           TAG="v${VERSION}"
 
           git fetch --tags
