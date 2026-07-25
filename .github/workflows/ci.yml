@@ -3,9 +3,9 @@ name: CI
 on: [push, pull_request]
 
 # Cancel in-progress runs for the same ref (rapid pushes to a branch/PR).
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+#concurrency:
+#  group: ${{ github.workflow }}-${{ github.ref }}
+#  cancel-in-progress: true
 
 # Minimal token permissions.
 permissions:
@@ -149,5 +149,4 @@ jobs:
         run: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. grpchook/message.proto
 
       - name: Run Pylint
-        run: |
-          pylint grpchook tests examples
+        run: pylint grpchook tests examples
