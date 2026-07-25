@@ -236,6 +236,18 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             self.disconnect()
             raise response.exc
 
+        if not response.metaInfo.HasField("serverInfo"):
+            self.logger.error(
+                "Expected welcome message (serverInfo) as first server response "
+                "but got messageName=%r. This indicates a server-side ordering bug.",
+                response.metaInfo.messageName,
+            )
+            self.disconnect()
+            raise GrpcConnectionError(
+                "Did not receive welcome message as first server response; "
+                f"got messageName={response.metaInfo.messageName!r} instead"
+            )
+
         self.server_session_id = response.metaInfo.serverInfo.uuid
         self.logger.iinfo(
             "Received response from server with uuid %s", self.server_session_id

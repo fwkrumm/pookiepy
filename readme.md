@@ -4,7 +4,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/grpchook)](https://pypi.org/project/grpchook/)
 [![Python](https://img.shields.io/pypi/pyversions/grpchook)](https://pypi.org/project/grpchook/)
-[![License](https://img.shields.io/badge/license-BSD%203--Clause-blue)](LICENSE.txt)
+[![License](https://img.shields.io/badge/license-BSD%203--Clause-blue)](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt)
 
 > **Status: Work in Progress.**
 > The project is open source and will remain open source.
@@ -42,7 +42,7 @@
 
 Core architecture and design were created by a human developer. AI was used extensively for unit and integration test creation, examples, documentation, refinements, and selected code sections. Core logic was human-reviewed, but the full test suite has not been fully audited --- AI-introduced oversights may still exist. Please report any issues you find.
 
-This software is provided **"as is"**, without warranty of any kind. The developer is not responsible for any damage, data loss, security vulnerabilities, or other issues that may arise from using this software. **You use it at your own risk.** See [LICENSE.txt](LICENSE.txt) for the full BSD 3-Clause terms.
+This software is provided **"as is"**, without warranty of any kind. The developer is not responsible for any damage, data loss, security vulnerabilities, or other issues that may arise from using this software. **You use it at your own risk.** See [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt) for the full BSD 3-Clause terms.
 
 
 ---
@@ -405,7 +405,7 @@ Contributions are welcome. Please open an issue first for major changes so the a
 
 ## License
 
-BSD 3-Clause --- see [LICENSE.txt](LICENSE.txt).
+BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt).
 
 ---
 <a name="release-history"></a>
@@ -422,4 +422,7 @@ BSD 3-Clause --- see [LICENSE.txt](LICENSE.txt).
 | 0.0.4                      | Add executor for server and wait for shutdown. |
 | 0.0.5                      | Fix readme on pypi page. |
 | 0.0.6                      | Update how-to markdown to include custom interface description. |
-| 0.0.7                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
+| 0.0.7                      | Fix race condition which allowed clients to put data before welcome message. |
+| 0.0.8                      | Fix link in readme for pypi page. |
+| 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
+

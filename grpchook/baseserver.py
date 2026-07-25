@@ -208,14 +208,13 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
                     self.on_client_accepted(peer, request)
 
-                    for require in requires:
-                        self._data_register.add_notification_queue_for_message_name(
-                            peer.client_id,
-                            require,
-                            notification_queue,
-                        )
-
-                    # create welcome message for client
+                    # Welcome message must be enqueued BEFORE registering requires in
+                    # DataRegister.  Once a require is registered, other threads (e.g. a
+                    # server-side broadcast loop) can immediately push data messages into
+                    # notification_queue. If the welcome message were enqueued after
+                    # registration there would be a race where a data message arrives first,
+                    # causing _check_connection() on the client to consume the wrong message
+                    # and subsequent get_data() calls to return the welcome (empty payload).
                     welcome_message = message_pb2.Message(
                         metaInfo=message_pb2.MetaInformation(
                             serverInfo=message_pb2.ServerProvides(
@@ -226,6 +225,13 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                     )
                     set_metadata(welcome_message)
                     notification_queue.put(welcome_message)
+
+                    for require in requires:
+                        self._data_register.add_notification_queue_for_message_name(
+                            peer.client_id,
+                            require,
+                            notification_queue,
+                        )
 
                     continue
 
