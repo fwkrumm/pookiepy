@@ -52,26 +52,6 @@ jobs:
 
       - name: Create and push release tag
         if: success() && github.ref_name == 'master'
-        run: |
-          VERSION="$(python -c "import pathlib,re; t=pathlib.Path('__init__.py').read_text(encoding='utf-8'); m=re.search(r'^__version__\\s*=\\s*[\\\"\\\']([^\\\"\\\']+)[\\\"\\\']\\s*$', t, re.MULTILINE); assert m, 'Could not find __version__ in __init__.py'; print(m.group(1))")"
-          TAG="v${VERSION}"
-
-          git fetch --tags
-
-          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
-            TAG_SHA="$(git rev-list -n 1 "refs/tags/${TAG}")"
-            HEAD_SHA="$(git rev-parse HEAD)"
-
-            if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
-              echo "Tag ${TAG} already points to this commit; nothing to do."
-              exit 0
-            fi
-
-            echo "Tag ${TAG} already exists on a different commit (${TAG_SHA}); refusing to move it."
-            exit 1
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$TAG" -m "Release $TAG"
-          git push origin "$TAG"
+        # if publish was successful -> create git tag on current
+        # commit and push it to the remote repository
+        run: bash .github/scripts/tag_release.sh
