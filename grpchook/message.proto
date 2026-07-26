@@ -20,7 +20,7 @@ message Message {
 message MetaInformation {
     google.protobuf.Timestamp timestamp = 1;
     string messageId = 2; // unique message id (uuid4)
-    string responseToId = 3; // in case the message is an answer to a previous message, this field contains the messageId of the original message
+    string responseToId = 3; // in case the message is an answer to a previous message, this field can be written to contain the original message id
     ClientProvides clientInfo = 4; // only filled by clients
     ServerProvides serverInfo = 5; // only filled by server
     string messageName = 6; // name of the data

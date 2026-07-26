@@ -26,6 +26,7 @@ def set_metadata(message: message_pb2.Message):
     if not message.metaInfo.messageId:
         # use .hex instead of str(uuid.uuid4()) to avoid dashes in the messageId
         message.metaInfo.messageId = uuid.uuid4().hex
+    # else: this case is not suggested however might be desired in certain situations
     if not message.metaInfo.HasField("timestamp"):
         message.metaInfo.timestamp = datetime.now(timezone.utc)
     # add more metadata fields here if needed
@@ -172,7 +173,7 @@ def generate_message(message_name: str = "default_message",
     Generate a Message with the given payload and message name.
 
     The payload can be either a dictionary (which will be converted to a Struct)
-    or raw bytes.  The message will have a unique messageId and the current
+    or raw bytes. The message will have a unique messageId and the current
     timestamp set in its metadata. If both payload types are empty, the message will have
     an empty payload.
 
