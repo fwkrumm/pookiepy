@@ -380,6 +380,8 @@ message Payload {
 - Clients should log their uid at startup
 - Server should log its name
 - add on_data_sent hook to client and server?
+- rename config to __config?
+- also hide grpc variables; those are not to be accessed by modules which inherit the base modules
 
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
