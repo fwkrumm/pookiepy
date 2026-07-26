@@ -19,10 +19,11 @@ message Message {
 
 message MetaInformation {
     google.protobuf.Timestamp timestamp = 1;
-    string messageId = 2; // can be added to a message which will in case the client answers be used for following messages
-    ClientProvides clientInfo = 3; // only filled by clients
-    ServerProvides serverInfo = 4; // only filled by server
-    string messageName = 5; // name of the data
+    string messageId = 2; // unique message id (uuid4)
+    string responseToId = 3; // in case the message is an answer to a previous message, this field contains the messageId of the original message
+    ClientProvides clientInfo = 4; // only filled by clients
+    ServerProvides serverInfo = 5; // only filled by server
+    string messageName = 6; // name of the data
 }
 
 message DataPoint {
@@ -54,7 +55,7 @@ message ServerProvides {
 message Payload {
     // struct payload (dict)
     google.protobuf.Struct structPayload = 1;
-	
+
 	// byte serialized payload
     bytes bytePayload = 2;
 }
