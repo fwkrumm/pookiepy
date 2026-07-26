@@ -376,6 +376,7 @@ message Payload {
 
 ### General
 - Consider separate id for answerToId to not having to overwrite the message id
+    -> add warning if it has been set manually?
 - Simplify answering a request because this might be a common use case; automatic tracking?
 - Clients should log their uid at startup
 - Server should log its name
