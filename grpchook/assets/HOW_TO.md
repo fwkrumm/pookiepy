@@ -369,6 +369,21 @@ Rules:
 - Do not overwrite `messageId` with request id.
 - For streaming replies, every chunk uses same `responseToId`.
 
+### Request/Response Policy (Minimalistic by design)
+
+`grpchook` intentionally keeps request/response as a message convention, not a dedicated client API.
+
+Why:
+- Keeps `BaseClient` and `BaseServer` small and predictable.
+- Avoids extra state machines, locks, and hidden queue-routing behavior in the framework core.
+- Works for mixed traffic (request/response + fire-and-forget) using the same hook/polling loop.
+
+Recommended approach:
+- Sender stores `request_id = request.metaInfo.messageId`.
+- Responder sets `reply.metaInfo.responseToId = request_id`.
+- Requester matches with `reply.metaInfo.responseToId == request_id`.
+- Non-matching messages continue through normal hook/polling flow.
+
 ### Match response on requester side
 
 ```python

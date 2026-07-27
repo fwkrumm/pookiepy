@@ -229,6 +229,15 @@ server.shutdown()
 For real workloads, subclass `BaseServer` to control routing and `BaseClient` to react to messages
 via the `on_receive` hook.
 
+Design note (important): request/response in grpchook is intentionally minimalistic.
+There is no dedicated `request()` helper in the core API by default; correlation is done via
+`messageId` and `responseToId` in normal hook/polling flow. This keeps the framework lean,
+transparent, and robust for mixed traffic patterns.
+
+Need full reference flow?
+- `tests/integration/request_response/server_request_response.py`
+- `tests/integration/request_response/clients_request_response.py`
+
 **`server.py`**
 
 ```python
@@ -373,9 +382,6 @@ message Payload {
 <a id="todos-and-roadmap"></a>
 
 ## ToDos and Roadmap
-
-### General
-- Add function for Respose mechanism? Basically its just setting the id manually, however maybe a send_answer/wait for answer would be desirable?
 
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
