@@ -171,6 +171,7 @@ class TestLifecycleHooks(unittest.TestCase):
         context.invocation_metadata.return_value = []
 
         def fake_queue_get(_self, timeout=1):
+            _ = timeout
             server.global_exit_event.set()
             return msg
 
