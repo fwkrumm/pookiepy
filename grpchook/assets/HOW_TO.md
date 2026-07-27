@@ -282,6 +282,7 @@ msg = generate_message("server-exit")
 ```python
 name   = data.metaInfo.messageName
 msg_id = data.metaInfo.messageId           # UUID hex string (set automatically)
+resp_to = data.metaInfo.responseToId       # request id this message answers, if any
 
 # struct payload → dict
 payload = struct_to_json(data.payload.structPayload)
@@ -289,6 +290,40 @@ payload = struct_to_json(data.payload.structPayload)
 # bytes payload
 raw = data.payload.bytePayload             # bytes
 ```
+
+### Respond to a request correctly
+
+```python
+reply = generate_message("my_response", struct_payload={"ok": True})
+reply.metaInfo.responseToId = request.metaInfo.messageId
+self.send_data(reply)
+```
+
+Rules:
+
+- Keep reply.metaInfo.messageId as new message id.
+- Put original request id into reply.metaInfo.responseToId.
+- Do not overwrite messageId with the request id.
+- For streaming replies, send every chunk with the same responseToId.
+
+### Match a response on the request side
+
+```python
+request = generate_message("my_request", struct_payload={"text": "hello"}, add_metadata=True)
+request_id = request.metaInfo.messageId
+self.send_data(request)
+
+while True:
+    reply = self.get_data(timeout=5.0)
+    if reply.metaInfo.responseToId != request_id:
+        continue
+    break
+```
+
+Rules:
+
+- Compare reply.metaInfo.responseToId against the original request id.
+- Do not compare reply.metaInfo.messageId for correlation.
 
 ---
 

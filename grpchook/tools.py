@@ -166,7 +166,8 @@ def evaluate_history(data: message_pb2.Message, log_callback: callable = None):
 
 def generate_message(message_name: str = "default_message",
                      struct_payload: dict = None,
-                     byte_payload: bytes = None) -> message_pb2.Message:
+                     byte_payload: bytes = None,
+                     add_metadata: bool = False) -> message_pb2.Message:
     """
     AI GENERATED
 
@@ -182,14 +183,19 @@ def generate_message(message_name: str = "default_message",
 
     Parameters
     ----------
+    message_name : str, optional
+        The name to set in the message's metaInfo.messageName field (default: "default_message").
     struct_payload : dict, optional
         The content to include in the message as a structured payload.  If provided, it will
         be converted to a google.protobuf.Struct.
     byte_payload : bytes, optional
         The content to include in the message as raw bytes.  If provided, it will
         be set as the bytePayload.
-    message_name : str, optional
-        The name to set in the message's metaInfo.messageName field (default: "default_message").
+    set_metadata : bool, optional
+        Whether to set the metadata automatically. NOTE that this is automatically also set
+        if the data are sent by the client, however in certain situations or test scenarios
+        it might be desired to set the metadata manually. In that case set this to True
+        (default: False).
 
     Returns
     -------
@@ -205,5 +211,8 @@ def generate_message(message_name: str = "default_message",
     if byte_payload is not None:
         msg.payload.bytePayload = byte_payload
 
-    # metadata will be set automatically by the clients
+    if add_metadata:
+        set_metadata(msg)
+
+    # metadata will be set automatically by the clients (in case set_metadata is False)
     return msg
