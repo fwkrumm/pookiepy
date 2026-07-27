@@ -109,14 +109,14 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self._data_register = DataRegister(self.logger)
         self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
 
-        self._ssl_credentials = ssl_credentials
+        self.__ssl_credentials = ssl_credentials
         self.__config = config or ServerConfig()
         self._port = port
         self._ip = ip
         self._uid = str(uuid.uuid4())
 
-        self._connected_clients = 0
-        self._connected_clients_lock = threading.Lock()
+        self.__connected_clients = 0
+        self.__connected_clients_lock = threading.Lock()
 
         self.on_init()
 
@@ -273,9 +273,9 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
         exit_event = threading.Event()
 
-        with self._connected_clients_lock:
-            self._connected_clients += 1
-            current_count = self._connected_clients
+        with self.__connected_clients_lock:
+            self.__connected_clients += 1
+            current_count = self.__connected_clients
 
         if current_count >= self.__config.effective_max_workers:
             self.logger.warning(
@@ -328,8 +328,8 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                 self.on_client_disconnect(peer)
                 self.logger.iinfo("%s: disconnected", peer)
         finally:
-            with self._connected_clients_lock:
-                self._connected_clients -= 1
+            with self.__connected_clients_lock:
+                self.__connected_clients -= 1
 
     def shutdown(self):
         if not self._global_exit_event.is_set():
@@ -355,11 +355,11 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             compression=self.__config.compression,
         )
         message_pb2_grpc.add_StreamServicer_to_server(self, server)
-        if self._ssl_credentials is None:
+        if self.__ssl_credentials is None:
             server.add_insecure_port(f"{self._ip}:{self._port}")
         else:
             self.logger.iinfo("Using SSL credentials for server")
-            server.add_secure_port(f"{self._ip}:{self._port}", self._ssl_credentials)
+            server.add_secure_port(f"{self._ip}:{self._port}", self.__ssl_credentials)
         server.start()
         self.logger.info("server %s started (schema=%s)", self, SCHEMA_VERSION)
         try:
