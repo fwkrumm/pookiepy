@@ -319,6 +319,12 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                                 time.perf_counter() - data.history[-1].perfCounter
                             )
                             data.history[-1].sendTimestamp = datetime.now(timezone.utc)
+
+                        try:
+                            self.on_data_yield(peer, data)
+                        except Exception as exc:  # pylint: disable=broad-exception-caught
+                            self.logger.error("%s: error in on_data_yield hook: %s", peer, exc)
+
                         yield data
                         self.logger.idebug("%s: sent notification", peer)
                     except queue.Empty:
@@ -397,6 +403,14 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
     def config(self) -> "ServerConfig":
         """Server configuration (read-only)."""
         return self.__config
+
+    def on_data_yield(self, peer: Peer, data: message_pb2.Message):
+        """
+        Hook called right before a message is yielded to a client stream.
+
+        This is a best-effort notification point that occurs when the message is
+        handed off to the gRPC stream iterator, not when the client has consumed it.
+        """
 
     def on_init(self):
         """

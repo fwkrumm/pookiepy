@@ -376,8 +376,6 @@ message Payload {
 
 ### This Branch
 - add on_data_sent hook to client and server?
-- rename config to __config? other parameters?
-- also hide grpc variables; those are not to be accessed by modules which inherit the base modules
 
 ### General
 - Add function for Respose mechanism? Basically its just setting the id manually, however maybe a send_answer/wait for answer would be desirable?
@@ -433,4 +431,5 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/mast
 | 0.0.7                      | Fix race condition which allowed clients to put data before welcome message. |
 | 0.0.8                      | Fix link in readme for pypi page. |
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
+| 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
 

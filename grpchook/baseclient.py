@@ -291,6 +291,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                                   data.metaInfo.timestamp,
                                   data.metaInfo.messageId)
 
+                try:
+                    self.on_data_yield(data)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self.logger.error("Error in on_data_yield hook: %s", exc)
+
                 yield data
 
                 # mark the message as done in the queue after it was sent to the server via yield
@@ -594,6 +599,14 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     def config(self) -> "ClientConfig":
         """Client configuration (read-only)."""
         return self.__config
+
+    def on_data_yield(self, data: message_pb2.Message):
+        """
+        Hook called right before a message is yielded from the client request generator.
+
+        This is a best-effort notification point that occurs when the message is
+        handed off to the gRPC stream iterator, not when the server has processed it.
+        """
 
     def on_init(self):
         """
