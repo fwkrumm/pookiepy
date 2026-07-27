@@ -376,7 +376,7 @@ message Payload {
 
 ### This Branch
 - add on_data_sent hook to client and server?
-- rename config to __config?
+- rename config to __config? other parameters?
 - also hide grpc variables; those are not to be accessed by modules which inherit the base modules
 
 ### General

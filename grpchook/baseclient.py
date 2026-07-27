@@ -93,7 +93,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         self.logger = get_logger(name=f"Client-{name}")
 
-        self._config = config or ClientConfig()
+        self.__config = config or ClientConfig()
         self.ip = ip
 
         # the following methods have to be overwritten by user in subclass
@@ -127,14 +127,14 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     def _setup_connection(self):
         """Create channel, stub, and queues, then connect. Safe to call on reconnect."""
 
-        if self._config.ssl_credentials is None:
+        if self.__config.ssl_credentials is None:
             self.channel = grpc.insecure_channel(f"{self.ip}:{self.port}",
-                                                 options=self._config.grpc_options)
+                                                 options=self.__config.grpc_options)
         else:
             self.logger.iinfo("Using SSL credentials for client")
             self.channel = grpc.secure_channel(f"{self.ip}:{self.port}",
-                                               self._config.ssl_credentials,
-                                               options=self._config.grpc_options)
+                                               self.__config.ssl_credentials,
+                                               options=self.__config.grpc_options)
 
         # stub and queues will be re-created on every connection attempt,
         # but this is necessary to ensure a clean state on reconnect.
@@ -142,7 +142,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         # not cause any issues.
         self.stub = message_pb2_grpc.StreamStub(self.channel)
         self.send_queue = queue.Queue()
-        self.receive_queue = queue.Queue(maxsize=self._config.receive_queue_maxsize)
+        self.receive_queue = queue.Queue(maxsize=self.__config.receive_queue_maxsize)
         self.server_session_id = ""
         self.uuid = str(uuid.uuid4())  # new UUID per connection --- avoids DataRegister race
         self.run_event.set()  # set BEFORE receive thread so that the latter starts
@@ -192,8 +192,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         self.stream = self.stub.DataChannel(
             self._request_generator(),
-            metadata=[(SCHEMA_VERSION_METADATA_KEY, SCHEMA_VERSION)] + self._config.ext_metadata,
-            compression=self._config.compression,
+            metadata=[(SCHEMA_VERSION_METADATA_KEY, SCHEMA_VERSION)] + self.__config.ext_metadata,
+            compression=self.__config.compression,
         )
 
         # send welcome message to server and exchange uuid, requires and provides lists
@@ -218,7 +218,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger.iinfo("waiting for server response")
 
         try:
-            response = self.receive_queue.get(timeout=self._config.connection_check_timeout)
+            response = self.receive_queue.get(timeout=self.__config.connection_check_timeout)
         except queue.Empty:
             self.logger.error(
                 "Did not receive response from server within timeout after connecting"
@@ -593,7 +593,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     @property
     def config(self) -> "ClientConfig":
         """Client configuration (read-only)."""
-        return self._config
+        return self.__config
 
     def on_init(self):
         """
