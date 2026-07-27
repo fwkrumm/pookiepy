@@ -429,4 +429,3 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/mast
 | 0.0.8                      | Fix link in readme for pypi page. |
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
 | 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
-
