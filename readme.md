@@ -374,9 +374,6 @@ message Payload {
 
 ## ToDos and Roadmap
 
-### This Branch
-- add on_data_sent hook to client and server?
-
 ### General
 - Add function for Respose mechanism? Basically its just setting the id manually, however maybe a send_answer/wait for answer would be desirable?
 
