@@ -208,11 +208,22 @@ class LlmBridgeClient(BaseClient):
         self.logger.info('tool=%s  msg=%s  id=%s', name, msg_name, msg_id[:8])
         self.send_data(msg)
 
-        # Block until the matching response arrives
-        try:
-            response = self.get_data(timeout=GRPC_TIMEOUT)
-        except ClientExit as exc:
-            return f'ERROR waiting for tool response: {exc}'
+        # Block until matching responseToId arrives.
+        while True:
+            try:
+                response = self.get_data(timeout=GRPC_TIMEOUT)
+            except ClientExit as exc:
+                return f'ERROR waiting for tool response: {exc}'
+
+            if response.metaInfo.responseToId != msg_id:
+                self.logger.warning(
+                    'Skipping unrelated response id=%s responseToId=%s expected=%s',
+                    response.metaInfo.messageId,
+                    response.metaInfo.responseToId,
+                    msg_id,
+                )
+                continue
+            break
 
         result = struct_to_json(response.payload.structPayload)
         return self._format_result(name, result)

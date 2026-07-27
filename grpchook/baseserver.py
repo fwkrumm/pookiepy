@@ -109,13 +109,14 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self._data_register = DataRegister(self.logger)
         self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
 
-        self._ssl_credentials = ssl_credentials
-        self._config = config or ServerConfig()
+        self.__ssl_credentials = ssl_credentials
+        self.__config = config or ServerConfig()
         self._port = port
         self._ip = ip
+        self._uid = str(uuid.uuid4())
 
-        self._connected_clients = 0
-        self._connected_clients_lock = threading.Lock()
+        self.__connected_clients = 0
+        self.__connected_clients_lock = threading.Lock()
 
         self.on_init()
 
@@ -123,7 +124,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
 
     def __repr__(self):
-        return f"BaseServer(name={self._name}, ip={self._ip}, port={self._port})"
+        return f"BaseServer(name={self._name}, id={self._uid}, ip={self._ip}, port={self._port})"
 
     def __str__(self):
         return self.__repr__()
@@ -218,6 +219,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                     welcome_message = message_pb2.Message(
                         metaInfo=message_pb2.MetaInformation(
                             serverInfo=message_pb2.ServerProvides(
+                                serverId=self._uid,
                                 uuid=peer.session_id,
                                 name=self._name,
                             )
@@ -267,20 +269,20 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         peer = Peer(peer=context.peer(), session_id=str(uuid.uuid4()))
 
         # queue for notifications to client
-        notification_queue = queue.Queue(maxsize=self._config.max_queue_elements)
+        notification_queue = queue.Queue(maxsize=self.__config.max_queue_elements)
 
         exit_event = threading.Event()
 
-        with self._connected_clients_lock:
-            self._connected_clients += 1
-            current_count = self._connected_clients
+        with self.__connected_clients_lock:
+            self.__connected_clients += 1
+            current_count = self.__connected_clients
 
-        if current_count >= self._config.effective_max_workers:
+        if current_count >= self.__config.effective_max_workers:
             self.logger.warning(
                 "Connected clients (%d) reached max_workers (%d). "
                 "The next client will stall until a slot opens. "
                 "Set ServerConfig.max_workers explicitly to handle more concurrent clients.",
-                current_count, self._config.effective_max_workers
+                current_count, self.__config.effective_max_workers
             )
 
         self.logger.idebug("%s: connected to DataChannel. Checking permissions", peer)
@@ -317,6 +319,12 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                                 time.perf_counter() - data.history[-1].perfCounter
                             )
                             data.history[-1].sendTimestamp = datetime.now(timezone.utc)
+
+                        try:
+                            self.on_data_yield(peer, data)
+                        except Exception as exc:  # pylint: disable=broad-exception-caught
+                            self.logger.error("%s: error in on_data_yield hook: %s", peer, exc)
+
                         yield data
                         self.logger.idebug("%s: sent notification", peer)
                     except queue.Empty:
@@ -326,8 +334,8 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                 self.on_client_disconnect(peer)
                 self.logger.iinfo("%s: disconnected", peer)
         finally:
-            with self._connected_clients_lock:
-                self._connected_clients -= 1
+            with self.__connected_clients_lock:
+                self.__connected_clients -= 1
 
     def shutdown(self):
         if not self._global_exit_event.is_set():
@@ -341,28 +349,28 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         """
         Start the server and wait for termination
         """
-        executor = futures.ThreadPoolExecutor(max_workers=self._config.max_workers)
+        executor = futures.ThreadPoolExecutor(max_workers=self.__config.max_workers)
         self.logger.iinfo(
             "max_workers set to %d (effective). "
             "Each connected client occupies one thread for its full connection lifetime.",
-            self._config.effective_max_workers
+            self.__config.effective_max_workers
         )
         server = grpc.server(
             executor,
-            options=self._config.server_options,
-            compression=self._config.compression,
+            options=self.__config.server_options,
+            compression=self.__config.compression,
         )
         message_pb2_grpc.add_StreamServicer_to_server(self, server)
-        if self._ssl_credentials is None:
+        if self.__ssl_credentials is None:
             server.add_insecure_port(f"{self._ip}:{self._port}")
         else:
             self.logger.iinfo("Using SSL credentials for server")
-            server.add_secure_port(f"{self._ip}:{self._port}", self._ssl_credentials)
+            server.add_secure_port(f"{self._ip}:{self._port}", self.__ssl_credentials)
         server.start()
-        self.logger.iinfo("server started at port %d (schema=%s)", self._port, SCHEMA_VERSION)
+        self.logger.info("server %s started (schema=%s)", self, SCHEMA_VERSION)
         try:
             while not self._global_exit_event.is_set():
-                self._global_exit_event.wait(timeout=self._config.shutdown_poll_interval)
+                self._global_exit_event.wait(timeout=self.__config.shutdown_poll_interval)
             # usually this was:
             # server.wait_for_termination()
         except KeyboardInterrupt:
@@ -394,7 +402,15 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
     @property
     def config(self) -> "ServerConfig":
         """Server configuration (read-only)."""
-        return self._config
+        return self.__config
+
+    def on_data_yield(self, peer: Peer, data: message_pb2.Message):
+        """
+        Hook called right before a message is yielded to a client stream.
+
+        This is a best-effort notification point that occurs when the message is
+        handed off to the gRPC stream iterator, not when the client has consumed it.
+        """
 
     def on_init(self):
         """

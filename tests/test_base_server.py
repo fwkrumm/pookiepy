@@ -11,8 +11,10 @@ Covered:
 - on_init / on_shutdown hooks are called at the right lifecycle points.
 - Hook overrides are invoked with the correct arguments.
 """
+import queue
 import threading
 import unittest
+from unittest.mock import MagicMock, patch
 
 import grpc
 
@@ -153,6 +155,44 @@ class TestLifecycleHooks(unittest.TestCase):
         srv = _Server(port=50093)
         srv.on_client_disconnect(peer)
         self.assertIs(_Server.received_peer, peer)
+
+    def test_on_data_yield_hook_called_when_message_yielded(self):
+        """on_data_yield is invoked when DataChannel yields a queued message."""
+        recorded = []
+        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+
+        class _Server(BaseServer):
+            def on_data_yield(self, peer, data):
+                recorded.append((peer, data))
+
+        server = _Server(port=50092)
+        context = MagicMock()
+        context.peer.return_value = "fake-peer"
+        context.invocation_metadata.return_value = []
+
+        def fake_queue_get(_self, timeout=1):
+            _ = timeout
+            server.global_exit_event.set()
+            return msg
+
+        class _DummyThread:  # pylint: disable=too-few-public-methods
+            def __init__(self, target, args=(), **_kwargs):
+                self.target = target
+                self.args = args
+
+            def start(self):
+                self.target(*self.args)
+
+        with patch("grpchook.baseserver.threading.Thread", _DummyThread), \
+             patch.object(BaseServer, "_handle_client_receive", lambda *_args, **_kwargs: None), \
+             patch.object(queue.Queue, "get", fake_queue_get):
+            generator = server.DataChannel(iter(()), context)
+            yielded = next(generator)
+
+        self.assertIs(yielded, msg)
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0][1], msg)
+        self.assertEqual(recorded[0][0].peer, "fake-peer")
 
 
 class TestPeerRepr(unittest.TestCase):

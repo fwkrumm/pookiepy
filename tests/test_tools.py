@@ -241,6 +241,12 @@ class TestGenerateMessage(unittest.TestCase):
         self.assertEqual(msg.payload.bytePayload, b"abc")
         self.assertEqual(struct_to_json(msg.payload.structPayload).get("x"), 1.0)
 
+    def test_set_metadata_flag_populates_message_metadata(self):
+        """add_metadata=True populates messageId and timestamp on generated messages."""
+        msg = generate_message(message_name="sensor_data", add_metadata=True)
+        self.assertEqual(msg.metaInfo.messageName, "sensor_data")
+        self.assertTrue(msg.metaInfo.messageId)
+        self.assertTrue(msg.metaInfo.HasField("timestamp"))
 
 if __name__ == "__main__":
     unittest.main()

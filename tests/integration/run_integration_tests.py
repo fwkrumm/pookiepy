@@ -150,9 +150,12 @@ def _terminate(proc: subprocess.Popen, name: str):
     try:
         proc.terminate()
         proc.wait(timeout=3)
+        time.sleep(0.25)
     except Exception:  # pylint: disable=broad-exception-caught
         try:
             proc.kill()
+            proc.wait(timeout=3)
+            time.sleep(0.25)
         except Exception:  # pylint: disable=broad-exception-caught
             pass
 
@@ -206,7 +209,7 @@ def run_example_pair(server_path: Path, client_path: Path):
             print(f"Server script not found: {server_path}, skipping example")
             return
 
-        srv_cmd = [sys.executable, str(server_path), "--port", str(port)]
+        srv_cmd = [sys.executable, str(server_path), "--ip", "127.0.0.1", "--port", str(port)]
         print(f"Starting server: {srv_cmd}")
         srv = subprocess.Popen(  # pylint: disable=consider-using-with
             srv_cmd,
@@ -224,7 +227,7 @@ def run_example_pair(server_path: Path, client_path: Path):
         _terminate(srv, "server")
         return
 
-    cli_cmd = [sys.executable, str(client_path), "--port", str(port)]
+    cli_cmd = [sys.executable, str(client_path), "--ip", "127.0.0.1", "--port", str(port)]
     print(f"Starting client: {cli_cmd}")
     cli = subprocess.Popen(  # pylint: disable=consider-using-with
         cli_cmd,

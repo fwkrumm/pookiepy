@@ -4,6 +4,8 @@ Autonomous LLM agent demo. An LLM (via LM Studio) drives file operations and
 code execution entirely through gRPC --- it never touches the filesystem directly.
 The agent's task is to generate and launch a Flask "aero glass" dashboard app.
 
+Note that the results may differ based on model and chosen parameters.
+
 ---
 
 ## Architecture

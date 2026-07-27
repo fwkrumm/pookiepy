@@ -197,7 +197,7 @@ class RunnerClient(BaseClient):
             metaInfo=message_pb2.MetaInformation(messageName=RUN_RESPONSE),
             payload=message_pb2.Payload(structPayload=json_to_struct(result)),
         )
-        response.metaInfo.messageId = data.metaInfo.messageId
+        response.metaInfo.responseToId = data.metaInfo.messageId
         self.send_data(response)
 
         status = "OK" if result["ok"] else "FAIL"

@@ -3,6 +3,8 @@
 Bidirectional streaming chat demo using **LM Studio** as the LLM backend.
 A proxy client forwards user prompts to LM Studio and streams the response back token-by-token.
 
+Note that the results may differ based on model and chosen parameters.
+
 ## Architecture
 
 ```

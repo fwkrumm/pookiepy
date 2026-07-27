@@ -229,6 +229,15 @@ server.shutdown()
 For real workloads, subclass `BaseServer` to control routing and `BaseClient` to react to messages
 via the `on_receive` hook.
 
+Design note (important): request/response in grpchook is intentionally minimalistic.
+There is no dedicated `request()` helper in the core API by default; correlation is done via
+`messageId` and `responseToId` in normal hook/polling flow. This keeps the framework lean,
+transparent, and robust for mixed traffic patterns.
+
+Need full reference flow?
+- `tests/integration/request_response/server_request_response.py`
+- `tests/integration/request_response/clients_request_response.py`
+
 **`server.py`**
 
 ```python
@@ -425,4 +434,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/mast
 | 0.0.7                      | Fix race condition which allowed clients to put data before welcome message. |
 | 0.0.8                      | Fix link in readme for pypi page. |
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
-
+| 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |

@@ -214,6 +214,27 @@ class TestHooks(unittest.TestCase):
         client.disconnect()
         self.assertTrue(shutdown_called.is_set())
 
+    def test_on_data_yield_hook_called_when_message_yielded(self):
+        """on_data_yield is invoked when the request generator yields a message."""
+        yielded_messages = []
+
+        class _Client(BaseClient):
+            def on_data_yield(self, data):
+                yielded_messages.append(data)
+
+        with patch.object(BaseClient, "run", lambda self: None):
+            client = _Client(name="yield-hook-test", port=50099, provides=["foo"])
+        client.channel = MagicMock()
+
+        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        client.send_data(msg)
+
+        generator = client._request_generator()  # pylint: disable=protected-access
+        yielded = next(generator)
+
+        self.assertIs(yielded, msg)
+        self.assertEqual(yielded_messages, [msg])
+
 
 # ---------------------------------------------------------------------------
 # ClientConfig

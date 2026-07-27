@@ -8,7 +8,7 @@ on:
 # Minimal token permissions.
 # id-token: write is required for PyPI Trusted Publishing (OIDC --- no stored secrets needed).
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
@@ -20,15 +20,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
 
@@ -48,4 +48,10 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           # repository-url: https://test.pypi.org/legacy/ # for testing
-          skip_existing: true
+          skip-existing: true
+
+      - name: Create and push release tag
+        if: success() && github.ref_name == 'master'
+        # if publish was successful -> create git tag on current
+        # commit and push it to the remote repository
+        run: bash .github/scripts/tag_release.sh

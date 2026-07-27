@@ -62,15 +62,18 @@ class ClientA(BaseClient):
         Args:
             data: Received protobuf message.
         """
-        if data.metaInfo.messageId == self.request_id:
+        if data.metaInfo.responseToId == self.request_id:
             self.logger.info(
                 "ClientA: matched response (messageId=%s)", self.request_id
             )
         else:
             self.logger.info(
-                "ClientA: data received but not response (messageId=%s)",
-                data.metaInfo.messageId,
+                "ClientA: data received but not response (messageId=%s), "\
+                "waiting for response to %s",
+                data.metaInfo.responseToId,
+                self.request_id,
             )
+        # the following list will be used for assertions in the main test flow
         self.received.append(data)
 
 
@@ -106,7 +109,7 @@ class ClientB(BaseClient):
             self.logger.info("ClientB: sent extra response %d", i)
 
         reply = generate_message(RESPONSE_MSG, byte_payload=b"response")
-        reply.metaInfo.messageId = req_id  # correlate with the request
+        reply.metaInfo.responseToId = req_id  # correlate with the request
         self.send_data(reply)
         self.logger.info("ClientB: sent matched response (messageId=%s)", req_id)
 
@@ -140,7 +143,11 @@ if __name__ == "__main__":
     assert len(client_a.received) == total_expected, (
         f"ClientA expected {total_expected} responses, got {len(client_a.received)}"
     )
-    matched = [m for m in client_a.received if m.metaInfo.messageId == request_id]
+
+    # check for response that matches the request_id from above; client_a should have received
+    # exactly one such response, the original request_id should be contained in the responseToId
+    # field of the matched response
+    matched = [m for m in client_a.received if m.metaInfo.responseToId == request_id]
     assert len(matched) == 1, (
         f"Expected exactly 1 matched response, got {len(matched)}"
     )
