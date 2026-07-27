@@ -41,8 +41,9 @@ message ClientProvides {
 }
 
 message ServerProvides {
-    string uuid = 1;  // server-generated session ID
-    string name = 2; // user-defined server id
+    string serverId = 1; // server id, equal for all sessions
+    string uuid = 2;  // server-generated session ID
+    string name = 3; // user-defined server id
 }
 
 

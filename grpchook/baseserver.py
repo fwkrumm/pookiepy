@@ -113,6 +113,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self._config = config or ServerConfig()
         self._port = port
         self._ip = ip
+        self._uid = str(uuid.uuid4())
 
         self._connected_clients = 0
         self._connected_clients_lock = threading.Lock()
@@ -123,7 +124,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
 
     def __repr__(self):
-        return f"BaseServer(name={self._name}, ip={self._ip}, port={self._port})"
+        return f"BaseServer(name={self._name}, id={self._uid}, ip={self._ip}, port={self._port})"
 
     def __str__(self):
         return self.__repr__()
@@ -218,6 +219,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                     welcome_message = message_pb2.Message(
                         metaInfo=message_pb2.MetaInformation(
                             serverInfo=message_pb2.ServerProvides(
+                                serverId=self._uid,
                                 uuid=peer.session_id,
                                 name=self._name,
                             )
@@ -359,7 +361,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             self.logger.iinfo("Using SSL credentials for server")
             server.add_secure_port(f"{self._ip}:{self._port}", self._ssl_credentials)
         server.start()
-        self.logger.iinfo("server started at port %d (schema=%s)", self._port, SCHEMA_VERSION)
+        self.logger.info("server %s started (schema=%s)", self, SCHEMA_VERSION)
         try:
             while not self._global_exit_event.is_set():
                 self._global_exit_event.wait(timeout=self._config.shutdown_poll_interval)

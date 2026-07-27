@@ -374,15 +374,13 @@ message Payload {
 
 ## ToDos and Roadmap
 
-### General
-- Consider separate id for answerToId to not having to overwrite the message id
-    -> add warning if it has been set manually?
-- Simplify answering a request because this might be a common use case; automatic tracking?
-- Clients should log their uid at startup
-- Server should log its name
+### This Branch
 - add on_data_sent hook to client and server?
 - rename config to __config?
 - also hide grpc variables; those are not to be accessed by modules which inherit the base modules
+
+### General
+- Add function for Respose mechanism? Basically its just setting the id manually, however maybe a send_answer/wait for answer would be desirable?
 
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.

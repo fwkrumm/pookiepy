@@ -121,7 +121,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self._setup_connection()
 
         # if connection fails exception will be raised before
-        self.logger.iinfo("Client %s connected (schema=%s)", self, SCHEMA_VERSION)
+        self.logger.info("Client %s connected (schema=%s)", self, SCHEMA_VERSION)
 
 
     def _setup_connection(self):
