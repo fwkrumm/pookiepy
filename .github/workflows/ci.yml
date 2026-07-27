@@ -11,6 +11,10 @@ on: [push, pull_request]
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     # if: false  # disabled --- tests already passing; re-enable when needed

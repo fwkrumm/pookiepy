@@ -1,12 +1,14 @@
-# HOW_TO.md --- Developer API Reference
+# HOW_TO.md - Developer API Reference (LLM-Optimized)
 
-This document is intended to be handed to an LLM for project generation and scaffolding. It captures the supported API surface, lifecycle hooks, and recommended patterns for building projects with grpchook.
+Purpose: hand to LLM for grpchook project generation/scaffolding. Contains supported API surface, lifecycle hooks, patterns.
 
 ## Core Concept
 
-All messages flow through one bidirectional gRPC stream per client. Clients declare `provides` (names of messages they send) and `requires` (names they want to receive). The server routes based on `messageName`; no separate RPCs needed.
+One bidirectional gRPC stream per client. Client declares:
+- `provides`: message names it sends
+- `requires`: message names it wants
 
----
+Server routes by `messageName` (no extra RPC methods needed).
 
 ## Imports
 
@@ -18,11 +20,9 @@ from grpchook.exceptions import GrpcEmpty, ClientExit, GrpcConnectionError
 import grpchook.message_pb2 as message_pb2
 ```
 
----
+## Server
 
-## Creating a Server
-
-Subclass `BaseServer`. Override only the hooks you need.
+Subclass `BaseServer`; override only needed hooks.
 
 ```python
 class MyServer(BaseServer):
@@ -30,52 +30,51 @@ class MyServer(BaseServer):
         super().__init__(port=port, name="MyServer")
 
     def on_init(self):
-        # called once after __init__; safe to set up state here
+        # once after __init__; safe place for state setup
         self.my_cache = {}
 
     def on_client_connect(self, request: message_pb2.Message, context) -> bool:
-        # called on first message from each client, before the client is registered
-        # request.metaInfo.clientInfo has: uuid, name, provides, requires
-        # return False to reject (triggers PERMISSION_DENIED abort)
+        # first message from each client, before registration
+        # request.metaInfo.clientInfo: uuid, name, provides, requires
+        # return False => reject (PERMISSION_DENIED abort)
         return True
 
     def on_client_accepted(self, peer: Peer, request: message_pb2.Message):
-        # called after a client has been accepted and fully registered
-        # peer fields are populated at this point
+        # after accept + full registration; peer fields now populated
         pass
 
     def on_client_disconnect(self, peer: Peer):
-        # called when a client stream is fully closed (after accepted clients only)
+        # when client stream fully closed (accepted clients only)
         pass
 
     def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
-        # called for every subsequent message from a client
-        # return True  → auto fan-out to all clients that require this messageName
-        # return False → drop; handle manually (e.g. unicast, cache, transform)
+        # subsequent client messages
+        # True  => auto fan-out to clients requiring this messageName
+        # False => drop/handle manually (unicast/cache/transform)
         name = request.metaInfo.messageName
         if name == "my_request":
             self._handle_request(peer, request)
-            return False  # we handle routing ourselves
-        return True       # let the framework fan-out
+            return False
+        return True
 
     def on_data_yield(self, peer: Peer, data: message_pb2.Message):
-        # called immediately before a server-side message is yielded to the client stream
-        # use for telemetry/metrics; this is not a delivery confirmation
+        # just before server-side yield to client stream
+        # telemetry/metrics hook; not delivery confirmation
         pass
 
     def _handle_request(self, peer: Peer, request: message_pb2.Message):
         response = generate_message("my_response", struct_payload={"result": 42})
-        # unicast back to requester only
+        # unicast to requester
         self._data_register.add_data_for_message_name(
             peer.client_id, "my_response", response, target_client_id=peer.client_id
         )
 
     def on_shutdown(self):
-        # called during shutdown; clean up resources
+        # shutdown cleanup
         pass
 ```
 
-### Start the server
+### Start
 
 ```python
 server = MyServer(port=50051)
@@ -88,16 +87,16 @@ server.serve_forever()   # blocks until KeyboardInterrupt or shutdown()
 server.shutdown()        # sets exit event; serve_forever() returns
 ```
 
-### Server-initiated push to all subscribers
+### Server push to all subscribers
 
 ```python
-# push to all clients that require "my_topic"
+# send to all clients requiring "my_topic"
 msg = generate_message("my_topic", struct_payload={"value": 1.0})
 self._data_register.add_data_for_message_name("", "my_topic", msg)
-# "" as clientId = no sender to skip → delivered to everyone who requires "my_topic"
+# "" clientId => no sender to skip; reaches all requiring "my_topic"
 ```
 
-### ServerConfig (optional)
+### `ServerConfig` (optional)
 
 ```python
 config = ServerConfig(
@@ -108,20 +107,18 @@ config = ServerConfig(
 BaseServer(port=50051, config=config)
 ```
 
-### Peer object fields
+### `Peer` fields
 
 | Field | Type | Value |
 |---|---|---|
 | `peer.client_id` | `str` | UUID generated per connection |
-| `peer.name` | `str` | Human-readable name sent by client |
+| `peer.name` | `str` | Human-readable name from client |
 | `peer.session_id` | `str` | Server-side session UUID |
 | `peer.peer` | `str` | Raw gRPC peer string (IP) |
 
----
+## Client
 
-## Creating a Client
-
-Subclass `BaseClient`. Set `provides` and `requires`.
+Subclass `BaseClient`; set `provides` and `requires`.
 
 ```python
 class MyClient(BaseClient):
@@ -129,43 +126,43 @@ class MyClient(BaseClient):
         super().__init__(
             name="my-client",
             port=port,
-            provides=["my_request"],      # message names this client will send
-            requires=["my_response"],     # message names this client wants to receive
+            provides=["my_request"],      # message names client sends
+            requires=["my_response"],     # message names client receives
         )
 
     def on_init(self):
-        # called after each connection (initial + reconnect)
+        # after each connection (initial + reconnect)
         pass
 
     def on_receive(self, data: message_pb2.Message) -> bool:
-        # called by spin() / spin_forever() for each received message
+        # called by spin()/spin_forever() per message
         name = data.metaInfo.messageName
         payload = struct_to_json(data.payload.structPayload)  # dict
         return True
 
     def on_data_yield(self, data: message_pb2.Message):
-        # called immediately before a client-side message is yielded to the gRPC stream
-        # useful for metrics/telemetry; not a server-ack or delivery confirmation
+        # just before client-side yield to gRPC stream
+        # telemetry/metrics hook; not server ack/delivery confirmation
         pass
 
     def on_shutdown(self):
-        # called during disconnect()
+        # during disconnect()
         pass
 ```
 
-### Connect and run
+### Connect/run
 
 ```python
 client = MyClient(port=50051)   # connects immediately in __init__
 
 # option A: hook-based (non-blocking send + blocking receive loop)
 client.send_data(generate_message("my_request"))
-client.spin_forever(timeout=5.0)   # calls on_receive() per message; returns on timeout or disconnect
+client.spin_forever(timeout=5.0)   # calls on_receive(); stops on timeout/disconnect
 
 # option B: manual polling
 client.send_data(generate_message("my_request"))
 try:
-    msg = client.get_data(timeout=5.0)   # blocks up to 5s
+    msg = client.get_data(timeout=5.0)   # block up to 5s
 except GrpcEmpty:
     pass   # timeout
 except ClientExit:
@@ -174,18 +171,18 @@ except ClientExit:
 # option C: context manager (auto-disconnect on exit; reconnects if reused)
 with MyClient(port=50051) as client:
     client.send_data(generate_message("my_request"))
-    client.wait_done()     # wait until message is yielded to gRPC
+    client.wait_done()     # waits until message yielded to gRPC
     msg = client.get_data(timeout=5.0)
 ```
 
-### ClientConfig (optional)
+### `ClientConfig` (optional)
 
 ```python
 config = ClientConfig(
     receive_queue_maxsize=0,        # 0 = unlimited
-    connection_check_timeout=5.0,   # seconds to wait for server welcome
-    ext_metadata=[],               # extra (key, value) gRPC call metadata tuples
-    compression=None,              # optional grpc.Compression.Gzip / Deflate
+    connection_check_timeout=5.0,   # seconds waiting for server welcome
+    ext_metadata=[],                # extra (key, value) gRPC call metadata tuples
+    compression=None,               # optional grpc.Compression.Gzip / Deflate
     grpc_options=[
         ("grpc.keepalive_time_ms", 180000),
         ("grpc.keepalive_timeout_ms", 10000),
@@ -195,7 +192,7 @@ config = ClientConfig(
 BaseClient(..., config=config)
 ```
 
-Example --- injecting an auth token without subclassing:
+Auth token injection without subclassing:
 
 ```python
 client = MyClient(port=50051, config=ClientConfig(
@@ -203,24 +200,22 @@ client = MyClient(port=50051, config=ClientConfig(
 ))
 ```
 
-### Client key methods
+### Key client methods
 
 | Method | Signature | Purpose |
 |---|---|---|
-| `send_data` | `(msg: Message, add_history=False)` | Enqueue message for sending. `messageName` must be in `provides`. `add_history` appends first `DataPoint`. |
+| `send_data` | `(msg: Message, add_history=False)` | Enqueue send. `messageName` must be in `provides`; `add_history` appends first `DataPoint`. |
 | `get_data` | `(timeout=None) → Message` | Poll receive queue. `None`=wait forever, `0`=non-blocking. |
-| `wait_done` | `(additional_sleep=0.5)` | Block until all enqueued sends have been yielded to gRPC. |
-| `spin` | `(timeout=None) → bool` | One `get_data` → `on_receive`. Returns `False` on timeout/disconnect. |
+| `wait_done` | `(additional_sleep=0.5)` | Block until all queued sends yielded to gRPC. |
+| `spin` | `(timeout=None) → bool` | One `get_data` then `on_receive`; `False` on timeout/disconnect. |
 | `spin_forever` | `(timeout=None)` | Loop `spin` until `False`. |
-| `disconnect` | `()` | Stop all threads, close channel. |
+| `disconnect` | `()` | Stop threads, close channel. |
 
----
-
-## Supported Features LLMs Should Know About
+## Features LLM Should Know
 
 ### Compression
 
-Both server and client support optional gRPC compression. Enable it on both sides for symmetric behavior:
+Server/client support optional gRPC compression; enable both sides for symmetric behavior.
 
 ```python
 from grpc import Compression
@@ -236,9 +231,9 @@ client = MyClient(
 )
 ```
 
-### History and latency tracing
+### History + latency tracing
 
-Messages can carry a per-hop `history` field. Use `add_history=True` when sending a message so the framework appends the first hop entry automatically. Later, use `evaluate_history(data, log_callback)` to compute per-hop latency.
+Messages may carry per-hop `history`. Use `add_history=True` on send to append first hop automatically. Use `evaluate_history(data, log_callback)` later for per-hop latency.
 
 ```python
 from grpchook.tools import evaluate_history
@@ -246,13 +241,13 @@ from grpchook.tools import evaluate_history
 msg = generate_message("my_topic", struct_payload={"x": 1})
 client.send_data(msg, add_history=True)
 
-# later, when a reply arrives:
+# later, when reply arrives:
 evaluate_history(reply, lambda point: print(point))
 ```
 
 ### Timers
 
-Use `timedevent` for drift-compensated periodic scheduling:
+`timedevent` provides drift-compensated periodic scheduling.
 
 ```python
 from grpchook.timer import timedevent
@@ -264,37 +259,34 @@ with timedevent(s=0.01, n=100) as te:
 
 ### Schema compatibility
 
-The framework automatically attaches schema-version metadata to each stream call. The server rejects a client with a different schema version using `FAILED_PRECONDITION`.
+Framework auto-attaches schema-version metadata on each stream call. Server rejects schema mismatch with `FAILED_PRECONDITION`.
 
 ### Logging
 
-Prefer `self.logger` on server/client subclasses. The built-in logger supports console + file rotation and custom levels (`INTERNAL_INFO`, `INTERNAL_DEBUG`).
-
----
+Prefer `self.logger` in `BaseServer`/`BaseClient` subclasses. Built-in logger supports console + rotating file logs and custom levels: `INTERNAL_INFO`, `INTERNAL_DEBUG`.
 
 ## Custom Interface (Runtime Proto)
 
-Use a custom `.proto` instead of the bundled one --- without modifying `grpchook/`.
-The proto must define the same message/service structure (`Message`, `ClientProvides`, `ServerProvides`, `StreamStub`, `StreamServicer`).
+Use custom `.proto` instead of bundled one without editing `grpchook/`. Proto must keep same message/service structure: `Message`, `ClientProvides`, `ServerProvides`, `StreamStub`, `StreamServicer`.
 
-### Compile and register at startup
+### Compile/register at startup
 
 ```python
 from grpchook.custom_interface import compile_and_register
 
-# Compiles my_proto/message.proto, registers as grpchook.message_pb2 / grpchook.message_pb2_grpc
+# compile my_proto/message.proto; register as grpchook.message_pb2 / grpchook.message_pb2_grpc
 pb2, pb2_grpc = compile_and_register(
     proto_path="my_proto/message.proto",
-    package="grpchook",        # replaces the built-in modules under this package name
-    out_dir="my_proto/",       # optional; temp dir used if omitted
+    package="grpchook",        # replaces built-in modules under this package name
+    out_dir="my_proto/",       # optional; temp dir if omitted
 )
 ```
 
-Call this **before** importing `BaseServer` / `BaseClient`. Once registered, all grpchook internals pick up the custom modules automatically.
+Call before importing `BaseServer`/`BaseClient`. After registration, grpchook internals automatically use custom modules.
 
-### Typical project layout
+### Typical layout
 
-```
+```text
 my_project/
     my_proto/
         message.proto       # custom proto (same service structure)
@@ -319,7 +311,7 @@ compile_and_register(
 `server.py` / `client.py`:
 
 ```python
-import _proto_setup  # must be first --- registers custom proto before grpchook imports
+import _proto_setup  # must be first; registers custom proto before grpchook imports
 from grpchook.baseserver import BaseServer
 ```
 
@@ -327,45 +319,43 @@ from grpchook.baseserver import BaseServer
 
 | Function | Purpose |
 |---|---|
-| `compile_proto(proto_path, out_dir=None) → Path` | Run `grpc_tools.protoc`; return output dir |
-| `load_pb_modules_from_dir(dir_path, package, register=True) → (pb2, pb2_grpc)` | Load generated `message_pb2.py` + `message_pb2_grpc.py` from dir |
-| `validate_interface(pb2, pb2_grpc)` | Assert required symbols present; raise `RuntimeError` if not |
-| `resolve_modules(message_module, grpc_module, module_path, package)` | Multi-mode resolver: accepts module objects, import strings, or dir path; falls back to bundled |
-
----
+| `compile_proto(proto_path, out_dir=None) → Path` | Run `grpc_tools.protoc`; return output dir. |
+| `load_pb_modules_from_dir(dir_path, package, register=True) → (pb2, pb2_grpc)` | Load generated `message_pb2.py` + `message_pb2_grpc.py` from directory. |
+| `validate_interface(pb2, pb2_grpc)` | Assert required symbols exist; raise `RuntimeError` otherwise. |
+| `resolve_modules(message_module, grpc_module, module_path, package)` | Multi-mode resolver: accepts module objects, import strings, or directory path; falls back to bundled modules. |
 
 ## Messages
 
-### Create a message
+### Create
 
 ```python
 from grpchook.tools import generate_message
 
-# with dict payload (JSON-like)
+# dict payload (JSON-like)
 msg = generate_message("my_topic", struct_payload={"key": "value", "num": 1})
 
-# with bytes payload
+# bytes payload
 msg = generate_message("my_topic", byte_payload=b"\x00\x01\x02")
 
-# empty (e.g. signal/event)
+# empty payload (signal/event)
 msg = generate_message("server-exit")
 ```
 
-### Read a received message
+### Read received message
 
 ```python
 name   = data.metaInfo.messageName
-msg_id = data.metaInfo.messageId           # UUID hex string (set automatically)
+msg_id = data.metaInfo.messageId           # UUID hex string (auto-set)
 resp_to = data.metaInfo.responseToId       # request id this message answers, if any
 
-# struct payload → dict
+# struct payload -> dict
 payload = struct_to_json(data.payload.structPayload)
 
 # bytes payload
 raw = data.payload.bytePayload             # bytes
 ```
 
-### Respond to a request correctly
+### Correct request response
 
 ```python
 reply = generate_message("my_response", struct_payload={"ok": True})
@@ -374,13 +364,12 @@ self.send_data(reply)
 ```
 
 Rules:
+- Keep `reply.metaInfo.messageId` as new message id.
+- Copy original request id into `reply.metaInfo.responseToId`.
+- Do not overwrite `messageId` with request id.
+- For streaming replies, every chunk uses same `responseToId`.
 
-- Keep reply.metaInfo.messageId as new message id.
-- Put original request id into reply.metaInfo.responseToId.
-- Do not overwrite messageId with the request id.
-- For streaming replies, send every chunk with the same responseToId.
-
-### Match a response on the request side
+### Match response on requester side
 
 ```python
 request = generate_message("my_request", struct_payload={"text": "hello"}, add_metadata=True)
@@ -395,36 +384,29 @@ while True:
 ```
 
 Rules:
-
-- Compare reply.metaInfo.responseToId against the original request id.
-- Do not compare reply.metaInfo.messageId for correlation.
-
----
+- Compare `reply.metaInfo.responseToId` with original request id.
+- Do not correlate via `reply.metaInfo.messageId`.
 
 ## Routing Rules
 
 | Scenario | How |
 |---|---|
 | Fan-out to all subscribers | `on_receive()` returns `True` |
-| Drop / handle manually | `on_receive()` returns `False` |
+| Drop / manual handling | `on_receive()` returns `False` |
 | Unicast to one client | `self._data_register.add_data_for_message_name(sender_id, name, msg, target_client_id=target_id)` |
-| Server-push (no sender) | `self._data_register.add_data_for_message_name("", name, msg)` |
+| Server push (no sender) | `self._data_register.add_data_for_message_name("", name, msg)` |
 
-Data is only delivered to clients that have `messageName` in their `requires` list. If no client requires the name, the message is silently dropped.
-
----
+Delivery only to clients whose `requires` contains `messageName`. If none require it, message is silently dropped.
 
 ## Exceptions
 
 | Exception | When |
 |---|---|
-| `GrpcEmpty` | `get_data(timeout)` expired with no message |
-| `ClientExit` | `get_data()` interrupted because client disconnected |
-| `GrpcConnectionError` | Connection failed or `wait_done()` called while disconnected |
-| `GrpcTimeoutError` | RPC `DEADLINE_EXCEEDED` |
-| `GrpcValueError` | `messageName` not in `provides`, or wrong type passed to `send_data` |
-
----
+| `GrpcEmpty` | `get_data(timeout)` expired without message. |
+| `ClientExit` | `get_data()` interrupted because client disconnected. |
+| `GrpcConnectionError` | Connection failed, or `wait_done()` called while disconnected. |
+| `GrpcTimeoutError` | RPC `DEADLINE_EXCEEDED`. |
+| `GrpcValueError` | `messageName` not in `provides`, or wrong type passed to `send_data`. |
 
 ## SSL / TLS (optional)
 
@@ -438,8 +420,6 @@ creds = grpc.ssl_channel_credentials(root_certificates=ca_cert_bytes)
 BaseClient(..., config=ClientConfig(ssl_credentials=creds))
 ```
 
----
-
 ## Reconnect Pattern
 
 ```python
@@ -447,18 +427,16 @@ client = MyClient(port=50051)
 
 with client:
     client.send_data(...)
-# client is disconnected here
+# client disconnected here
 
 # reconnect by re-entering context manager
 with client:
     client.send_data(...)   # fresh connection, new UUID
 ```
 
----
-
 ## Logging
 
-If your class inherits from `BaseServer` or `BaseClient`, prefer the built-in instance logger:
+If class inherits from `BaseServer`/`BaseClient`, prefer built-in instance logger:
 
 ```python
 class MyServer(BaseServer):
@@ -467,12 +445,14 @@ class MyServer(BaseServer):
         return True
 ```
 
-Use `get_logger(...)` mainly in static methods or helper modules where `self` is not available:
+Use `get_logger(...)` mainly in static methods/helper modules where `self` is unavailable:
 
 ```python
 from grpchook.logger import get_logger
 logger = get_logger(name="MyComponent")   # returns GrpcLogger
-logger.setLevel("DEBUG")   # syncs console + file handler; use "INFO" by default
+logger.setLevel("DEBUG")                   # syncs console + file handler; keep "INFO" default
 ```
 
-Default console level: `INFO`. File logs by default at `INTERNAL_DEBUG` (level 5) written to `%TEMP%/grpcLogs/<name>_YYYYMMDD.log`.
+Defaults:
+- Console level: `INFO`.
+- File logs: `INTERNAL_DEBUG` (level 5), path `%TEMP%/grpcLogs/<name>_YYYYMMDD.log`.

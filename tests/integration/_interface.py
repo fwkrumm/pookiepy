@@ -13,7 +13,7 @@ Usage
 import argparse
 
 DEFAULT_PORT = 49999
-DEFAULT_IP = "localhost"
+DEFAULT_IP = "127.0.0.1"
 DEFAULT_TIMEOUT = 5.0
 
 
