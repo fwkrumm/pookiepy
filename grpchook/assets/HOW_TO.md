@@ -1,5 +1,7 @@
 # HOW_TO.md --- Developer API Reference
 
+This document is intended to be handed to an LLM for project generation and scaffolding. It captures the supported API surface, lifecycle hooks, and recommended patterns for building projects with grpchook.
+
 ## Core Concept
 
 All messages flow through one bidirectional gRPC stream per client. Clients declare `provides` (names of messages they send) and `requires` (names they want to receive). The server routes based on `messageName`; no separate RPCs needed.
@@ -55,6 +57,11 @@ class MyServer(BaseServer):
             self._handle_request(peer, request)
             return False  # we handle routing ourselves
         return True       # let the framework fan-out
+
+    def on_data_yield(self, peer: Peer, data: message_pb2.Message):
+        # called immediately before a server-side message is yielded to the client stream
+        # use for telemetry/metrics; this is not a delivery confirmation
+        pass
 
     def _handle_request(self, peer: Peer, request: message_pb2.Message):
         response = generate_message("my_response", struct_payload={"result": 42})
@@ -136,6 +143,11 @@ class MyClient(BaseClient):
         payload = struct_to_json(data.payload.structPayload)  # dict
         return True
 
+    def on_data_yield(self, data: message_pb2.Message):
+        # called immediately before a client-side message is yielded to the gRPC stream
+        # useful for metrics/telemetry; not a server-ack or delivery confirmation
+        pass
+
     def on_shutdown(self):
         # called during disconnect()
         pass
@@ -173,6 +185,12 @@ config = ClientConfig(
     receive_queue_maxsize=0,        # 0 = unlimited
     connection_check_timeout=5.0,   # seconds to wait for server welcome
     ext_metadata=[],               # extra (key, value) gRPC call metadata tuples
+    compression=None,              # optional grpc.Compression.Gzip / Deflate
+    grpc_options=[
+        ("grpc.keepalive_time_ms", 180000),
+        ("grpc.keepalive_timeout_ms", 10000),
+        ("grpc.keepalive_without_calls", True),
+    ],
 )
 BaseClient(..., config=config)
 ```
@@ -195,6 +213,62 @@ client = MyClient(port=50051, config=ClientConfig(
 | `spin` | `(timeout=None) → bool` | One `get_data` → `on_receive`. Returns `False` on timeout/disconnect. |
 | `spin_forever` | `(timeout=None)` | Loop `spin` until `False`. |
 | `disconnect` | `()` | Stop all threads, close channel. |
+
+---
+
+## Supported Features LLMs Should Know About
+
+### Compression
+
+Both server and client support optional gRPC compression. Enable it on both sides for symmetric behavior:
+
+```python
+from grpc import Compression
+
+server = BaseServer(
+    port=50051,
+    config=ServerConfig(compression=Compression.Gzip),
+)
+
+client = MyClient(
+    port=50051,
+    config=ClientConfig(compression=Compression.Gzip),
+)
+```
+
+### History and latency tracing
+
+Messages can carry a per-hop `history` field. Use `add_history=True` when sending a message so the framework appends the first hop entry automatically. Later, use `evaluate_history(data, log_callback)` to compute per-hop latency.
+
+```python
+from grpchook.tools import evaluate_history
+
+msg = generate_message("my_topic", struct_payload={"x": 1})
+client.send_data(msg, add_history=True)
+
+# later, when a reply arrives:
+evaluate_history(reply, lambda point: print(point))
+```
+
+### Timers
+
+Use `timedevent` for drift-compensated periodic scheduling:
+
+```python
+from grpchook.timer import timedevent
+
+with timedevent(s=0.01, n=100) as te:
+    for tick in te:
+        ...
+```
+
+### Schema compatibility
+
+The framework automatically attaches schema-version metadata to each stream call. The server rejects a client with a different schema version using `FAILED_PRECONDITION`.
+
+### Logging
+
+Prefer `self.logger` on server/client subclasses. The built-in logger supports console + file rotation and custom levels (`INTERNAL_INFO`, `INTERNAL_DEBUG`).
 
 ---
 
