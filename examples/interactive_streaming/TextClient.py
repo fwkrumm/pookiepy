@@ -72,7 +72,7 @@ class TextClient(BaseClient):
                         print("\nClient stopped:", e)
                         return
 
-                    if resp.metaInfo.messageId != msg_id:
+                    if resp.metaInfo.responseToId != msg_id:
                         # not for this request; ignore
                         continue
 

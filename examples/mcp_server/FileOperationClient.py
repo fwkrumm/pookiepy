@@ -183,7 +183,7 @@ class FileOperationClient(BaseClient):
             self.logger.warning("op=%s  rel='%s'  -> FAIL: %s", operation, path, error)
 
         response = self._make_response(ok, operation, path, error)
-        response.metaInfo.messageId = data.metaInfo.messageId
+        response.metaInfo.responseToId = data.metaInfo.messageId
         self.send_data(response)
         return True
 

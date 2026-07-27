@@ -44,7 +44,7 @@ class LMProxyClient(BaseClient):
                 structPayload=json_to_struct({"chunk": text, "done": done})
             ),
         )
-        msg.metaInfo.messageId = request.metaInfo.messageId
+        msg.metaInfo.responseToId = request.metaInfo.messageId
         self.send_data(msg)
 
     def _handle_request(self, request: message_pb2.Message):
