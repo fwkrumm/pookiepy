@@ -104,8 +104,10 @@ EXAMPLES = [
     },
     {
         "name": "multi_client_request_response",
-        "server": ROOT / "multi_client_request_response" / "server_multi_client_request_response.py",
-        "client": ROOT / "multi_client_request_response" / "clients_multi_client_request_response.py",
+        "server": ROOT / "multi_client_request_response" / \
+            "server_multi_client_request_response.py",
+        "client": ROOT / "multi_client_request_response" / \
+            "clients_multi_client_request_response.py",
     },
     {
         "name": "compression",
