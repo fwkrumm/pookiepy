@@ -23,4 +23,4 @@ tonic-build = "0.10"
 
 [[bin]]
 name = "grpchook-server"
-path = "src/server_main.rs"
+path = ".rust/server_main.rs"
