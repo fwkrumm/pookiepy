@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package grpchook;
+
+option go_package = "grpchook-server/proto";
+option java_multiple_files = true;
+option java_package = "com.grpchook.proto";
+option ruby_package = "Grpchook::Proto";
+
+// Service definition for the grpchook messaging server
+service GrpchookService {
+    // Handle bidirectional streaming connection with schema validation
+    rpc HandleStream(stream Message) returns (stream Message);
+    
+    // Subscribe client to receive messages of specific type
+    rpc Subscribe(SubscribeRequest) returns (SubscribeResponse);
+    
+    // Broadcast message to all subscribers (skip sender)
+    rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+    
+    // Send unicast message to specific client
+    rpc SendUnicast(UnicastRequest) returns (UnicastResponse);
+    
+    // Get server status and health information
+    rpc GetStatus(StatusRequest) returns (StatusResponse);
+    
+    // Disconnect client and cleanup subscriptions
+    rpc Disconnect(DisconnectRequest) returns (DisconnectResponse);
+}
+
+// Message type for bidirectional streaming
+message Message {
+    string message_name = 1;
+    string sender_id = 2;
+    bytes payload = 3;
+}
+
+// Subscribe to receive messages of specific type
+message SubscribeRequest {
+    string message_name = 1;
+    string client_id = 2; // Optional - if empty, server assigns one
+}
+
+message SubscribeResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Broadcast message to all subscribers (skips sender)
+message SendMessageRequest {
+    string message_name = 1;
+    bytes payload = 2;
+}
+
+message SendMessageResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Send unicast message to specific client
+message UnicastRequest {
+    string target_client_id = 1;
+    bytes payload = 2;
+}
+
+message UnicastResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Status request/response for health checks
+message StatusRequest {}
+
+message StatusResponse {
+    int32 connected_clients = 1;
+    int32 max_workers = 2;
+    string schema_version = 3;
+}
+
+// Disconnect client and cleanup subscriptions
+message DisconnectRequest {
+    string client_id = 1; // Optional - if empty, server uses current connection context
+}
+
+message DisconnectResponse {
+    bool success = 1;
+    string message = 2;
+}
