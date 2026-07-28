@@ -73,7 +73,7 @@ pub struct BaseServer {
     /// Counter for connected clients (protected by a mutex).
     connected_clients: Arc<Mutex<usize>>,
     /// Data register for routing messages to clients.
-    data_register: Arc<RwLock<DashMap<String, Vec<crate::server::threading::NotificationQueue>>>>,
+    data_register: Arc<RwLock<DashMap<String, Vec<(String, crate::server::threading::NotificationQueue)>>>>,
 }
 
 impl BaseServer {
@@ -156,6 +156,13 @@ impl BaseServer {
         let server_uid = self.uid.clone();
         let server_name = self.name.clone();
 
+        // Increment the connected clients counter.
+        {
+            let mut clients = connected_clients.lock().await;
+            *clients += 1;
+            debug!("{}: connected. Connected clients: {}", peer, *clients);
+        }
+
         tokio::spawn(async move {
             // Process messages from the client in a loop.
             let mut notification_queue = tx; // The sender side of the channel to send messages back to the client.
@@ -232,7 +239,7 @@ impl BaseServer {
                                 if let Some(data_register) = data_register.clone().try_write() {
                                     data_register.entry(require.clone())
                                         .or_insert_with(Vec::new)
-                                        .push(notification_queue.clone());
+                                        .push((peer.client_id.clone().unwrap(), notification_queue.clone()));
                                 } else {
                                     error!("{}: Failed to acquire write lock on data register", peer);
                                     break;
@@ -262,8 +269,8 @@ impl BaseServer {
                                 if let Some(data_register) = data_register.clone().try_read() {
                                     if let Some(notification_queues) = data_register.get(&message_name) {
                                         // Iterate through all queues registered for this message type.
-                                        for queue in notification_queues.iter() {
-                                            debug!("{}: routing message {} to client", peer, message_name);
+                                        for (client_id, queue) in notification_queues.iter() {
+                                            debug!("{}: routing message {} to client {}", peer, message_name, client_id);
                                             // Attempt to send the message. If the receiver is gone (e.g., client disconnected), we ignore the error.
                                             let _ = queue.send(request.clone()).await;
                                         }
@@ -300,11 +307,8 @@ impl BaseServer {
             if let Some(data_register) = data_register.clone().try_write() {
                 for (message_name, queues) in data_register.iter_mut() {
                     // FIX: Properly identify and remove only the queue belonging to this specific peer.
-                    queues.retain(|queue| {
-                        // A proper solution would involve storing a unique identifier for each client's queue.
-                        // For now, we must avoid removing all entries.
-                        // This is a placeholder for a more robust identification mechanism.
-                        false
+                    queues.retain(|(client_id, _queue)| {
+                        client_id != &peer.client_id.clone().unwrap_or_default()
                     });
                 }
             } else {
