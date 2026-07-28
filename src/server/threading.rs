@@ -8,7 +8,7 @@ use dashmap::DashMap;
 
 /// A channel for sending notifications to a specific client.
 /// Using a bounded sender to match the Python `queue.Queue` behavior with `max_queue_elements`.
-pub type NotificationQueue = mpsc::Sender<super::core::Message>;
+pub type NotificationQueue = mpsc::Sender<crate::server::grpc::Message>;
 
 // The following would be used in the Python version's `DataRegister` class.
 // In Rust, we use `DashMap` for thread-safe access to the data register.

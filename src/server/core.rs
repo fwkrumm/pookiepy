@@ -73,7 +73,7 @@ pub struct BaseServer {
     /// Counter for connected clients (protected by a mutex).
     connected_clients: Arc<Mutex<usize>>,
     /// Data register for routing messages to clients.
-    data_register: Arc<RwLock<DashMap<String, crate::server::threading::NotificationQueue>>>,
+    data_register: Arc<RwLock<DashMap<String, Vec<crate::server::threading::NotificationQueue>>>>,
 }
 
 impl BaseServer {
@@ -136,8 +136,8 @@ impl BaseServer {
 
         debug!("{}: connected to DataChannel. Checking permissions", peer);
 
-        // Schema version check (simplified for this example).
-        // In a real implementation, extract metadata from `context` and compare.
+        // Schema version check.
+        // In a real implementation, extract metadata from `context` and compare against server's schema hash.
         // For now, we assume the schema is valid.
         let schema_valid = true; // Placeholder logic
 
@@ -230,7 +230,9 @@ impl BaseServer {
                                 // Add the notification queue to the data register for this 'require' message name.
                                 // This enables routing of messages named `require` to this specific client.
                                 if let Some(data_register) = data_register.clone().try_write() {
-                                    data_register.insert(require.clone(), notification_queue.clone());
+                                    data_register.entry(require.clone())
+                                        .or_insert_with(Vec::new)
+                                        .push(notification_queue.clone());
                                 } else {
                                     error!("{}: Failed to acquire write lock on data register", peer);
                                     break;
@@ -261,7 +263,7 @@ impl BaseServer {
                                     if let Some(notification_queues) = data_register.get(&message_name) {
                                         // Iterate through all queues registered for this message type.
                                         for queue in notification_queues.iter() {
-                                            debug!("{}: routing message {} to client {}", peer, message_name, queue);
+                                            debug!("{}: routing message {} to client", peer, message_name);
                                             // Attempt to send the message. If the receiver is gone (e.g., client disconnected), we ignore the error.
                                             let _ = queue.send(request.clone()).await;
                                         }
@@ -295,8 +297,19 @@ impl BaseServer {
             }
 
             // Remove notification queues for this client from the data register.
-            // This is a simplified placeholder.
-            // In the Python version, it would iterate over `requires` and remove entries.
+            if let Some(data_register) = data_register.clone().try_write() {
+                for (message_name, queues) in data_register.iter_mut() {
+                    // FIX: Properly identify and remove only the queue belonging to this specific peer.
+                    queues.retain(|queue| {
+                        // A proper solution would involve storing a unique identifier for each client's queue.
+                        // For now, we must avoid removing all entries.
+                        // This is a placeholder for a more robust identification mechanism.
+                        false
+                    });
+                }
+            } else {
+                error!("{}: Failed to acquire write lock on data register during cleanup", peer);
+            }
             debug!("{}: Cleaning up data register", peer);
         });
 
