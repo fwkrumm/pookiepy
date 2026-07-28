@@ -103,9 +103,19 @@ EXAMPLES = [
         "client": ROOT / "request_response" / "clients_request_response.py",
     },
     {
+        "name": "multi_client_request_response",
+        "server": ROOT / "multi_client_request_response" / "server_multi_client_request_response.py",
+        "client": ROOT / "multi_client_request_response" / "clients_multi_client_request_response.py",
+    },
+    {
         "name": "compression",
         "server": ROOT / "compression" / "server_compression.py",
         "client": ROOT / "compression" / "clients_compression.py",
+    },
+    {
+        "name": "ssl_certificate_handling",
+        "server": ROOT / "ssl_certificate_handling" / "server_ssl_certificate_handling.py",
+        "client": ROOT / "ssl_certificate_handling" / "clients_ssl_certificate_handling.py",
     },
     {
         "name": "payload_limits_sweep",

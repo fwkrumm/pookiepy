@@ -1,0 +1,79 @@
+"""SSL certificate handling test --- server.
+
+Starts IntegrationServer with dummy self-signed certificate for test-only TLS.
+"""
+
+import grpc
+
+from tests.integration._interface import get_args
+from tests.integration._server_base import IntegrationServer
+
+# Public gRPC test certificate material. Test-only, not production-safe.
+DUMMY_CERT_PEM = b"""-----BEGIN CERTIFICATE-----
+MIIDtDCCApygAwIBAgIUbJfTREJ6k6/+oInWhV1O1j3ZT0IwDQYJKoZIhvcNAQEL
+BQAwVjELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDEPMA0GA1UEAwwGdGVzdGNhMB4XDTIw
+MDMxODAzMTA0MloXDTMwMDMxNjAzMTA0MlowZTELMAkGA1UEBhMCVVMxETAPBgNV
+BAgMCElsbGlub2lzMRAwDgYDVQQHDAdDaGljYWdvMRUwEwYDVQQKDAxFeGFtcGxl
+LCBDby4xGjAYBgNVBAMMESoudGVzdC5nb29nbGUuY29tMIIBIjANBgkqhkiG9w0B
+AQEFAAOCAQ8AMIIBCgKCAQEA5xOONxJJ8b8Qauvob5/7dPYZfIcd+uhAWL2ZlTPz
+Qvu4oF0QI4iYgP5iGgry9zEtCM+YQS8UhiAlPlqa6ANxgiBSEyMHH/xE8lo/+caY
+GeACqy640Jpl/JocFGo3xd1L8DCawjlaj6eu7T7T/tpAV2qq13b5710eNRbCAfFe
+8yALiGQemx0IYhlZXNbIGWLBNhBhvVjJh7UvOqpADk4xtl8o5j0xgMIRg6WJGK6c
+6ffSIg4eP1XmovNYZ9LLEJG68tF0Q/yIN43B4dt1oq4jzSdCbG4F1EiykT2TmwPV
+YDi8tml6DfOCDGnit8svnMEmBv/fcPd31GSbXjF8M+KGGQIDAQABo2swaTAJBgNV
+HRMEAjAAMAsGA1UdDwQEAwIF4DBPBgNVHREESDBGghAqLnRlc3QuZ29vZ2xlLmZy
+ghh3YXRlcnpvb2kudGVzdC5nb29nbGUuYmWCEioudGVzdC55b3V0dWJlLmNvbYcE
+wKgBAzANBgkqhkiG9w0BAQsFAAOCAQEAS8hDQA8PSgipgAml7Q3/djwQ644ghWQv
+C2Kb+r30RCY1EyKNhnQnIIh/OUbBZvh0M0iYsy6xqXgfDhCB93AA6j0i5cS8fkhH
+Jl4RK0tSkGQ3YNY4NzXwQP/vmUgfkw8VBAZ4Y4GKxppdATjffIW+srbAmdDruIRM
+wPeikgOoRrXf0LA1fi4TqxARzeRwenQpayNfGHTvVF9aJkl8HoaMunTAdG5pIVcr
+9GKi/gEMpXUJbbVv3U5frX1Wo4CFo+rZWJ/LyCMeb0jciNLxSdMwj/E/ZuExlyeZ
+gc9ctPjSMvgSyXEKv6Vwobleeg88V2ZgzenziORoWj4KszG/lbQZvg==
+-----END CERTIFICATE-----
+"""
+
+DUMMY_KEY_PEM = b"""-----BEGIN PRIVATE KEY-----
+MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDnE443EknxvxBq
+6+hvn/t09hl8hx366EBYvZmVM/NC+7igXRAjiJiA/mIaCvL3MS0Iz5hBLxSGICU+
+WproA3GCIFITIwcf/ETyWj/5xpgZ4AKrLrjQmmX8mhwUajfF3UvwMJrCOVqPp67t
+PtP+2kBXaqrXdvnvXR41FsIB8V7zIAuIZB6bHQhiGVlc1sgZYsE2EGG9WMmHtS86
+qkAOTjG2XyjmPTGAwhGDpYkYrpzp99IiDh4/Veai81hn0ssQkbry0XRD/Ig3jcHh
+23WiriPNJ0JsbgXUSLKRPZObA9VgOLy2aXoN84IMaeK3yy+cwSYG/99w93fUZJte
+MXwz4oYZAgMBAAECggEBAIVn2Ncai+4xbH0OLWckabwgyJ4IM9rDc0LIU368O1kU
+koais8qP9dujAWgfoh3sGh/YGgKn96VnsZjKHlyMgF+r4TaDJn3k2rlAOWcurGlj
+1qaVlsV4HiEzp7pxiDmHhWvp4672Bb6iBG+bsjCUOEk/n9o9KhZzIBluRhtxCmw5
+nw4Do7z00PTvN81260uPWSc04IrytvZUiAIx/5qxD72bij2xJ8t/I9GI8g4FtoVB
+8pB6S/hJX1PZhh9VlU6Yk+TOfOVnbebG4W5138LkB835eqk3Zz0qsbc2euoi8Hxi
+y1VGwQEmMQ63jXz4c6g+X55ifvUK9Jpn5E8pq+pMd7ECgYEA93lYq+Cr54K4ey5t
+sWMa+ye5RqxjzgXj2Kqr55jb54VWG7wp2iGbg8FMlkQwzTJwebzDyCSatguEZLuB
+gRGroRnsUOy9vBvhKPOch9bfKIl6qOgzMJB267fBVWx5ybnRbWN/I7RvMQf3k+9y
+biCIVnxDLEEYyx7z85/5qxsXg/MCgYEA7wmWKtCTn032Hy9P8OL49T0X6Z8FlkDC
+Rk42ygrc/MUbugq9RGUxcCxoImOG9JXUpEtUe31YDm2j+/nbvrjl6/bP2qWs0V7l
+dTJl6dABP51pCw8+l4cWgBBX08Lkeen812AAFNrjmDCjX6rHjWHLJcpS18fnRRkP
+V1d/AHWX7MMCgYEA6Gsw2guhp0Zf2GCcaNK5DlQab8OL4Hwrpttzo4kuTlwtqNKp
+Q9H4al9qfF4Cr1TFya98+EVYf8yFRM3NLNjZpe3gwYf2EerlJj7VLcahw0KKzoN1
+QBENfwgPLRk5sDkx9VhSmcfl/diLroZdpAwtv3vo4nEoxeuGFbKTGx3Qkf0CgYEA
+xyR+dcb05Ygm3w4klHQTowQ10s1H80iaUcZBgQuR1ghEtDbUPZHsoR5t1xCB02ys
+DgAwLv1bChIvxvH/L6KM8ovZ2LekBX4AviWxoBxJnfz/EVau98B0b1auRN6eSC83
+FRuGldlSOW1z/nSh8ViizSYE5H5HX1qkXEippvFRE88CgYB3Bfu3YQY60ITWIShv
+nNkdcbTT9eoP9suaRJjw92Ln+7ZpALYlQMKUZmJ/5uBmLs4RFwUTQruLOPL4yLTH
+awADWUzs3IRr1fwn9E+zM8JVyKCnUEM3w4N5UZskGO2klashAd30hWO+knRv/y0r
+uGIYs9Ek7YXlXIRVrzMwcsrt1w==
+-----END PRIVATE KEY-----
+"""
+
+
+class SslCertificateServer(IntegrationServer):
+    """Integration server using TLS credentials."""
+
+
+def build_server_credentials() -> grpc.ServerCredentials:
+    """Build gRPC server credentials from embedded dummy key/cert pair."""
+    return grpc.ssl_server_credentials([(DUMMY_KEY_PEM, DUMMY_CERT_PEM)])
+
+
+if __name__ == "__main__":
+    args = get_args("SSL certificate handling test")
+    s = SslCertificateServer(args.port, ip=args.ip, ssl_credentials=build_server_credentials())
+    s.serve_forever()
