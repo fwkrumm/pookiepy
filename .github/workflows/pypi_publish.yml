@@ -31,6 +31,7 @@ jobs:
         uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
+          cache-suffix: ${{ github.job }}
 
       - name: Install grpcio-tools for proto generation
         run: uv pip install --system --only-binary grpcio-tools grpcio-tools
