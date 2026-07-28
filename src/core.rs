@@ -4,10 +4,17 @@ use tokio::sync::{Mutex, RwLock};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, Code};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     pub id: String,
     pub tx: tokio::sync::mpsc::UnboundedSender<Message>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Message {
+    pub message_name: String,
+    pub sender_id: String,
+    pub payload: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -61,7 +68,7 @@ impl Core {
 
         let mut register = self.data_register.write().await;
         for (_msg_name, client_ids) in register.iter_mut() {
-            client_ids.retain(|id| id != client_id);
+            client.client_ids.retain(|id| id != client_id);
         }
 
         let mut count = self.connection_count.lock().await;
