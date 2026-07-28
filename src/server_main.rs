@@ -55,6 +55,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // This replaces the placeholder sleep-loop implementation
     let server_future = Server::builder()
         .add_service(tonic_reflect::server::Reflect::new())
+        .add_service(crate::grpc::GrpchookServiceServer::new(grpc_service))  // ✅ FIXED: Add actual gRPC service!
         .serve_with_shutdown(addr, shutdown_signal());
 
     tracing::info!("Tonic server started successfully");
