@@ -32,9 +32,10 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
+          cache-suffix: ${{ matrix.os }}-${{ matrix.python-version }}
 
       - name: Install dependencies (wider grpc range)
         run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements-weekly.txt coverage
@@ -63,9 +64,10 @@ jobs:
           python-version: "3.x"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
+          cache-suffix: ${{ github.job }}
 
       - name: Install dependencies (wider grpc range)
         run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements-weekly.txt
