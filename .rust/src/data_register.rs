@@ -139,3 +139,165 @@ impl DataRegister {
 
 /// Shared router type.
 pub type SharedDataRegister = Arc<DataRegister>;
+
+#[cfg(test)]
+mod tests {
+    use tokio::time::{timeout, Duration};
+
+    use super::{notification_channel, DataRegister};
+    use crate::pb::{Message, MetaInformation};
+
+    fn test_message(message_name: &str) -> Message {
+        Message {
+            meta_info: Some(MetaInformation {
+                message_name: message_name.to_owned(),
+                ..MetaInformation::default()
+            }),
+            ..Message::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn unbounded_notification_channel_transfers_message() {
+        let (tx, mut rx) = notification_channel(0);
+        let message = test_message("alpha");
+
+        tx.send(message.clone())
+            .await
+            .expect("send should succeed");
+
+        let received = timeout(Duration::from_millis(50), rx.recv())
+            .await
+            .expect("receive should not time out")
+            .expect("message should exist");
+
+        assert_eq!(received.meta_info, message.meta_info);
+    }
+
+    #[tokio::test]
+    async fn fanout_skips_sender_and_delivers_to_other_subscribers() {
+        let register = DataRegister::new();
+        let (sender_tx, mut sender_rx) = notification_channel(1);
+        let (receiver_tx, mut receiver_rx) = notification_channel(1);
+
+        register
+            .add_notification_queue_for_message_name(
+                "sender".to_owned(),
+                "alpha".to_owned(),
+                sender_tx,
+            )
+            .await;
+        register
+            .add_notification_queue_for_message_name(
+                "receiver".to_owned(),
+                "alpha".to_owned(),
+                receiver_tx,
+            )
+            .await;
+
+        register
+            .add_data_for_message_name("sender", "alpha", test_message("alpha"), None)
+            .await;
+
+        let received = timeout(Duration::from_millis(50), receiver_rx.recv())
+            .await
+            .expect("receiver should not time out")
+            .expect("receiver should get data");
+        assert_eq!(
+            received
+                .meta_info
+                .as_ref()
+                .expect("meta info should exist")
+                .message_name,
+            "alpha"
+        );
+
+        let sender_result = timeout(Duration::from_millis(20), sender_rx.recv()).await;
+        assert!(sender_result.is_err(), "sender should not receive its own data");
+    }
+
+    #[tokio::test]
+    async fn target_client_id_limits_delivery() {
+        let register = DataRegister::new();
+        let (first_tx, mut first_rx) = notification_channel(1);
+        let (second_tx, mut second_rx) = notification_channel(1);
+
+        register
+            .add_notification_queue_for_message_name(
+                "first".to_owned(),
+                "alpha".to_owned(),
+                first_tx,
+            )
+            .await;
+        register
+            .add_notification_queue_for_message_name(
+                "second".to_owned(),
+                "alpha".to_owned(),
+                second_tx,
+            )
+            .await;
+
+        register
+            .add_data_for_message_name(
+                "sender",
+                "alpha",
+                test_message("alpha"),
+                Some("second"),
+            )
+            .await;
+
+        let sender_result = timeout(Duration::from_millis(20), first_rx.recv()).await;
+        assert!(sender_result.is_err(), "non-target client should not receive data");
+
+        let received = timeout(Duration::from_millis(50), second_rx.recv())
+            .await
+            .expect("target should not time out")
+            .expect("target should get data");
+        assert_eq!(
+            received
+                .meta_info
+                .as_ref()
+                .expect("meta info should exist")
+                .message_name,
+            "alpha"
+        );
+    }
+
+    #[tokio::test]
+    async fn removing_client_unregisters_all_routes() {
+        let register = DataRegister::new();
+        let (tx, mut rx) = notification_channel(1);
+
+        register
+            .add_notification_queue_for_message_name(
+                "client-1".to_owned(),
+                "alpha".to_owned(),
+                tx.clone(),
+            )
+            .await;
+        register
+            .add_notification_queue_for_message_name(
+                "client-1".to_owned(),
+                "beta".to_owned(),
+                tx,
+            )
+            .await;
+
+        register
+            .remove_notification_queues_for_client("client-1")
+            .await;
+
+        register
+            .add_data_for_message_name("sender", "alpha", test_message("alpha"), None)
+            .await;
+        register
+            .add_data_for_message_name("sender", "beta", test_message("beta"), None)
+            .await;
+
+        let receive_result = timeout(Duration::from_millis(20), rx.recv()).await;
+        assert!(
+            receive_result.is_err(),
+            "removed client should not receive data on any route"
+        );
+    }
+}

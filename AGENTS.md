@@ -58,6 +58,8 @@ Schema check: reads `SCHEMA_VERSION_METADATA_KEY` from metadata → `FAILED_PREC
 
 **Other:** `serve_forever()`, `shutdown()`, `_add_static_data(name, msg)`, `_get_static_data(name)`
 
+Rust sync rule: any behavior change, hook change, handshake change, routing change, schema handling change, or shutdown change in `grpchook/baseserver.py` must be reviewed against `.rust/src/server.rs` and synced when applicable. Such changes must also add or update tests for affected Python and Rust behavior.
+
 ## BaseClient --- [grpchook/BaseClient.py](grpchook/BaseClient.py)
 
 ```python
