@@ -291,7 +291,7 @@ mod tests {
 
         let receive_result = timeout(Duration::from_millis(20), rx.recv()).await;
         assert!(
-            receive_result.is_err(),
+            matches!(receive_result, Err(_) | Ok(None)),
             "removed client should not receive data on any route"
         );
     }
