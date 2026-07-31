@@ -227,24 +227,21 @@ impl<H: ServerHooks> BaseServer<H> {
         Ok(())
     }
 
-    fn handle_schema(&self, metadata: &MetadataMap, peer: &Peer) -> Result<(), Status> {
-        let Some(client_schema_value) = metadata.get(SCHEMA_VERSION_METADATA_KEY) else {
-            return Ok(());
-        };
+    fn handle_schema(&self, metadata: &MetadataMap, peer: &Peer) -> Option<Status> {
+        let client_schema_value = metadata.get(SCHEMA_VERSION_METADATA_KEY)?;
 
         let Ok(client_schema) = client_schema_value.to_str() else {
-            return Ok(());
+            return None;
         };
 
         let server_schema = schema_version();
         if client_schema == server_schema {
-            return Ok(());
+            return None;
         }
 
         if self.config.strict_schema_version {
-            return Err(Status::failed_precondition(format!(
-                "Proto schema mismatch: server={}, client={}",
-                server_schema, client_schema
+            return Some(Status::failed_precondition(format!(
+                "Proto schema mismatch: server={server_schema}, client={client_schema}"
             )));
         }
 
@@ -252,7 +249,7 @@ impl<H: ServerHooks> BaseServer<H> {
             "{}: schema mismatch tolerated strict_schema_version=false server={} client={}",
             peer.peer, server_schema, client_schema
         );
-        Ok(())
+        None
     }
 
     fn spawn_outgoing_task(
@@ -358,7 +355,7 @@ impl<H: ServerHooks> Stream for BaseServer<H> {
                 .unwrap_or_else(|| "unknown".to_owned()),
         );
 
-        if let Err(status) = self.handle_schema(request.metadata(), &peer) {
+        if let Some(status) = self.handle_schema(request.metadata(), &peer) {
             self.connected_clients.fetch_sub(1, Ordering::SeqCst);
             return Err(status);
         }
@@ -548,7 +545,7 @@ mod tests {
 
         let err = server
             .handle_schema(&metadata, &peer)
-            .expect_err("strict mismatch should reject");
+            .expect("strict mismatch should reject");
 
         assert_eq!(err.code(), Code::FailedPrecondition);
         assert!(err.message().contains(schema_version()));
@@ -569,7 +566,7 @@ mod tests {
 
         let result = server.handle_schema(&metadata, &peer);
 
-        assert!(result.is_ok());
+        assert!(result.is_none());
     }
 
     #[test]

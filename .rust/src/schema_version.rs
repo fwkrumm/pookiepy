@@ -30,6 +30,6 @@ pub fn schema_version() -> &'static str {
         let mut hasher = Sha256::new();
         hasher.update(serialized);
         let digest = hasher.finalize();
-        format!("{:x}", digest)[0..16].to_owned()
+        format!("{digest:x}")[0..16].to_owned()
     })
 }
