@@ -492,3 +492,131 @@ fn now_perf_counter() -> f64 {
         .elapsed()
         .as_secs_f64()
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use tonic::Code;
+
+    use super::{
+        append_receive_history, now_timestamp, set_metadata, update_send_history, BaseServer,
+        DefaultHooks, Message, MetaInformation, Peer, ServerConfig,
+    };
+    use crate::pb::DataPoint;
+    use crate::schema_version::{schema_version, SCHEMA_VERSION_METADATA_KEY};
+
+    fn test_server(strict_schema_version: bool) -> BaseServer<DefaultHooks> {
+        BaseServer::new(
+            "127.0.0.1:50051",
+            "test-server",
+            DefaultHooks,
+            ServerConfig {
+                strict_schema_version,
+                shutdown_poll_interval: Duration::from_millis(1),
+                ..ServerConfig::default()
+            },
+        )
+        .expect("test server should build")
+    }
+
+    #[test]
+    fn shutdown_sets_global_exit_state() {
+        let server = test_server(false);
+        assert!(!server.is_shutdown());
+
+        server.shutdown();
+
+        assert!(server.is_shutdown());
+    }
+
+    #[test]
+    fn strict_schema_mismatch_is_rejected() {
+        let server = test_server(true);
+        let peer = Peer::new("127.0.0.1:12345".to_owned());
+        let mut metadata = tonic::metadata::MetadataMap::new();
+        metadata.insert(
+            SCHEMA_VERSION_METADATA_KEY,
+            "different-version".parse().expect("metadata value should parse"),
+        );
+
+        let err = server
+            .handle_schema(&metadata, &peer)
+            .expect_err("strict mismatch should reject");
+
+        assert_eq!(err.code(), Code::FailedPrecondition);
+        assert!(err.message().contains(schema_version()));
+        assert!(err.message().contains("different-version"));
+    }
+
+    #[test]
+    fn permissive_schema_mismatch_is_accepted() {
+        let server = test_server(false);
+        let peer = Peer::new("127.0.0.1:12345".to_owned());
+        let mut metadata = tonic::metadata::MetadataMap::new();
+        metadata.insert(
+            SCHEMA_VERSION_METADATA_KEY,
+            "different-version".parse().expect("metadata value should parse"),
+        );
+
+        let result = server.handle_schema(&metadata, &peer);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn set_metadata_populates_timestamp_and_message_id() {
+        let mut message = Message::default();
+
+        set_metadata(&mut message);
+
+        let meta = message.meta_info.expect("meta info should exist");
+        assert!(meta.timestamp.is_some());
+        assert!(!meta.message_id.is_empty());
+    }
+
+    #[test]
+    fn append_receive_history_adds_server_datapoint() {
+        let mut message = Message {
+            meta_info: Some(MetaInformation {
+                timestamp: Some(now_timestamp()),
+                ..MetaInformation::default()
+            }),
+            history: vec![DataPoint {
+                name: "client".to_owned(),
+                receive_timestamp: Some(now_timestamp()),
+                send_timestamp: None,
+                perf_counter: 0.0,
+            }],
+            ..Message::default()
+        };
+
+        append_receive_history(&mut message);
+
+        assert_eq!(message.history.len(), 2);
+        let last = message.history.last().expect("history entry should exist");
+        assert_eq!(last.name, "server");
+        assert!(last.receive_timestamp.is_some());
+        assert!(last.send_timestamp.is_none());
+        assert!(last.perf_counter >= 0.0);
+    }
+
+    #[test]
+    fn update_send_history_sets_send_timestamp_and_elapsed_time() {
+        let mut message = Message {
+            history: vec![DataPoint {
+                name: "server".to_owned(),
+                receive_timestamp: Some(now_timestamp()),
+                send_timestamp: None,
+                perf_counter: 0.0,
+            }],
+            ..Message::default()
+        };
+
+        update_send_history(&mut message);
+
+        let last = message.history.last().expect("history entry should exist");
+        assert!(last.send_timestamp.is_some());
+        assert!(last.perf_counter >= 0.0);
+    }
+}

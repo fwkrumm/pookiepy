@@ -2,6 +2,8 @@
 
 Async Rust implementation of BaseServer from grpchook. Wire protocol stays compatible with Python clients because server uses same gRPC service and message schema from grpchook/message.proto.
 
+This Rust port was generated with AI assistance. Treat it as working draft code and plan human review before relying on it for long-term maintenance or production use.
+
 ## What this port includes
 
 - Async bidirectional streaming server with tonic + tokio
@@ -115,3 +117,7 @@ Set-Location ..; uv run python examples/interactive_streaming/run_text_client.py
 - Server sends welcome message with metaInfo.serverInfo before require registration side effects are visible.
 - strict_schema_version defaults to false so mismatches are logged but tolerated.
 - If you need Python-equivalent hard reject on mismatch, set strict_schema_version to true in ServerConfig.
+
+## ToDos
+
+- Extend test coverage with Python client examples.
