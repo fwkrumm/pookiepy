@@ -9,3 +9,9 @@ uv.lock
 grpchook/message_pb2.py
 grpchook/message_pb2.pyi
 grpchook/message_pb2_grpc.py
+
+
+# rust specific
+.rust/target/*
+Cargo.lock
+devcontainer-lock.json

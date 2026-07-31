@@ -16,6 +16,10 @@ grpchook/schema_version.py        # SHA-256 proto fingerprint for compat check
 grpchook/custom_interface.py      # runtime .proto compile+load
 grpchook/message.proto         # proto source (one service, one bidirectional RPC)
 grpchook/message_pb2*.py       # generated --- DO NOT EDIT
+.rust/                        # Rust async BaseServer port (tonic/tokio)
+.rust/src/server.rs           # Rust BaseServer + hook trait + stream service
+.rust/src/data_register.rs    # Rust msg routing: messageName→clientId→queue
+.rust/src/schema_version.rs   # Rust proto fingerprint + metadata key
 ```
 
 Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. grpchook/message.proto`
