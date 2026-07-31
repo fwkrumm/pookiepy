@@ -331,7 +331,8 @@ impl<H: ServerHooks> BaseServer<H> {
 
 #[async_trait]
 impl<H: ServerHooks> Stream for BaseServer<H> {
-    type DataChannelStream = Pin<Box<dyn futures_core::Stream<Item = Result<Message, Status>> + Send + 'static>>;
+    type DataChannelStream =
+        Pin<Box<dyn futures_core::Stream<Item = Result<Message, Status>> + Send + 'static>>;
 
     async fn data_channel(
         &self,
@@ -399,7 +400,8 @@ impl<H: ServerHooks> Stream for BaseServer<H> {
 
         self.hooks.on_client_accepted(&peer, &first_message).await;
 
-        let (notification_tx, notification_rx) = notification_channel(self.config.max_queue_elements);
+        let (notification_tx, notification_rx) =
+            notification_channel(self.config.max_queue_elements);
 
         let mut welcome_message = Message {
             meta_info: Some(MetaInformation {
@@ -441,7 +443,9 @@ impl<H: ServerHooks> Stream for BaseServer<H> {
         self.spawn_incoming_task(incoming, peer);
 
         let output_stream = ReceiverStream::new(stream_rx);
-        Ok(Response::new(Box::pin(output_stream) as Self::DataChannelStream))
+        Ok(Response::new(
+            Box::pin(output_stream) as Self::DataChannelStream
+        ))
     }
 }
 
@@ -537,7 +541,9 @@ mod tests {
         let mut metadata = tonic::metadata::MetadataMap::new();
         metadata.insert(
             SCHEMA_VERSION_METADATA_KEY,
-            "different-version".parse().expect("metadata value should parse"),
+            "different-version"
+                .parse()
+                .expect("metadata value should parse"),
         );
 
         let err = server
@@ -556,7 +562,9 @@ mod tests {
         let mut metadata = tonic::metadata::MetadataMap::new();
         metadata.insert(
             SCHEMA_VERSION_METADATA_KEY,
-            "different-version".parse().expect("metadata value should parse"),
+            "different-version"
+                .parse()
+                .expect("metadata value should parse"),
         );
 
         let result = server.handle_schema(&metadata, &peer);

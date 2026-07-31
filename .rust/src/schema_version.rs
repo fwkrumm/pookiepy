@@ -17,11 +17,11 @@ pub fn schema_version() -> &'static str {
             Err(err) => panic!("failed to decode descriptor set: {err}"),
         };
 
-        let file_proto = match file_set
-            .file
-            .iter()
-            .find(|f| f.name.as_deref().is_some_and(|name| name.ends_with("message.proto")))
-        {
+        let file_proto = match file_set.file.iter().find(|f| {
+            f.name
+                .as_deref()
+                .is_some_and(|name| name.ends_with("message.proto"))
+        }) {
             Some(value) => value,
             None => panic!("message.proto descriptor not found in descriptor set"),
         };
