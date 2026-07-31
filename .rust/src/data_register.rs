@@ -162,9 +162,7 @@ mod tests {
         let (tx, mut rx) = notification_channel(0);
         let message = test_message("alpha");
 
-        tx.send(message.clone())
-            .await
-            .expect("send should succeed");
+        tx.send(message.clone()).await.expect("send should succeed");
 
         let received = timeout(Duration::from_millis(50), rx.recv())
             .await
@@ -213,7 +211,10 @@ mod tests {
         );
 
         let sender_result = timeout(Duration::from_millis(20), sender_rx.recv()).await;
-        assert!(sender_result.is_err(), "sender should not receive its own data");
+        assert!(
+            sender_result.is_err(),
+            "sender should not receive its own data"
+        );
     }
 
     #[tokio::test]
@@ -238,16 +239,14 @@ mod tests {
             .await;
 
         register
-            .add_data_for_message_name(
-                "sender",
-                "alpha",
-                test_message("alpha"),
-                Some("second"),
-            )
+            .add_data_for_message_name("sender", "alpha", test_message("alpha"), Some("second"))
             .await;
 
         let sender_result = timeout(Duration::from_millis(20), first_rx.recv()).await;
-        assert!(sender_result.is_err(), "non-target client should not receive data");
+        assert!(
+            sender_result.is_err(),
+            "non-target client should not receive data"
+        );
 
         let received = timeout(Duration::from_millis(50), second_rx.recv())
             .await
@@ -276,11 +275,7 @@ mod tests {
             )
             .await;
         register
-            .add_notification_queue_for_message_name(
-                "client-1".to_owned(),
-                "beta".to_owned(),
-                tx,
-            )
+            .add_notification_queue_for_message_name("client-1".to_owned(), "beta".to_owned(), tx)
             .await;
 
         register
