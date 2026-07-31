@@ -1,5 +1,5 @@
 """
-Unit tests for grpchook/data_register.py
+Unit tests for pookiepy/data_register.py
 
 DataRegister is pure Python (no gRPC transport) so all tests run without
 starting a server or client.
@@ -14,9 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
-from grpchook import message_pb2
-from grpchook.data_register import DataRegister
-from grpchook.exceptions import GrpcValueError
+from pookiepy import message_pb2
+from pookiepy.data_register import DataRegister
+from pookiepy.exceptions import GrpcValueError
 
 
 def _msg(name: str = "topic") -> message_pb2.Message:

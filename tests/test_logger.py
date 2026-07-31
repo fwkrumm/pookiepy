@@ -1,5 +1,5 @@
 """
-Unit tests for grpchook/logger.py
+Unit tests for pookiepy/logger.py
 
 Tests cover branches missed in previous coverage runs:
 - GrpcLogger.setLevel propagates level to all attached handlers (line 34)
@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
-from grpchook.logger import GrpcLogger, get_logger
+from pookiepy.logger import GrpcLogger, get_logger
 
 
 def _unique(prefix: str = "test") -> str:

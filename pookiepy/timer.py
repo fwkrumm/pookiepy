@@ -16,7 +16,7 @@ from typing import Union
 
 import psutil
 
-from grpchook.logger import get_logger
+from pookiepy.logger import get_logger
 
 TIME_NS_OFFSET = len(str(int(time.time())))
 # the latter  will cause a problem on Sat Nov 20 2286 17:46:39 GMT+0000

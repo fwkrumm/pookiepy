@@ -1,5 +1,5 @@
 """
-Unit tests for grpchook/tools.py
+Unit tests for pookiepy/tools.py
 
 Tests cover:
 - set_metadata: assigns messageId and timestamp; does not overwrite existing values.
@@ -14,12 +14,12 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
-from grpchook import message_pb2
-from grpchook.tools import evaluate_history, generate_message, json_to_struct, set_metadata, struct_to_json
+from pookiepy import message_pb2
+from pookiepy.tools import evaluate_history, generate_message, json_to_struct, set_metadata, struct_to_json
 
 
 class TestSetMetadata(unittest.TestCase):
-    """Tests for set_metadata() in grpchook/tools.py."""
+    """Tests for set_metadata() in pookiepy/tools.py."""
 
     def test_assigns_message_id_when_empty(self):
         """An empty message receives a non-empty messageId after set_metadata."""
@@ -77,7 +77,7 @@ class TestSetMetadata(unittest.TestCase):
 
 
 class TestStructJsonRoundtrip(unittest.TestCase):
-    """Roundtrip tests for json_to_struct / struct_to_json in grpchook/tools.py."""
+    """Roundtrip tests for json_to_struct / struct_to_json in pookiepy/tools.py."""
 
     def test_flat_dict_roundtrip(self):
         """A flat Python dict survives a json_to_struct → struct_to_json roundtrip unchanged."""
@@ -107,7 +107,7 @@ class TestStructJsonRoundtrip(unittest.TestCase):
 
 
 class TestEvaluateHistory(unittest.TestCase):
-    """Tests for evaluate_history() in grpchook/tools.py."""
+    """Tests for evaluate_history() in pookiepy/tools.py."""
 
     @staticmethod
     def _ts(seconds: int) -> Timestamp:
@@ -203,7 +203,7 @@ class TestEvaluateHistory(unittest.TestCase):
 
 
 class TestGenerateMessage(unittest.TestCase):
-    """Tests for generate_message() in grpchook/tools.py."""
+    """Tests for generate_message() in pookiepy/tools.py."""
 
     def test_default_message_name(self):
         """Default message_name is 'default_message'."""

@@ -8,7 +8,7 @@ Demonstrates simple password-based client authentication using gRPC call metadat
     This pattern is intentionally labelled as **NOT best practice**.
     Use TLS certificate-based authentication for production workloads.
 """
-from grpchook import message_pb2
+from pookiepy import message_pb2
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

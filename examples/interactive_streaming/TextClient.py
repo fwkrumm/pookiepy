@@ -2,9 +2,9 @@
 import uuid
 import queue
 
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient
-from grpchook.tools import json_to_struct, struct_to_json
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import json_to_struct, struct_to_json
 
 
 class TextClient(BaseClient):

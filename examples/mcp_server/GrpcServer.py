@@ -1,5 +1,5 @@
 """Plain gRPC relay server for the mcp_server example."""
-from grpchook.baseserver import BaseServer
+from pookiepy.baseserver import BaseServer
 
 
 class McpGrpcServer(BaseServer):

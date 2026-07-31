@@ -1,13 +1,13 @@
-Project-specific performance evaluation for grpchook.
+Project-specific performance evaluation for pookiepy.
 
 ---
 
 ## 1) Asyncio default event loop (Proactor on Windows)
 
-Status in grpchook: Not applicable today.
+Status in pookiepy: Not applicable today.
 
 Reason:
-- grpchook server uses sync grpc.server + ThreadPoolExecutor, not grpc.aio.
+- pookiepy server uses sync grpc.server + ThreadPoolExecutor, not grpc.aio.
 - Event-loop choice does not control current DataChannel runtime path.
 
 Effort to adopt:
@@ -18,7 +18,7 @@ Effort to adopt:
 
 ## 2) Zero-copy protobuf techniques
 
-Status in grpchook: Partly valid in principle, not true end-to-end in current API.
+Status in pookiepy: Partly valid in principle, not true end-to-end in current API.
 
 Reason:
 - Current stub path serializes/deserializes protobuf Message objects each hop.
@@ -32,7 +32,7 @@ Effort to improve:
 
 ## 3) Large streaming chunks (512 KB - 2 MB)
 
-Status in grpchook: Correct direction, workload-dependent target.
+Status in pookiepy: Correct direction, workload-dependent target.
 
 Reason:
 - Larger application messages usually improve throughput by amortizing per-message overhead.

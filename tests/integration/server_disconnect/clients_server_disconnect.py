@@ -20,8 +20,8 @@ Run
 import sys
 import time
 
-from grpchook.baseclient import BaseClient
-from grpchook.exceptions import GrpcEmpty, GrpcConnectionError, ClientExit
+from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import GrpcEmpty, GrpcConnectionError, ClientExit
 from tests.integration._interface import get_args
 
 # Must be longer than SHUTDOWN_AFTER (1.0 s) on the server

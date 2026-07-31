@@ -18,7 +18,7 @@ def pdm_build_initialize(context) -> None:  # noqa: ANN001
     from grpc_tools import protoc  # pylint: disable=import-outside-toplevel
 
     project_root = Path(__file__).parent
-    proto_file = project_root / "grpchook" / "message.proto"
+    proto_file = project_root / "pookiepy" / "message.proto"
 
     # Locate the google/*.proto well-known types bundled with grpcio-tools.
     try:

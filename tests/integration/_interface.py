@@ -18,7 +18,7 @@ DEFAULT_TIMEOUT = 5.0
 
 
 def get_args(description: str = "gRPC integration test") -> argparse.Namespace:
-    """Parse grpchook CLI arguments for integration test scripts.
+    """Parse pookiepy CLI arguments for integration test scripts.
 
     Args:
         description: Help text shown in --help output.

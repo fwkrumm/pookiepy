@@ -17,7 +17,7 @@ schema to version; however this is a start.
 
 import hashlib
 
-from grpchook import message_pb2
+from pookiepy import message_pb2
 
 # 16-hex-char prefix is sufficient for collision resistance in this context
 SCHEMA_VERSION: str = hashlib.sha256(

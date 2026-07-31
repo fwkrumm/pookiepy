@@ -19,9 +19,9 @@ Run
 
 import sys
 
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient
-from grpchook.exceptions import GrpcEmpty
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import GrpcEmpty
 from tests.integration._interface import get_args
 
 NUM_CLIENTS = 3

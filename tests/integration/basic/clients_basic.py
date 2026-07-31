@@ -1,7 +1,7 @@
 """Basic connectivity integration test --- two clients exchange messages."""
-from grpchook.baseclient import BaseClient
-from grpchook.tools import generate_message
-from grpchook import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import generate_message
+from pookiepy import message_pb2
 from tests.integration._interface import get_args
 
 TIMEOUT = 2 # seconds

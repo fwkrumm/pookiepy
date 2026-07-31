@@ -14,9 +14,9 @@ import threading
 
 import grpc
 
-from grpchook import message_pb2
-from grpchook.baseserver import Peer
-from grpchook.tools import struct_to_json
+from pookiepy import message_pb2
+from pookiepy.baseserver import Peer
+from pookiepy.tools import struct_to_json
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 
