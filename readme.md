@@ -1,6 +1,6 @@
 # pookiepy
 
-**pookiepy** (gRPC + hook) is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
+**pookiepy** is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
 
 [![PyPI](https://img.shields.io/pypi/v/pookiepy)](https://pypi.org/project/pookiepy/)
 [![Python](https://img.shields.io/pypi/pyversions/pookiepy)](https://pypi.org/project/pookiepy/)
