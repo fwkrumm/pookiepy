@@ -1,5 +1,5 @@
 //! Main entry point for grpchook-server binary
-//! 
+//!
 //! This module initializes the Tonic server, registers services, and handles
 //! graceful shutdown. It replaces the placeholder implementation with a real
 //! production-ready server startup.
@@ -7,10 +7,11 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::signal;
-use tonic::{transport::Server, Status};
+use tonic::transport::Server;
 use tracing_subscriber::{self, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 // Import the core library modules
+mod core;
 mod grpc;
 use crate::grpc::GrpchookService;
 
@@ -24,7 +25,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let schema_version = std::env::var("SCHEMA_VERSION")
         .unwrap_or_else(|_| "1.0.0".to_string());
-    
+
     let max_workers: usize = std::env::var("MAX_WORKERS")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -38,14 +39,14 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create core state - this is the shared state for all connections and routing
     let core = Arc::new(crate::core::CoreState::new(schema_version.clone(), max_workers));
-    
+
     // Create gRPC service handler with proper Arc wrapping (no borrowed-self issues)
     let grpc_service = GrpchookService::new(core.clone());
 
     // Bind to configured IP:port - use environment variable or default
     let addr_str = std::env::var("GRPC_BIND_ADDRESS")
         .unwrap_or_else(|_| "127.0.0.1:50051".to_string());
-    
+
     let addr: SocketAddr = addr_str.parse()
         .map_err(|e| format!("Invalid GRPC_BIND_ADDRESS '{}': {}", addr_str, e))?;
 
@@ -54,7 +55,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build and start the real Tonic server with proper service registration
     // This replaces the placeholder sleep-loop implementation
     let server_future = Server::builder()
-        .add_service(tonic_reflect::server::Reflect::new())
         .add_service(crate::grpc::GrpchookServiceServer::new(grpc_service))  // ✅ FIXED: Add actual gRPC service!
         .serve_with_shutdown(addr, shutdown_signal());
 
@@ -84,7 +84,7 @@ async fn shutdown_signal() {
             .expect("failed to install SIGTERM handler");
         let mut sigint = signal(SignalKind::interrupt())
             .expect("failed to install SIGINT handler");
-        
+
         tokio::select! {
             _ = sigterm.recv() => tracing::info!("Received SIGTERM, initiating graceful shutdown..."),
             _ = sigint.recv() => tracing::info!("Received SIGINT, initiating graceful shutdown..."),
@@ -104,16 +104,16 @@ async fn shutdown_signal() {
 #[tokio::main]
 pub async fn health_check() -> Result<(), Box<dyn std::error::Error>> {
     use tonic::{transport::Channel, Request};
-    
+
     let channel = Channel::from_static("http://127.0.0.1:50051")
         .connect_timeout(std::time::Duration::from_secs(5))
         .await?;
 
     let mut client = grpc::GrpchookClient::new(channel);
-    
+
     let response = client.get_status(Request::new(grpc::StatusRequest {})).await?;
-    
+
     println!("Health check passed: {:?}", response.into_inner());
-    
+
     Ok(())
 }

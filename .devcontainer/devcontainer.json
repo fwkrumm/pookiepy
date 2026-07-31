@@ -4,12 +4,17 @@
     "dockerfile": "Dockerfile"
   },
   "runArgs": ["--net=host"],
-  "settings": {
-    "terminal.integrated.shell.linux": "/bin/bash"
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "rust-lang.rust-analyzer"
+      ]
+    }
   },
-  "extensions": [
-    "ms-python.python",
-    "ms-azuretools.vscode-docker"
-  ],
-  "postCreateCommand": "uv pip install --system -r requirements.txt && echo 'DevContainer setup complete!'"
+  "postCreateCommand": "bash -lc 'uv pip install --system -r requirements.txt; cargo --version; rustc --version; protoc --version; echo DevContainer setup complete'"
 }

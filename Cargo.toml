@@ -16,7 +16,6 @@ tokio-stream = "0.1"
 
 # Build dependencies for proto code generation
 tonic-build = "0.10"
-tonic-reflect = "0.10"
 
 [build-dependencies]
 tonic-build = "0.10"
