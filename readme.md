@@ -10,6 +10,7 @@
 > The project is open source and will remain open source.
 > Treat with caution. If you depend on it, **pin your version**.
 > Semantic versioning will only begin with the first official release, starting at version **1.0.0**.
+> Note that until and including version 0.0.11 the project was named **grpchook**.
 
 ---
 
@@ -435,3 +436,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
 | 0.0.11                     | Add deprecation warning because of project rename. |
 | 0.0.12                     | Project renamed to pookiepy |
+| 0.0.13                     | Revert publish via token and add note concerning old project name |
