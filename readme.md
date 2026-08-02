@@ -1,5 +1,9 @@
 # grpchook
 
+> [!IMPORTANT]
+> This project is being renamed from **grpchook** to **pookiepy**.
+> New repository: https://github.com/fwkrumm/pookiepy
+
 **grpchook** (gRPC + hook) is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
 
 [![PyPI](https://img.shields.io/pypi/v/grpchook)](https://pypi.org/project/grpchook/)
