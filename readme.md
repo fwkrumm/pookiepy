@@ -433,5 +433,5 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.8                      | Fix link in readme for pypi page. |
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
 | 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
-| 0.0.11                     | Update readme for renaming info. |
+| 0.0.11                     | Add deprecation warning because of project rename. |
 | 0.0.12                     | Project renamed to pookiepy |
