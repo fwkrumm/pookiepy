@@ -10,7 +10,7 @@ disconnect promptly and exits without freezing.
 import threading
 import time
 
-from grpchook import message_pb2
+from pookiepy import message_pb2
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

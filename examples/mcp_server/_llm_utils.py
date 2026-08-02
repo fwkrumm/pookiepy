@@ -38,7 +38,7 @@ def _process_escape(raw: str, i: int, out: list) -> int:
     return i + 1
 
 
-# Fast dispatch table for control characters grpchookly appearing inside JSON strings
+# Fast dispatch table for control characters pookiepyly appearing inside JSON strings
 _CTRL_ESCAPES: dict[str, str] = {'\n': '\\n', '\r': '\\r', '\t': '\\t'}
 
 

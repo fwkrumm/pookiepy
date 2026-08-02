@@ -9,7 +9,7 @@ by the server regardless, because grpcio always registers gzip/deflate codecs.
 No exception is raised when only one side enables compression.
 """
 import grpc
-from grpchook.baseserver import ServerConfig
+from pookiepy.baseserver import ServerConfig
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

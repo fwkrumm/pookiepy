@@ -1,6 +1,6 @@
 [run]
 source =
-    grpchook
+    pookiepy
     tests
 
 [report]

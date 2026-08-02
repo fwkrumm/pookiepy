@@ -1,6 +1,6 @@
 """Timer Test --- Clients
 ======================
-Shows how ``grpchook/timer.py``'s ``timer()`` function drives a gRPC client.
+Shows how ``pookiepy/timer.py``'s ``timer()`` function drives a gRPC client.
 
 Scenario
 --------
@@ -22,10 +22,10 @@ Run
 """
 import threading
 
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient
-from grpchook.timer import timer
-from grpchook.tools import generate_message
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.timer import timer
+from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
 N_TICKS = 5

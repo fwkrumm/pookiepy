@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from google.protobuf import struct_pb2
 from google.protobuf import json_format
-from grpchook import message_pb2
+from pookiepy import message_pb2
 
 def set_metadata(message: message_pb2.Message):
     """

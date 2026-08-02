@@ -26,10 +26,10 @@ import threading
 import time
 import webbrowser
 
-from grpchook.baseclient import BaseClient
-from grpchook.exceptions import GrpcConnectionError
-from grpchook.tools import generate_message, struct_to_json
-from grpchook import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import GrpcConnectionError
+from pookiepy.tools import generate_message, struct_to_json
+from pookiepy import message_pb2
 
 try:
     from flask import Flask, jsonify, request as flask_request

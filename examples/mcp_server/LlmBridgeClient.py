@@ -18,10 +18,10 @@ import time
 import uuid
 import threading
 
-from grpchook.baseclient import BaseClient
-from grpchook import message_pb2
-from grpchook.tools import json_to_struct, struct_to_json
-from grpchook.exceptions import ClientExit
+from pookiepy.baseclient import BaseClient
+from pookiepy import message_pb2
+from pookiepy.tools import json_to_struct, struct_to_json
+from pookiepy.exceptions import ClientExit
 from examples.mcp_server.FileOperationClient import MCP_RESPONSE
 from examples.mcp_server.RunnerClient import RUN_REQUEST, RUN_RESPONSE
 from examples.mcp_server._task import TASK, _SYSTEM_PROMPT

@@ -21,9 +21,9 @@ from unittest.mock import MagicMock, patch
 
 import grpc
 
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient, ClientConfig
-from grpchook.exceptions import ClientExit, GrpcValueError
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient, ClientConfig
+from pookiepy.exceptions import ClientExit, GrpcValueError
 
 
 # ---------------------------------------------------------------------------

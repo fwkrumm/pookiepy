@@ -159,8 +159,8 @@ contextmanager-decorators=contextlib.contextmanager,contextlib2.contextmanager
 ignored-modules=google.protobuf.struct_pb2,
                 google.protobuf.timestamp_pb2,
                 custom_if.message_pb2,
-                grpchook.message_pb2,
-                grpchook.message_pb2_grpc
+                pookiepy.message_pb2,
+                pookiepy.message_pb2_grpc
 
 # List of class names for which member attributes should not be checked (useful
 # for classes with dynamically set attributes). This supports the use of

@@ -13,7 +13,7 @@ except ImportError:
     requests = None
     _HTTPAdapter = None
 
-from grpchook.logger import get_logger
+from pookiepy.logger import get_logger
 
 SYSTEM_PROMPT = os.environ.get(
     "LMSTUDIO_SYSTEM_PROMPT",

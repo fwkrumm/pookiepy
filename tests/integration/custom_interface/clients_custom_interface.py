@@ -5,8 +5,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))  # enable: import _proto_setup
 # pylint: disable=wrong-import-position
 import _proto_setup  # side-effect: compiles + registers custom proto
-from grpchook.tools import generate_message
-from grpchook.baseclient import BaseClient
+from pookiepy.tools import generate_message
+from pookiepy.baseclient import BaseClient
 from tests.integration._interface import get_args
 # pylint: enable=wrong-import-position
 

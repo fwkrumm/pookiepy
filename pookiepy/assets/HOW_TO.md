@@ -1,6 +1,6 @@
 # HOW_TO.md - Developer API Reference (LLM-Optimized)
 
-Purpose: hand to LLM for grpchook project generation/scaffolding. Contains supported API surface, lifecycle hooks, patterns.
+Purpose: hand to LLM for pookiepy project generation/scaffolding. Contains supported API surface, lifecycle hooks, patterns.
 
 ## Core Concept
 
@@ -13,11 +13,11 @@ Server routes by `messageName` (no extra RPC methods needed).
 ## Imports
 
 ```python
-from grpchook.baseserver import BaseServer, Peer, ServerConfig
-from grpchook.baseclient import BaseClient, ClientConfig
-from grpchook.tools import generate_message, struct_to_json, json_to_struct, evaluate_history
-from grpchook.exceptions import GrpcEmpty, ClientExit, GrpcConnectionError
-import grpchook.message_pb2 as message_pb2
+from pookiepy.baseserver import BaseServer, Peer, ServerConfig
+from pookiepy.baseclient import BaseClient, ClientConfig
+from pookiepy.tools import generate_message, struct_to_json, json_to_struct, evaluate_history
+from pookiepy.exceptions import GrpcEmpty, ClientExit, GrpcConnectionError
+import pookiepy.message_pb2 as message_pb2
 ```
 
 ## Server
@@ -236,7 +236,7 @@ client = MyClient(
 Messages may carry per-hop `history`. Use `add_history=True` on send to append first hop automatically. Use `evaluate_history(data, log_callback)` later for per-hop latency.
 
 ```python
-from grpchook.tools import evaluate_history
+from pookiepy.tools import evaluate_history
 
 msg = generate_message("my_topic", struct_payload={"x": 1})
 client.send_data(msg, add_history=True)
@@ -250,7 +250,7 @@ evaluate_history(reply, lambda point: print(point))
 `timedevent` provides drift-compensated periodic scheduling.
 
 ```python
-from grpchook.timer import timedevent
+from pookiepy.timer import timedevent
 
 with timedevent(s=0.01, n=100) as te:
     for tick in te:
@@ -267,22 +267,22 @@ Prefer `self.logger` in `BaseServer`/`BaseClient` subclasses. Built-in logger su
 
 ## Custom Interface (Runtime Proto)
 
-Use custom `.proto` instead of bundled one without editing `grpchook/`. Proto must keep same message/service structure: `Message`, `ClientProvides`, `ServerProvides`, `StreamStub`, `StreamServicer`.
+Use custom `.proto` instead of bundled one without editing `pookiepy/`. Proto must keep same message/service structure: `Message`, `ClientProvides`, `ServerProvides`, `StreamStub`, `StreamServicer`.
 
 ### Compile/register at startup
 
 ```python
-from grpchook.custom_interface import compile_and_register
+from pookiepy.custom_interface import compile_and_register
 
-# compile my_proto/message.proto; register as grpchook.message_pb2 / grpchook.message_pb2_grpc
+# compile my_proto/message.proto; register as pookiepy.message_pb2 / pookiepy.message_pb2_grpc
 pb2, pb2_grpc = compile_and_register(
     proto_path="my_proto/message.proto",
-    package="grpchook",        # replaces built-in modules under this package name
+    package="pookiepy",        # replaces built-in modules under this package name
     out_dir="my_proto/",       # optional; temp dir if omitted
 )
 ```
 
-Call before importing `BaseServer`/`BaseClient`. After registration, grpchook internals automatically use custom modules.
+Call before importing `BaseServer`/`BaseClient`. After registration, pookiepy internals automatically use custom modules.
 
 ### Typical layout
 
@@ -299,11 +299,11 @@ my_project/
 
 ```python
 from pathlib import Path
-from grpchook.custom_interface import compile_and_register
+from pookiepy.custom_interface import compile_and_register
 
 compile_and_register(
     proto_path=Path(__file__).parent / "my_proto" / "message.proto",
-    package="grpchook",
+    package="pookiepy",
     out_dir=Path(__file__).parent / "my_proto",
 )
 ```
@@ -311,8 +311,8 @@ compile_and_register(
 `server.py` / `client.py`:
 
 ```python
-import _proto_setup  # must be first; registers custom proto before grpchook imports
-from grpchook.baseserver import BaseServer
+import _proto_setup  # must be first; registers custom proto before pookiepy imports
+from pookiepy.baseserver import BaseServer
 ```
 
 ### Lower-level functions
@@ -329,7 +329,7 @@ from grpchook.baseserver import BaseServer
 ### Create
 
 ```python
-from grpchook.tools import generate_message
+from pookiepy.tools import generate_message
 
 # dict payload (JSON-like)
 msg = generate_message("my_topic", struct_payload={"key": "value", "num": 1})
@@ -371,7 +371,7 @@ Rules:
 
 ### Request/Response Policy (Minimalistic by design)
 
-`grpchook` intentionally keeps request/response as a message convention, not a dedicated client API.
+`pookiepy` intentionally keeps request/response as a message convention, not a dedicated client API.
 
 Why:
 - Keeps `BaseClient` and `BaseServer` small and predictable.
@@ -463,7 +463,7 @@ class MyServer(BaseServer):
 Use `get_logger(...)` mainly in static methods/helper modules where `self` is unavailable:
 
 ```python
-from grpchook.logger import get_logger
+from pookiepy.logger import get_logger
 logger = get_logger(name="MyComponent")   # returns GrpcLogger
 logger.setLevel("DEBUG")                   # syncs console + file handler; keep "INFO" default
 ```

@@ -10,9 +10,9 @@ grpcio always has gzip/deflate decompression codecs available. Only the
 sending side's outgoing messages are compressed; the other direction is plain.
 """
 import grpc
-from grpchook.baseclient import BaseClient, ClientConfig
-from grpchook.tools import generate_message
-from grpchook import message_pb2
+from pookiepy.baseclient import BaseClient, ClientConfig
+from pookiepy.tools import generate_message
+from pookiepy import message_pb2
 from tests.integration._interface import get_args
 
 TIMEOUT = 2  # seconds

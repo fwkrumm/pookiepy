@@ -18,7 +18,7 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 PROJECT_ROOT = ROOT.parent.parent
 
-# Ensure subprocesses can import project packages (baseclasses, grpchook, interface, tests)
+# Ensure subprocesses can import project packages (baseclasses, pookiepy, interface, tests)
 _env = os.environ.copy()
 _existing = _env.get("PYTHONPATH", "")
 _env["PYTHONPATH"] = str(PROJECT_ROOT) + (os.pathsep + _existing if _existing else "")

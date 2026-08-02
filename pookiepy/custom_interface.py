@@ -70,7 +70,7 @@ def register_modules(pb2: ModuleType, pb2_grpc: ModuleType, package: str = "inte
     Register generated modules into sys.modules under `package.message_pb2` and
     `package.message_pb2_grpc`, and expose them as attributes on the package module.
 
-    This allows existing code that does `import grpchook.message_pb2` to keep
+    This allows existing code that does `import pookiepy.message_pb2` to keep
     working without changing import sites.
     """
     pkg = sys.modules.get(package)
@@ -192,8 +192,8 @@ def resolve_modules(message_module: Optional[Union[str, ModuleType]] = None,
 
     # fall back to bundled interface
     try:
-        import grpchook.message_pb2 as default_pb2  # type: ignore  # pylint: disable=import-outside-toplevel
-        import grpchook.message_pb2_grpc as default_pb2_grpc  # type: ignore  # pylint: disable=import-outside-toplevel
+        import pookiepy.message_pb2 as default_pb2  # type: ignore  # pylint: disable=import-outside-toplevel
+        import pookiepy.message_pb2_grpc as default_pb2_grpc  # type: ignore  # pylint: disable=import-outside-toplevel
         validate_interface(default_pb2, default_pb2_grpc)
         return default_pb2, default_pb2_grpc
     except Exception as e:  # pylint: disable=broad-exception-caught

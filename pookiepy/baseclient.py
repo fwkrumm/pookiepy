@@ -12,37 +12,25 @@ import queue
 import threading
 import time
 import uuid
-import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Union
 
 import grpc
 
-from grpchook import message_pb2
-from grpchook import message_pb2_grpc
+from pookiepy import message_pb2
+from pookiepy import message_pb2_grpc
 
-from grpchook.logger import get_logger
-from grpchook.exceptions import GrpcConnectionError, \
+from pookiepy.logger import get_logger
+from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcTimeoutError, \
                               GrpcResourceExhaustedError, \
                               GrpcValueError, \
                               ClientExit, \
                               GrpcEmpty
 
-from grpchook.tools import set_metadata
-from grpchook.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
-
-
-RENAME_NOTICE = (
-    "The name grpchook is deprecated and will be renamed to pookiepy starting with version 0.0.12. "
-    "Please migrate imports and package references to pookiepy."
-)
-
-
-def _warn_package_rename() -> None:
-    """Emit upcoming package rename warning for runtime visibility."""
-    warnings.warn(RENAME_NOTICE, FutureWarning, stacklevel=3)
+from pookiepy.tools import set_metadata
+from pookiepy.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
 
 
 class _StreamError:  # pylint: disable=too-few-public-methods
@@ -102,8 +90,6 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                  requires: list[str] = None,
                  ip: str = "localhost",
                  config: ClientConfig = None):
-
-        _warn_package_rename()
 
         self.logger = get_logger(name=f"Client-{name}")
 

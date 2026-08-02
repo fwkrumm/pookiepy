@@ -1,5 +1,5 @@
 """Integration test server for the history scenario."""
-# pylint: disable=duplicate-code  # integration server files share a grpchook sys.path + import pattern
+# pylint: disable=duplicate-code  # integration server files share a pookiepy sys.path + import pattern
 import sys
 from pathlib import Path
 
@@ -10,8 +10,8 @@ sys.path.insert(0, str(project_root))  # pylint: disable=wrong-import-position
 
 from tests.integration._server_base import IntegrationServer
 from tests.integration._interface import get_args
-from grpchook.baseserver import Peer
-from grpchook import message_pb2
+from pookiepy.baseserver import Peer
+from pookiepy import message_pb2
 
 
 class HistoryServer(IntegrationServer):

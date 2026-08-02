@@ -9,8 +9,8 @@ import threading
 import queue
 import logging
 
-from grpchook import message_pb2
-from grpchook.exceptions import GrpcValueError
+from pookiepy import message_pb2
+from pookiepy.exceptions import GrpcValueError
 
 # make configurable? currently no specific reason for the value
 WARNING_AT_QUEUE_SIZE = 100_000

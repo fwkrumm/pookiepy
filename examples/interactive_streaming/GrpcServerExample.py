@@ -1,5 +1,5 @@
 """Minimal gRPC server for the interactive streaming example."""
-from grpchook.baseserver import BaseServer
+from pookiepy.baseserver import BaseServer
 
 
 class GrpcServer(BaseServer):

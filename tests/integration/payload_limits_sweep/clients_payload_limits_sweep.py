@@ -21,15 +21,15 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from grpchook.baseclient import BaseClient, ClientConfig
-from grpchook.exceptions import (
+from pookiepy.baseclient import BaseClient, ClientConfig
+from pookiepy.exceptions import (
     ClientExit,
     GrpcConnectionError,
     GrpcEmpty,
     GrpcResourceExhaustedError,
 )
-from grpchook.tools import generate_message
-from grpchook import message_pb2
+from pookiepy.tools import generate_message
+from pookiepy import message_pb2
 from tests.integration._interface import get_args
 
 MIB = 1024 * 1024

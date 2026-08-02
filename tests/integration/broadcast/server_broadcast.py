@@ -9,8 +9,8 @@ messages at a fixed rate into the DataRegister for all subscribers.
 
 import threading
 
-from grpchook import message_pb2
-from grpchook.tools import generate_message
+from pookiepy import message_pb2
+from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

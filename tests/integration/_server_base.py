@@ -22,8 +22,8 @@ Usage
 import threading
 import time
 
-from grpchook.baseserver import BaseServer, Peer
-from grpchook import message_pb2
+from pookiepy.baseserver import BaseServer, Peer
+from pookiepy import message_pb2
 
 
 SHUTDOWN_DELAY = 1  # seconds to wait before shutting down after receiving "server-exit"

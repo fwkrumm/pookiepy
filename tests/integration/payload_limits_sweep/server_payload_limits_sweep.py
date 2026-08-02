@@ -6,7 +6,7 @@ It relays messages unchanged; benchmarking logic lives in the client script.
 
 import argparse
 
-from grpchook.baseserver import ServerConfig
+from pookiepy.baseserver import ServerConfig
 from tests.integration._server_base import IntegrationServer
 
 

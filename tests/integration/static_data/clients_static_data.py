@@ -8,9 +8,9 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))  # pylint: disable=wrong-import-position
 # pylint: disable=wrong-import-position  # project path must be set before importing project modules
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient
-from grpchook.tools import generate_message, set_metadata
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import generate_message, set_metadata
 from tests.integration._interface import get_args
 
 TIMEOUT = 1.0 # seconds

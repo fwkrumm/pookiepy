@@ -10,9 +10,9 @@ sys.path.insert(0, str(project_root))  # pylint: disable=wrong-import-position
 
 from tests.integration._server_base import IntegrationServer
 from tests.integration._interface import get_args
-from grpchook.baseserver import Peer
-from grpchook.exceptions import GrpcValueError
-from grpchook import message_pb2
+from pookiepy.baseserver import Peer
+from pookiepy.exceptions import GrpcValueError
+from pookiepy import message_pb2
 
 class StaticDataServer(IntegrationServer):
     """

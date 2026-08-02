@@ -13,9 +13,9 @@ Run
 
 import sys
 
-from grpchook.baseclient import BaseClient
-from grpchook.exceptions import GrpcConnectionError
-from grpchook.logger import get_logger
+from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import GrpcConnectionError
+from pookiepy.logger import get_logger
 
 # Use a dedicated port that the test runner will never start a server on.
 # The point is that *nothing* is listening here.

@@ -14,9 +14,9 @@ the requirement is satisfied.
 
 import threading
 
-from grpchook import message_pb2
-from grpchook.baseserver import Peer
-from grpchook.tools import generate_message
+from pookiepy import message_pb2
+from pookiepy.baseserver import Peer
+from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

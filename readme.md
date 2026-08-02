@@ -1,14 +1,10 @@
-# grpchook
+# pookiepy
 
-> [!IMPORTANT]
-> This project is being renamed from **grpchook** to **pookiepy**.
-> New repository: https://github.com/fwkrumm/pookiepy
+**pookiepy** is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
 
-**grpchook** (gRPC + hook) is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
-
-[![PyPI](https://img.shields.io/pypi/v/grpchook)](https://pypi.org/project/grpchook/)
-[![Python](https://img.shields.io/pypi/pyversions/grpchook)](https://pypi.org/project/grpchook/)
-[![License](https://img.shields.io/badge/license-BSD%203--Clause-blue)](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt)
+[![PyPI](https://img.shields.io/pypi/v/pookiepy)](https://pypi.org/project/pookiepy/)
+[![Python](https://img.shields.io/pypi/pyversions/pookiepy)](https://pypi.org/project/pookiepy/)
+[![License](https://img.shields.io/badge/license-BSD%203--Clause-blue)](https://github.com/fwkrumm/pookiepy/blob/master/LICENSE.txt)
 
 > **Status: Work in Progress.**
 > The project is open source and will remain open source.
@@ -20,7 +16,7 @@
 ## Table of Contents
 
 - [Disclaimer](#disclaimer)
-- [When to Use and When Not to Use grpchook](#when-to-use-and-when-not-to-use-grpchook)
+- [When to Use and When Not to Use pookiepy](#when-to-use-and-when-not-to-use-pookiepy)
 - [Requirements](#requirements)
 - [Installation](#installation)
   - [From PyPI](#from-pypi)
@@ -46,21 +42,21 @@
 
 Core architecture and design were created by a human developer. AI was used extensively for unit and integration test creation, examples, documentation, refinements, and selected code sections. Core logic was human-reviewed, but the full test suite has not been fully audited --- AI-introduced oversights may still exist. Please report any issues you find.
 
-This software is provided **"as is"**, without warranty of any kind. The developer is not responsible for any damage, data loss, security vulnerabilities, or other issues that may arise from using this software. **You use it at your own risk.** See [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt) for the full BSD 3-Clause terms.
+This software is provided **"as is"**, without warranty of any kind. The developer is not responsible for any damage, data loss, security vulnerabilities, or other issues that may arise from using this software. **You use it at your own risk.** See [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/master/LICENSE.txt) for the full BSD 3-Clause terms.
 
 
 ---
-<a name="when-to-use-and-when-not-to-use-grpchook"></a>
-<a id="when-to-use-and-when-not-to-use-grpchook"></a>
-## When to Use and When Not to Use grpchook
+<a name="when-to-use-and-when-not-to-use-pookiepy"></a>
+<a id="when-to-use-and-when-not-to-use-pookiepy"></a>
+## When to Use and When Not to Use pookiepy
 
-### When to Use grpchook
+### When to Use pookiepy
 - You need a simple, Python-based gRPC bidirectional streaming server and client.
 - You want a data exchange blueprint for developers or AI agents to build on top of.
 - You want a framework that can be extended with custom hooks for specific events.
 - You want to distribute clients to many different machines (e.g. voice recorder, voice to text, text to LLM, and vice versa until the final response is replayed)
 
-  **Example --- four clients on four machines, all routed through one grpchook server:**
+  **Example --- four clients on four machines, all routed through one pookiepy server:**
 
   > 💡 Diagram requires the [Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid) extension to render in VS Code.
 
@@ -79,7 +75,7 @@ This software is provided **"as is"**, without warranty of any kind. The develop
           RP["🔊 Voice Replay"]
       end
 
-      SRV(["⚙️ grpchook Server"])
+      SRV(["⚙️ pookiepy Server"])
 
       VR  -->|"① audio"| SRV
       SRV -->|"① audio"| STT
@@ -89,10 +85,10 @@ This software is provided **"as is"**, without warranty of any kind. The develop
       SRV -->|"③ llm_response"| RP
   ```
 
-### When Not to Use grpchook
+### When Not to Use pookiepy
 - When you need a very large number of clients; the threading model may introduce overhead.
-- When you need direct peer-to-peer communication without a server intermediary; grpchook routes all messages through a central server.
-- You want a framework that supports multiple programming languages out of the box; grpchook is (currently) Python-only.
+- When you need direct peer-to-peer communication without a server intermediary; pookiepy routes all messages through a central server.
+- You want a framework that supports multiple programming languages out of the box; pookiepy is (currently) Python-only.
 
 ---
 <a name="requirements"></a>
@@ -101,7 +97,7 @@ This software is provided **"as is"**, without warranty of any kind. The develop
 ## Requirements
 
 - Python 3.10 or later
-- A dedicated virtual environment is **strongly recommended** --- gRPC version conflicts with other packages are common when using grpchook.
+- A dedicated virtual environment is **strongly recommended** --- gRPC version conflicts with other packages are common when using pookiepy.
 
 ---
 <a name="installation"></a>
@@ -114,7 +110,7 @@ This software is provided **"as is"**, without warranty of any kind. The develop
 ### From PyPI
 
 ```bash
-pip install grpchook
+pip install pookiepy
 ```
 
 <a name="from-source"></a>
@@ -122,8 +118,8 @@ pip install grpchook
 ### From Source
 
 ```bash
-git clone https://github.com/fwkrumm/grpchook.git
-cd grpchook
+git clone https://github.com/fwkrumm/pookiepy.git
+cd pookiepy
 pip install -e .
 ```
 
@@ -133,18 +129,18 @@ pip install -e .
 
 ## Quick Start
 
-Refer to [HOW_TO.md](grpchook/assets/HOW_TO.md) for the full API reference and code examples.
+Refer to [HOW_TO.md](pookiepy/assets/HOW_TO.md) for the full API reference and code examples.
 Alternatively run
 
 ```bash
-python -m grpchook --generate-skeletons
+python -m pookiepy --generate-skeletons
 ```
 
 to generate a very basic server and client skeleton in the current directory.
 Use
 
 ```bash
-python -m grpchook --generate-interface-with-skeletons
+python -m pookiepy --generate-interface-with-skeletons
 ```
 
 to generate the skeletons along with a copy of the `message.proto` interface file in the current directory to modify which is then used by the skeletons.
@@ -156,12 +152,12 @@ to generate the skeletons along with a copy of the `message.proto` interface fil
 
 ## Parameters
 
-You can print the following text via `python -m grpchook --help`:
+You can print the following text via `python -m pookiepy --help`:
 
 ```bash
-usage: python -m grpchook [-h] [--generate] [--generate-skeletons] [--generate-server] [--generate-client] [--generate-how-to] [--generate-interface] [--generate-interface-with-skeletons]
+usage: python -m pookiepy [-h] [--generate] [--generate-skeletons] [--generate-server] [--generate-client] [--generate-how-to] [--generate-interface] [--generate-interface-with-skeletons]
 
-grpchook scaffolding tool.
+pookiepy scaffolding tool.
 
 Generates skeleton server/client files and the HOW_TO reference
 document into the current working directory.
@@ -178,13 +174,13 @@ options:
                         Copy message.proto and write server_skeleton.py + client_skeleton.py that load the custom interface at startup via compile_and_register()
 
 examples:
-  python -m grpchook --generate                          # skeleton + HOW_TO
-  python -m grpchook --generate-skeletons                  # server + client only
-  python -m grpchook --generate-server                   # server only
-  python -m grpchook --generate-client                   # client only
-  python -m grpchook --generate-how-to                   # HOW_TO.md only
-  python -m grpchook --generate-interface                # message.proto + instructions
-  python -m grpchook --generate-interface-with-skeletons  # proto + matching skeletons
+  python -m pookiepy --generate                          # skeleton + HOW_TO
+  python -m pookiepy --generate-skeletons                  # server + client only
+  python -m pookiepy --generate-server                   # server only
+  python -m pookiepy --generate-client                   # client only
+  python -m pookiepy --generate-how-to                   # HOW_TO.md only
+  python -m pookiepy --generate-interface                # message.proto + instructions
+  python -m pookiepy --generate-interface-with-skeletons  # proto + matching skeletons
 ```
 
 
@@ -204,9 +200,9 @@ Everything runs in a single script --- no subclassing or hook overrides needed.
 ```python
 # example_minimal.py
 import threading
-from grpchook.baseserver import BaseServer
-from grpchook.baseclient import BaseClient
-from grpchook.tools import generate_message
+from pookiepy.baseserver import BaseServer
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import generate_message
 
 # start the server in a background thread
 server = BaseServer(port=50051, name="server")
@@ -233,7 +229,7 @@ server.shutdown()
 For real workloads, subclass `BaseServer` to control routing and `BaseClient` to react to messages
 via the `on_receive` hook.
 
-Design note (important): request/response in grpchook is intentionally minimalistic.
+Design note (important): request/response in pookiepy is intentionally minimalistic.
 There is no dedicated `request()` helper in the core API by default; correlation is done via
 `messageId` and `responseToId` in normal hook/polling flow. This keeps the framework lean,
 transparent, and robust for mixed traffic patterns.
@@ -245,9 +241,9 @@ Need full reference flow?
 **`server.py`**
 
 ```python
-from grpchook.baseserver import BaseServer, Peer
-from grpchook.tools import generate_message
-import grpchook.message_pb2 as pb2
+from pookiepy.baseserver import BaseServer, Peer
+from pookiepy.tools import generate_message
+import pookiepy.message_pb2 as pb2
 
 
 class EchoServer(BaseServer):
@@ -271,9 +267,9 @@ EchoServer().serve_forever()
 **`client.py`**
 
 ```python
-from grpchook.baseclient import BaseClient
-from grpchook.tools import generate_message
-import grpchook.message_pb2 as pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import generate_message
+import pookiepy.message_pb2 as pb2
 
 
 class EchoClient(BaseClient):
@@ -286,7 +282,7 @@ class EchoClient(BaseClient):
 
 
 client = EchoClient()
-client.send_data(generate_message("request", byte_payload=b"hello, grpchook!"))
+client.send_data(generate_message("request", byte_payload=b"hello, pookiepy!"))
 client.spin(timeout=5.0)   # calls on_receive() per message; returns on timeout/disconnect
 client.disconnect()
 ```
@@ -343,7 +339,7 @@ Example for a client to use the default configuration but disable proxy forwardi
 
 
 ```python
-from grpchook.baseclient import BaseClient, ClientConfig
+from pookiepy.baseclient import BaseClient, ClientConfig
 
 class TestClient(BaseClient):
     def __init__(self):
@@ -360,10 +356,10 @@ class TestClient(BaseClient):
 
 ## Regenerating the gRPC Interface
 
-If you modify `grpchook/message.proto` after cloning the repository, regenerate the Python bindings with:
+If you modify `pookiepy/message.proto` after cloning the repository, regenerate the Python bindings with:
 
 ```bash
-python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. grpchook/message.proto
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto
 ```
 
 Note that all clients which connect to a server have to use the same proto schema version i.e. the same proto file. The different signals for the clients must be used in substructures:
@@ -416,7 +412,7 @@ Contributions are welcome. Please open an issue first for major changes so the a
 
 ## License
 
-BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/master/LICENSE.txt).
+BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/master/LICENSE.txt).
 
 ---
 <a name="release-history"></a>
@@ -438,3 +434,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/grpchook/blob/mast
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
 | 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
 | 0.0.11                     | Add deprecation warning because of project rename. |
+| 0.0.12                     | Project renamed to pookiepy |

@@ -16,10 +16,10 @@ Run
 ---
     python tests/integration/password/clients_password.py
 """
-from grpchook.baseclient import BaseClient, ClientConfig
-from grpchook.exceptions import GrpcConnectionError
-from grpchook.logger import get_logger as _get_logger
-from grpchook.tools import generate_message
+from pookiepy.baseclient import BaseClient, ClientConfig
+from pookiepy.exceptions import GrpcConnectionError
+from pookiepy.logger import get_logger as _get_logger
+from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
 CORRECT_PASSWORD = "s3cr3t"
