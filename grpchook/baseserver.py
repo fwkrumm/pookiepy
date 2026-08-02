@@ -13,6 +13,7 @@ import queue
 import threading
 import time
 import uuid
+import warnings
 from concurrent import futures
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -26,6 +27,17 @@ from grpchook.logger import get_logger
 from grpchook.data_register import DataRegister
 from grpchook.tools import set_metadata
 from grpchook.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
+
+
+RENAME_NOTICE = (
+    "The name grpchook is deprecated and will be renamed to pookiepy starting with version 0.0.12. "
+    "Please migrate imports and package references to pookiepy."
+)
+
+
+def _warn_package_rename() -> None:
+    """Emit upcoming package rename warning for runtime visibility."""
+    warnings.warn(RENAME_NOTICE, FutureWarning, stacklevel=3)
 
 @dataclass
 class ServerConfig():
@@ -99,6 +111,8 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                  global_exit_event: threading.Event = None,
                  ssl_credentials: grpc.ServerCredentials = None,
                  config: ServerConfig = None):
+
+        _warn_package_rename()
 
         super().__init__()
 
