@@ -6,10 +6,8 @@ on:
       - master
 
 # Minimal token permissions.
-# id-token: write is required for PyPI Trusted Publishing (OIDC --- no stored secrets needed).
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   build-and-publish:
@@ -42,12 +40,13 @@ jobs:
       - name: Build distribution packages (sdist + wheel)
         run: uv build
 
-      - name: Publish to PyPI via Trusted Publishing
-        # Uses OIDC --- no PYPI_API_TOKEN secret required.
-        # Configure the trusted publisher once at:
-        # https://pypi.org/manage/project/<your-package>/settings/publishing/
+      - name: Publish to PyPI via API token
+        # Bootstrap mode for first project creation / migration.
+        # Secret required: PYPI_TOKEN
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
           # repository-url: https://test.pypi.org/legacy/ # for testing
           skip-existing: true
 
