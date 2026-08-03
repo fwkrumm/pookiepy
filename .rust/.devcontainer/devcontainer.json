@@ -1,10 +1,10 @@
 {
-  "name": "grpchook-rust",
+  "name": "pookiepy-rust",
   "build": {
     "dockerfile": "Dockerfile"
   },
-  "workspaceFolder": "/workspaces/grpchook-rust",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/grpchook-rust,type=bind,consistency=cached",
+  "workspaceFolder": "/workspaces/pookiepy-rust",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/pookiepy-rust,type=bind,consistency=cached",
   "features": {
     "ghcr.io/devcontainers/features/common-utils:2": {}
   },

@@ -1,6 +1,6 @@
 # Rust BaseServer Port
 
-Async Rust implementation of BaseServer from grpchook. Wire protocol stays compatible with Python clients because server uses same gRPC service and message schema from grpchook/message.proto.
+Async Rust implementation of BaseServer from pookiepy. Wire protocol stays compatible with Python clients because server uses same gRPC service and message schema from pookiepy/message.proto.
 
 This Rust port was generated with AI assistance. Treat it as working draft code and plan human review before relying on it for long-term maintenance or production use.
 
@@ -91,13 +91,13 @@ cd .rust && cargo run
 Custom bind address and server name:
 
 ```bash
-cd .rust && GRPCHOOK_RUST_ADDR='[::]:50051' GRPCHOOK_RUST_NAME='server-rs' cargo run
+cd .rust && pookiepy_RUST_ADDR='[::]:50051' pookiepy_RUST_NAME='server-rs' cargo run
 ```
 
 On Windows PowerShell:
 
 ```powershell
-Set-Location .rust; $env:GRPCHOOK_RUST_ADDR='[::]:50051'; $env:GRPCHOOK_RUST_NAME='server-rs'; cargo run
+Set-Location .rust; $env:pookiepy_RUST_ADDR='[::]:50051'; $env:pookiepy_RUST_NAME='server-rs'; cargo run
 ```
 
 ## Test with Python client

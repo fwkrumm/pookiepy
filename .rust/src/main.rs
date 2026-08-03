@@ -1,6 +1,6 @@
-use grpchook_rust_server::server::{BaseServer, DefaultHooks, ServerConfig};
+use pookiepy_rust_server::server::{BaseServer, DefaultHooks, ServerConfig};
 
-/// Run async Rust grpchook-compatible server.
+/// Run async Rust pookiepy-compatible server.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -12,8 +12,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compact()
         .init();
 
-    let bind_addr = std::env::var("GRPCHOOK_RUST_ADDR").unwrap_or_else(|_| "[::]:50051".to_owned());
-    let name = std::env::var("GRPCHOOK_RUST_NAME").unwrap_or_else(|_| "rust-server".to_owned());
+    let bind_addr = std::env::var("pookiepy_RUST_ADDR").unwrap_or_else(|_| "[::]:50051".to_owned());
+    let name = std::env::var("pookiepy_RUST_NAME").unwrap_or_else(|_| "rust-server".to_owned());
 
     let server = BaseServer::new(bind_addr, name, DefaultHooks, ServerConfig::default())?;
 

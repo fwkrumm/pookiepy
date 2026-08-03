@@ -1,8 +1,8 @@
 [package]
-name = "grpchook-rust-server"
+name = "pookiepy-rust-server"
 version = "0.1.0"
 edition = "2021"
-description = "Rust async server compatible with grpchook Python clients"
+description = "Rust async server compatible with pookiepy Python clients"
 license = "MIT"
 
 [dependencies]

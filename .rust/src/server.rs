@@ -122,7 +122,7 @@ pub enum ServerRunError {
     Transport(#[from] tonic::transport::Error),
 }
 
-/// Async Rust port of grpchook BaseServer.
+/// Async Rust port of pookiepy BaseServer.
 pub struct BaseServer<H: ServerHooks> {
     name: String,
     uid: String,
