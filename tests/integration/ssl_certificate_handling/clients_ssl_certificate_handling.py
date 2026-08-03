@@ -9,9 +9,9 @@ import sys
 
 import grpc
 
-from grpchook.baseclient import BaseClient, ClientConfig
-from grpchook.exceptions import GrpcConnectionError
-from grpchook.tools import generate_message
+from pookiepy.baseclient import BaseClient, ClientConfig
+from pookiepy.exceptions import GrpcConnectionError
+from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
 SERVER_NAME_OVERRIDE = "waterzooi.test.google.be"

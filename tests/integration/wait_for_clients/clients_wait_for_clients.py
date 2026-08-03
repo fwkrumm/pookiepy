@@ -28,10 +28,10 @@ import sys
 import threading
 import time
 
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient
-from grpchook.exceptions import GrpcEmpty, GrpcConnectionError, ClientExit
-from grpchook.tools import generate_message
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import GrpcEmpty, GrpcConnectionError, ClientExit
+from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
 READY_TIMEOUT = 5.0   # seconds to wait for the ready_signal

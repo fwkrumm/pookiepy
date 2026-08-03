@@ -5,24 +5,24 @@ Python gRPC bidirectional-streaming framework. Subclass `BaseServer`/`BaseClient
 ## Layout
 
 ```
-grpchook/baseserver.py       # server base (StreamServicer)
-grpchook/baseclient.py       # client base
-grpchook/data_register.py         # server-side msg routing: messageName→clientId→queue
-grpchook/exceptions.py            # exception hierarchy
-grpchook/logger.py                # GrpcLogger + rotating file logger
-grpchook/tools.py                 # set_metadata, generate_message, evaluate_history
-grpchook/timer.py                 # high-precision periodic timer (multiprocessing)
-grpchook/schema_version.py        # SHA-256 proto fingerprint for compat check
-grpchook/custom_interface.py      # runtime .proto compile+load
-grpchook/message.proto         # proto source (one service, one bidirectional RPC)
-grpchook/message_pb2*.py       # generated --- DO NOT EDIT
+pookiepy/baseserver.py       # server base (StreamServicer)
+pookiepy/baseclient.py       # client base
+pookiepy/data_register.py         # server-side msg routing: messageName→clientId→queue
+pookiepy/exceptions.py            # exception hierarchy
+pookiepy/logger.py                # GrpcLogger + rotating file logger
+pookiepy/tools.py                 # set_metadata, generate_message, evaluate_history
+pookiepy/timer.py                 # high-precision periodic timer (multiprocessing)
+pookiepy/schema_version.py        # SHA-256 proto fingerprint for compat check
+pookiepy/custom_interface.py      # runtime .proto compile+load
+pookiepy/message.proto         # proto source (one service, one bidirectional RPC)
+pookiepy/message_pb2*.py       # generated --- DO NOT EDIT
 .rust/                        # Rust async BaseServer port (tonic/tokio)
 .rust/src/server.rs           # Rust BaseServer + hook trait + stream service
 .rust/src/data_register.rs    # Rust msg routing: messageName→clientId→queue
 .rust/src/schema_version.rs   # Rust proto fingerprint + metadata key
 ```
 
-Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. grpchook/message.proto`
+Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto`
 
 ## Proto --- Message fields
 
@@ -35,7 +35,7 @@ Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.
 | `payload` | `Payload` | `bytes bytePayload` or `Struct structPayload` |
 | `history` | `repeated DataPoint` | per-hop timestamps + perf_counter |
 
-## BaseServer --- [grpchook/BaseServer.py](grpchook/BaseServer.py)
+## BaseServer --- [pookiepy/BaseServer.py](pookiepy/BaseServer.py)
 
 ```python
 BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None)
@@ -58,9 +58,9 @@ Schema check: reads `SCHEMA_VERSION_METADATA_KEY` from metadata → `FAILED_PREC
 
 **Other:** `serve_forever()`, `shutdown()`, `_add_static_data(name, msg)`, `_get_static_data(name)`
 
-Rust sync rule: any behavior change, hook change, handshake change, routing change, schema handling change, or shutdown change in `grpchook/baseserver.py` must be reviewed against `.rust/src/server.rs` and synced when applicable. Such changes must also add or update tests for affected Python and Rust behavior.
+Rust sync rule: any behavior change, hook change, handshake change, routing change, schema handling change, or shutdown change in `pookiepy/baseserver.py` must be reviewed against `.rust/src/server.rs` and synced when applicable. Such changes must also add or update tests for affected Python and Rust behavior.
 
-## BaseClient --- [grpchook/BaseClient.py](grpchook/BaseClient.py)
+## BaseClient --- [pookiepy/BaseClient.py](pookiepy/BaseClient.py)
 
 ```python
 BaseClient(identifier, port, provides=None, requires=None, ip="localhost",
@@ -88,7 +88,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 **Context manager:** `with client:` → `__enter__` reconnects if disconnected, `__exit__` disconnects. Reusable.
 
-## DataRegister --- [grpchook/data_register.py](grpchook/data_register.py)
+## DataRegister --- [pookiepy/data_register.py](pookiepy/data_register.py)
 
 `dict[messageName → dict[clientId → queue.Queue]]`. Thread-safe: `_meta_lock` + per-messageName locks.
 
@@ -98,7 +98,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `remove_notification_queues_for_client(client_id)` | deregister on disconnect |
 | `add_data_for_message_name(client_id, message_name, data, target_client_id=None)` | fan-out, skip sender; `target_client_id`=unicast |
 
-## Exceptions --- [grpchook/exceptions.py](grpchook/exceptions.py)
+## Exceptions --- [pookiepy/exceptions.py](pookiepy/exceptions.py)
 
 | Exception | Raised when |
 |---|---|
@@ -110,21 +110,21 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `ClientExit` | `run_event` cleared during `get_data()` |
 | `GrpcEmpty` | `get_data()` timeout |
 
-## grpchook Utils
+## pookiepy Utils
 
-**Logger** (`grpchook/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console `coloredlogs` default `INFO`. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d at `INTERNAL_DEBUG`.
+**Logger** (`pookiepy/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console `coloredlogs` default `INFO`. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d at `INTERNAL_DEBUG`.
 
-**Tools** (`grpchook/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `Message`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
+**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `Message`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
-**Timer** (`grpchook/timer.py`): `timedevent(s, n)` context manager --- drift-compensated, RT priority.
+**Timer** (`pookiepy/timer.py`): `timedevent(s, n)` context manager --- drift-compensated, RT priority.
 ```python
 with timedevent(s=0.01, n=100) as te:
     for tick in te: ...
 ```
 
-**Schema version** (`grpchook/schema_version.py`): SHA-256 `FileDescriptorProto` → `SCHEMA_VERSION_METADATA_KEY`.
+**Schema version** (`pookiepy/schema_version.py`): SHA-256 `FileDescriptorProto` → `SCHEMA_VERSION_METADATA_KEY`.
 
-**Custom interface** (`grpchook/custom_interface.py`): `compile_proto(proto_path, out_dir)` + `load_module(...)` --- runtime proto compile/load without touching `grpchook/`.
+**Custom interface** (`pookiepy/custom_interface.py`): `compile_proto(proto_path, out_dir)` + `load_module(...)` --- runtime proto compile/load without touching `pookiepy/`.
 
 ## Design Patterns
 

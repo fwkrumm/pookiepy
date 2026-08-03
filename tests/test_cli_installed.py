@@ -1,8 +1,8 @@
 """
-Integration tests for the grpchook CLI.
+Integration tests for the pookiepy CLI.
 
-These tests install grpchook into a dedicated virtual environment (created
-once per test run in ``setUpClass``) and then invoke ``python -m grpchook``
+These tests install pookiepy into a dedicated virtual environment (created
+once per test run in ``setUpClass``) and then invoke ``python -m pookiepy``
 from a temporary working directory that is completely outside the project
 source tree.  This guarantees that the CLI is exercised against the *installed*
 package, not imported directly from sources.
@@ -56,12 +56,12 @@ from pathlib import Path
 # Root of the project source tree (two levels above this file).
 _PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-# HOW_TO.md as bundled inside the grpchook package directory.
+# HOW_TO.md as bundled inside the pookiepy package directory.
 # This is the authoritative source used for byte-for-byte comparison.
-_BUNDLED_HOW_TO = _PROJECT_ROOT / "grpchook" / "assets" / "HOW_TO.md"
+_BUNDLED_HOW_TO = _PROJECT_ROOT / "pookiepy" / "assets" / "HOW_TO.md"
 
 # The bundled message.proto used for byte-for-byte comparison.
-_BUNDLED_PROTO = _PROJECT_ROOT / "grpchook" / "message.proto"
+_BUNDLED_PROTO = _PROJECT_ROOT / "pookiepy" / "message.proto"
 
 # Optional extra args passed to pip install (e.g. "--no-build-isolation").
 # Set the PIP_EXTRA_ARGS environment variable to override.
@@ -101,7 +101,7 @@ def _find_uv() -> str | None:
 
 class TestInstalledCLI(unittest.TestCase):
     """
-    Smoke-tests for the ``python -m grpchook`` CLI, run against an installed
+    Smoke-tests for the ``python -m pookiepy`` CLI, run against an installed
     wheel rather than the source tree.
     """
 
@@ -115,13 +115,13 @@ class TestInstalledCLI(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         """
-        Create a temporary virtual environment and install grpchook into it.
+        Create a temporary virtual environment and install pookiepy into it.
 
         This runs once before all test methods in this class.  The install step
         invokes a PEP 517 build (pdm-backend), so it may take ~10–30 s on first
         run when the build backend is not yet cached.
         """
-        raw_venv_dir = tempfile.mkdtemp(prefix="grpchook_test_venv_")
+        raw_venv_dir = tempfile.mkdtemp(prefix="pookiepy_test_venv_")
         cls._venv_dir = Path(raw_venv_dir)
 
         uv = _find_uv()
@@ -139,7 +139,7 @@ class TestInstalledCLI(unittest.TestCase):
     @classmethod
     def _setup_with_uv(cls, uv: str) -> None:
         """
-        Create the virtual environment and install grpchook using ``uv``.
+        Create the virtual environment and install pookiepy using ``uv``.
 
         ``uv venv`` skips the ensurepip bootstrap entirely and is typically
         10x faster than ``venv.create(with_pip=True)``.
@@ -184,7 +184,7 @@ class TestInstalledCLI(unittest.TestCase):
     @classmethod
     def _setup_with_pip(cls) -> None:
         """
-        Create the virtual environment and install grpchook using the standard
+        Create the virtual environment and install pookiepy using the standard
         ``venv`` + ``pip`` toolchain.
 
         This is the fallback path when ``uv`` is not available.  The install
@@ -239,7 +239,7 @@ class TestInstalledCLI(unittest.TestCase):
         Each test method gets its own empty directory so generated files never
         bleed between tests.
         """
-        self._work_dir = Path(tempfile.mkdtemp(prefix="grpchook_test_work_"))
+        self._work_dir = Path(tempfile.mkdtemp(prefix="pookiepy_test_work_"))
 
     def tearDown(self) -> None:
         """Remove the per-test working directory."""
@@ -251,13 +251,13 @@ class TestInstalledCLI(unittest.TestCase):
 
     def _run(self, *args: str) -> subprocess.CompletedProcess:
         """
-        Invoke ``python -m grpchook *args`` inside *self._work_dir*.
+        Invoke ``python -m pookiepy *args`` inside *self._work_dir*.
 
         The working directory is always the temporary directory created in
         ``setUp``, so generated files land there and never pollute the project.
         """
         return subprocess.run(
-            [str(self._python), "-m", "grpchook", *args],
+            [str(self._python), "-m", "pookiepy", *args],
             cwd=str(self._work_dir),
             capture_output=True,
             text=True,
@@ -337,7 +337,7 @@ class TestInstalledCLI(unittest.TestCase):
         actual = generated.read_bytes()
         self.assertEqual(
             expected, actual,
-            "Generated HOW_TO.md content does not match grpchook/HOW_TO.md"
+            "Generated HOW_TO.md content does not match pookiepy/HOW_TO.md"
         )
 
     def test_generate(self):
@@ -407,7 +407,7 @@ class TestInstalledCLI(unittest.TestCase):
         actual = proto.read_bytes()
         self.assertEqual(
             expected, actual,
-            "Generated message.proto content does not match grpchook/message.proto"
+            "Generated message.proto content does not match pookiepy/message.proto"
         )
 
         # Printed instructions must contain the key heading.

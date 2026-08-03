@@ -19,13 +19,13 @@ from datetime import datetime, timezone
 from typing import Iterator
 
 import grpc
-from grpchook import message_pb2
-from grpchook import message_pb2_grpc
+from pookiepy import message_pb2
+from pookiepy import message_pb2_grpc
 
-from grpchook.logger import get_logger
-from grpchook.data_register import DataRegister
-from grpchook.tools import set_metadata
-from grpchook.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
+from pookiepy.logger import get_logger
+from pookiepy.data_register import DataRegister
+from pookiepy.tools import set_metadata
+from pookiepy.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
 
 @dataclass
 class ServerConfig():

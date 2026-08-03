@@ -6,12 +6,13 @@ uv.lock
 .lurus
 
 # Generated protobuf files --- regenerated at build/CI time
-grpchook/message_pb2.py
-grpchook/message_pb2.pyi
-grpchook/message_pb2_grpc.py
+pookiepy/message_pb2.py
+pookiepy/message_pb2.pyi
+pookiepy/message_pb2_grpc.py
 
 
 # rust specific
 .rust/target/*
 Cargo.lock
 devcontainer-lock.json
+

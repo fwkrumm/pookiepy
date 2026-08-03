@@ -18,8 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import grpc
 
-from grpchook import message_pb2
-from grpchook.baseserver import BaseServer, Peer, ServerConfig
+from pookiepy import message_pb2
+from pookiepy.baseserver import BaseServer, Peer, ServerConfig
 
 
 def _make_server(**kwargs) -> BaseServer:
@@ -183,7 +183,7 @@ class TestLifecycleHooks(unittest.TestCase):
             def start(self):
                 self.target(*self.args)
 
-        with patch("grpchook.baseserver.threading.Thread", _DummyThread), \
+        with patch("pookiepy.baseserver.threading.Thread", _DummyThread), \
              patch.object(BaseServer, "_handle_client_receive", lambda *_args, **_kwargs: None), \
              patch.object(queue.Queue, "get", fake_queue_get):
             generator = server.DataChannel(iter(()), context)

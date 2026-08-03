@@ -13,8 +13,8 @@ A clear and concise description of what the bug is.
 **To Reproduce**
 Provide a self-contained minimal example that demonstrates the bug. It should include only the code and setup needed to reproduce the issue, and nothing extra:
 ```python
-from grpchook.baseclient import BaseClient
-from grpchook.baseserver import BaseServer
+from pookiepy.baseclient import BaseClient
+from pookiepy.baseserver import BaseServer
 # ...
 ```
 

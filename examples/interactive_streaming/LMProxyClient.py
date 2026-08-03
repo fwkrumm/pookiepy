@@ -2,9 +2,9 @@
 import threading
 import time
 
-from grpchook import message_pb2
-from grpchook.baseclient import BaseClient
-from grpchook.tools import json_to_struct, struct_to_json
+from pookiepy import message_pb2
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import json_to_struct, struct_to_json
 from examples.interactive_streaming import _lm_http
 from examples.interactive_streaming._lm_http import (
     _iter_stream, _fetch_sync, _offline_stream, make_http_session,

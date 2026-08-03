@@ -17,8 +17,8 @@ import importlib
 import sys
 from pathlib import Path
 
-from grpchook.custom_interface import compile_and_register
-from grpchook.logger import get_logger as _get_logger
+from pookiepy.custom_interface import compile_and_register
+from pookiepy.logger import get_logger as _get_logger
 
 _THIS_DIR = Path(__file__).parent
 PROJECT_ROOT = _THIS_DIR.parent.parent.parent  # root directory
@@ -33,15 +33,15 @@ if not _p.exists():
     raise RuntimeError(f"Expected proto file at {_p} but it does not exist")
 
 _logger.info("Compiling and registering proto from %s", _p)
-compile_and_register(_p, package="grpchook", out_dir=_p.parent)
+compile_and_register(_p, package="pookiepy", out_dir=_p.parent)
 
-_imported_pb2 = importlib.import_module("grpchook.message_pb2")
-_internal_path = (PROJECT_ROOT / "grpchook" / "message_pb2.py").resolve()
+_imported_pb2 = importlib.import_module("pookiepy.message_pb2")
+_internal_path = (PROJECT_ROOT / "pookiepy" / "message_pb2.py").resolve()
 _imported_path = Path(_imported_pb2.__file__).resolve()
 
 if _imported_path == _internal_path:
     raise RuntimeError(
-        "Loaded grpchook.message_pb2 is the internal packaged module; "
+        "Loaded pookiepy.message_pb2 is the internal packaged module; "
         "expected the external/custom interface"
     )
 

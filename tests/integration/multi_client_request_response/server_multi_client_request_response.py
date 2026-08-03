@@ -8,8 +8,8 @@ example response_client1/response_client2/response_client3) and server routes
 by messageName only. This example shows the shared-topic + correlation-id model.
 """
 
-from grpchook.baseserver import Peer
-from grpchook import message_pb2
+from pookiepy.baseserver import Peer
+from pookiepy import message_pb2
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 

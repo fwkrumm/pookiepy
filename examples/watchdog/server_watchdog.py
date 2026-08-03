@@ -18,9 +18,9 @@ import threading
 from collections import deque
 from datetime import datetime, timezone
 
-from grpchook.baseserver import BaseServer, Peer, ServerConfig
-from grpchook.tools import generate_message
-from grpchook import message_pb2
+from pookiepy.baseserver import BaseServer, Peer, ServerConfig
+from pookiepy.tools import generate_message
+from pookiepy import message_pb2
 
 WATCHDOG_REQUEST = "watchdog_request"
 WATCHDOG_STATS   = "watchdog_stats"

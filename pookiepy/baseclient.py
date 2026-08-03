@@ -18,19 +18,19 @@ from typing import Union
 
 import grpc
 
-from grpchook import message_pb2
-from grpchook import message_pb2_grpc
+from pookiepy import message_pb2
+from pookiepy import message_pb2_grpc
 
-from grpchook.logger import get_logger
-from grpchook.exceptions import GrpcConnectionError, \
+from pookiepy.logger import get_logger
+from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcTimeoutError, \
                               GrpcResourceExhaustedError, \
                               GrpcValueError, \
                               ClientExit, \
                               GrpcEmpty
 
-from grpchook.tools import set_metadata
-from grpchook.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
+from pookiepy.tools import set_metadata
+from pookiepy.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
 
 
 class _StreamError:  # pylint: disable=too-few-public-methods

@@ -4,9 +4,9 @@ import tempfile
 import threading
 from pathlib import Path
 
-from grpchook.baseclient import BaseClient
-from grpchook import message_pb2
-from grpchook.tools import struct_to_json, json_to_struct
+from pookiepy.baseclient import BaseClient
+from pookiepy import message_pb2
+from pookiepy.tools import struct_to_json, json_to_struct
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
