@@ -37,10 +37,16 @@ class IntegrationServer(BaseServer):
         args: Parsed ``argparse.Namespace`` from :func:`tests.integration._interface.get_args`.
     """
 
-    def __init__(self, port: int, *args, **kwargs):
+    def __init__(self, port: int, *args, ip: str = "127.0.0.1", **kwargs):
+        """Initialize test server on explicit loopback by default.
+
+        Integration tests run many short-lived subprocesses in CI. Binding to
+        loopback instead of wildcard address reduces cross-process port
+        collisions on shared runners while still allowing explicit overrides.
+        """
         self._active_client_ids: set[str] = set()
         self._active_client_lock = threading.Lock()
-        super().__init__(port, *args, **kwargs)
+        super().__init__(port, *args, ip=ip, **kwargs)
 
     def on_client_accepted(self, peer: Peer, request: message_pb2.Message):
         """Track accepted integration clients for disconnect-based shutdown fallback."""

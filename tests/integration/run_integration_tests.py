@@ -28,6 +28,7 @@ _env["PYTHONPATH"] = str(PROJECT_ROOT) + (os.pathsep + _existing if _existing el
 # letting CI spin forever.
 EXAMPLE_TIMEOUT_S = 120
 SERVER_STARTUP_WAIT_S = 1.0
+SERVER_STARTUP_RETRIES = 5
 
 # examples/integration tests to execute
 EXAMPLES = [
@@ -199,6 +200,37 @@ def _wait_for_server_startup(server_path: Path, srv: subprocess.Popen, port: int
         )
 
 
+def _start_server_with_retry(server_path: Path) -> tuple[subprocess.Popen, int]:
+    """Start server subprocess, retrying ephemeral port races a few times."""
+    last_error: RuntimeError | None = None
+
+    for attempt in range(1, SERVER_STARTUP_RETRIES + 1):
+        port = _pick_unused_port()
+        srv_cmd = [sys.executable, str(server_path), "--ip", "127.0.0.1", "--port", str(port)]
+        print(f"Starting server (attempt {attempt}/{SERVER_STARTUP_RETRIES}): {srv_cmd}")
+        srv = subprocess.Popen(  # pylint: disable=consider-using-with
+            srv_cmd,
+            cwd=str(ROOT),
+            env=_env,
+        )
+        try:
+            _wait_for_server_startup(server_path, srv, port)
+            return srv, port
+        except RuntimeError as exc:
+            last_error = exc
+            _terminate(srv, "server")
+            if attempt == SERVER_STARTUP_RETRIES:
+                break
+            print(
+                f"Server startup failed on port {port}; retrying with a fresh port "
+                f"({attempt}/{SERVER_STARTUP_RETRIES})."
+            )
+
+    raise last_error if last_error is not None else RuntimeError(
+        f"Server '{server_path.name}' failed to start."
+    )
+
+
 def run_example_pair(server_path: Path, client_path: Path):
     """
     run examples and check if they terminate cleanly. If one example
@@ -221,14 +253,7 @@ def run_example_pair(server_path: Path, client_path: Path):
             print(f"Server script not found: {server_path}, skipping example")
             return
 
-        srv_cmd = [sys.executable, str(server_path), "--ip", "127.0.0.1", "--port", str(port)]
-        print(f"Starting server: {srv_cmd}")
-        srv = subprocess.Popen(  # pylint: disable=consider-using-with
-            srv_cmd,
-            cwd=str(ROOT),
-            env=_env,
-        )
-        _wait_for_server_startup(server_path, srv, port)
+        srv, port = _start_server_with_retry(server_path)
     else:
         print("(client-only test --- no server started)")
 
