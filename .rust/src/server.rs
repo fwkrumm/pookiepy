@@ -14,7 +14,7 @@ use tonic::{Request, Response, Status};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::data_register::{notification_channel, DataRegister, NotificationRx};
+use crate::data_register::{notification_channel, DataRegister, NotificationRx, NotificationTx};
 use crate::pb::stream_server::{Stream, StreamServer};
 use crate::pb::{DataPoint, Message, MetaInformation, ServerProvides};
 use crate::schema_version::SCHEMA_VERSION_METADATA_KEY;
@@ -271,13 +271,22 @@ impl<H: ServerHooks> BaseServer<H> {
         });
     }
 
-    fn spawn_incoming_task(&self, mut incoming: tonic::Streaming<Message>, peer: Peer) {
+    fn spawn_incoming_task(
+        &self,
+        mut incoming: tonic::Streaming<Message>,
+        peer: Peer,
+        notification_tx: NotificationTx,
+    ) {
         let hooks = Arc::clone(&self.hooks);
         let data_register = Arc::clone(&self.data_register);
         let connected_clients = Arc::clone(&self.connected_clients);
         let global_exit_event = Arc::clone(&self.global_exit_event);
 
         tokio::spawn(async move {
+            // Keep one sender alive for stream lifetime so response channel does not close
+            // when client has no `requires` subscriptions.
+            let _notification_tx_guard = notification_tx;
+
             loop {
                 if global_exit_event.load(Ordering::SeqCst) {
                     break;
@@ -315,7 +324,10 @@ impl<H: ServerHooks> BaseServer<H> {
                 .await;
             hooks.on_client_disconnect(&peer).await;
             connected_clients.fetch_sub(1, Ordering::SeqCst);
-            info!("{}: disconnected", peer.peer);
+            info!(
+                "{}: client disconnected name={} client_id={} session_id={}",
+                peer.peer, peer.name, peer.client_id, peer.session_id
+            );
         });
     }
 }
@@ -427,11 +439,9 @@ impl<H: ServerHooks> Stream for BaseServer<H> {
             peer.peer, client_info.requires, client_info.provides, peer.session_id
         );
 
-        drop(notification_tx);
-
         let (stream_tx, stream_rx) = mpsc::channel(self.config.response_stream_buffer);
         self.spawn_outgoing_task(notification_rx, stream_tx, peer.clone());
-        self.spawn_incoming_task(incoming, peer);
+        self.spawn_incoming_task(incoming, peer, notification_tx);
 
         let output_stream = ReceiverStream::new(stream_rx);
         Ok(Response::new(
