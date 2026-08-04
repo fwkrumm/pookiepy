@@ -20,6 +20,7 @@ import grpc
 
 from pookiepy import message_pb2
 from pookiepy.baseserver import BaseServer, Peer, ServerConfig
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
 
 
 def _make_server(**kwargs) -> BaseServer:
@@ -224,6 +225,10 @@ class TestServerName(unittest.TestCase):
 class TestServerConfig(unittest.TestCase):
     """Tests for ServerConfig defaults and compression field."""
 
+    def test_schema_version_default_is_empty(self):
+        """ServerConfig.schema_version defaults to an empty string."""
+        self.assertEqual(ServerConfig().schema_version, "")
+
     def test_compression_default_is_none(self):
         """ServerConfig.compression defaults to None (no compression)."""
         self.assertIsNone(ServerConfig().compression)
@@ -240,9 +245,65 @@ class TestServerConfig(unittest.TestCase):
 
     def test_compression_passed_to_server(self):
         """BaseServer stores the config compression field for use in serve_forever."""
-        cfg = ServerConfig(compression=grpc.Compression.Gzip)
+        cfg = ServerConfig(compression=grpc.Compression.Gzip, schema_version="v1")
         server = BaseServer(port=50088, config=cfg)
         self.assertEqual(server.config.compression, grpc.Compression.Gzip)
+        self.assertEqual(server.config.schema_version, "v1")
+
+
+class TestSchemaValidation(unittest.TestCase):
+    """Tests for schema-version metadata validation in BaseServer.DataChannel."""
+
+    def test_empty_server_and_client_schema_logs_warning(self):
+        """Server warns when neither side provides a schema version string."""
+        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        server = BaseServer(port=50087, config=ServerConfig(schema_version=""))
+        server.logger.warning = MagicMock()
+        context = MagicMock()
+        context.peer.return_value = "fake-peer"
+        context.invocation_metadata.return_value = []
+
+        def fake_queue_get(_self, timeout=1):
+            _ = timeout
+            server.global_exit_event.set()
+            return msg
+
+        class _DummyThread:  # pylint: disable=too-few-public-methods
+            def __init__(self, target, args=(), **_kwargs):
+                self.target = target
+                self.args = args
+
+            def start(self):
+                self.target(*self.args)
+
+        with patch("pookiepy.baseserver.threading.Thread", _DummyThread), \
+             patch.object(BaseServer, "_handle_client_receive", lambda *_args, **_kwargs: None), \
+             patch.object(queue.Queue, "get", fake_queue_get):
+            generator = server.DataChannel(iter(()), context)
+            yielded = next(generator)
+
+        self.assertIs(yielded, msg)
+        server.logger.warning.assert_called_once()
+        self.assertIn("cannot check schema because empty", server.logger.warning.call_args.args[0])
+
+    def test_mismatched_schema_aborts_connection(self):
+        """Server aborts with FAILED_PRECONDITION when schema strings differ."""
+        server = BaseServer(port=50086, config=ServerConfig(schema_version="server-v1"))
+        context = MagicMock()
+        context.peer.return_value = "fake-peer"
+        context.invocation_metadata.return_value = [
+            (SCHEMA_VERSION_METADATA_KEY, "client-v2")
+        ]
+
+        generator = server.DataChannel(iter(()), context)
+
+        with self.assertRaises(StopIteration):
+            next(generator)
+
+        context.abort.assert_called_once_with(
+            grpc.StatusCode.FAILED_PRECONDITION,
+            "Proto schema mismatch: server=server-v1, client=client-v2",
+        )
 
 
 if __name__ == "__main__":

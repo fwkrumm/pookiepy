@@ -24,6 +24,7 @@ import grpc
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient, ClientConfig
 from pookiepy.exceptions import ClientExit, GrpcValueError
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -251,13 +252,42 @@ class TestClientConfig(unittest.TestCase):
         """Default connection_check_timeout is a positive number."""
         self.assertGreater(ClientConfig().connection_check_timeout, 0)
 
+    def test_default_schema_version_is_empty(self):
+        """ClientConfig.schema_version defaults to an empty string."""
+        self.assertEqual(ClientConfig().schema_version, "")
+
     def test_custom_config_applied(self):
         """A custom ClientConfig is stored and applied on the client instance."""
-        cfg = ClientConfig(receive_queue_maxsize=10, connection_check_timeout=1.0)
+        cfg = ClientConfig(
+            receive_queue_maxsize=10,
+            connection_check_timeout=1.0,
+            schema_version="v1",
+        )
         with patch.object(BaseClient, "run", lambda self: None):
             client = BaseClient(name="cfg-test", port=50099, config=cfg)
         self.assertEqual(client.config.receive_queue_maxsize, 10)
         self.assertEqual(client.config.connection_check_timeout, 1.0)
+        self.assertEqual(client.config.schema_version, "v1")
+
+    def test_schema_version_metadata_is_sent_from_config(self):
+        """Configured schema_version is attached to the gRPC stream metadata."""
+        cfg = ClientConfig(schema_version="v1")
+        with patch.object(BaseClient, "run", lambda self: None):
+            client = BaseClient(
+                name="schema-test",
+                port=50099,
+                provides=["foo"],
+                config=cfg,
+            )
+        client.channel = MagicMock()
+        client.stub = MagicMock()
+
+        with patch("pookiepy.baseclient.grpc.channel_ready_future") as ready_future:
+            ready_future.return_value.result.return_value = None
+            client._connect()  # pylint: disable=protected-access
+
+        metadata = client.stub.DataChannel.call_args.kwargs["metadata"]
+        self.assertEqual(metadata[0], (SCHEMA_VERSION_METADATA_KEY, "v1"))
 
     def test_ext_metadata_default_is_empty(self):
         """Default ext_metadata is an empty list."""
