@@ -25,7 +25,7 @@ from pookiepy import message_pb2_grpc
 from pookiepy.logger import get_logger
 from pookiepy.data_register import DataRegister
 from pookiepy.tools import set_metadata
-from pookiepy.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
 
 @dataclass
 class ServerConfig():
@@ -39,6 +39,8 @@ class ServerConfig():
     max_workers: int | None = None
     # interval in seconds for the serve_forever shutdown-detection watchdog
     shutdown_poll_interval: float = 0.1
+    # application-managed schema version string expected from connecting clients
+    schema_version: str = ""
     # gRPC compression algorithm applied to server-sent messages.
     # Must be enabled on BOTH server and client to compress both directions.
     # If only the server sets this, only server->client messages are compressed;
@@ -288,17 +290,23 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self.logger.idebug("%s: connected to DataChannel. Checking permissions", peer)
 
         try:
-            # Verify proto schema compatibility before processing any messages
+            # Verify application-managed schema compatibility before processing any messages.
             metadata = dict(context.invocation_metadata())
-            client_schema = metadata.get(SCHEMA_VERSION_METADATA_KEY)
-            if client_schema is not None and client_schema != SCHEMA_VERSION:
+            client_schema = metadata.get(SCHEMA_VERSION_METADATA_KEY, "")
+            server_schema = self.__config.schema_version
+
+            if not server_schema and not client_schema:
+                self.logger.warning("%s: cannot check schema because empty", peer)
+            elif client_schema != server_schema:
                 self.logger.error(
                     "%s: schema mismatch - server=%s client=%s. Rejecting connection.",
-                    peer, SCHEMA_VERSION, client_schema
+                    peer,
+                    server_schema,
+                    client_schema,
                 )
                 context.abort(
                     grpc.StatusCode.FAILED_PRECONDITION,
-                    f"Proto schema mismatch: server={SCHEMA_VERSION}, client={client_schema}"
+                    f"Proto schema mismatch: server={server_schema}, client={client_schema}"
                 )
                 return
 
@@ -367,7 +375,11 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             self.logger.iinfo("Using SSL credentials for server")
             server.add_secure_port(f"{self._ip}:{self._port}", self.__ssl_credentials)
         server.start()
-        self.logger.info("server %s started (schema=%s)", self, SCHEMA_VERSION)
+        self.logger.info(
+            "server %s started (schema=%s)",
+            self,
+            self.__config.schema_version,
+        )
         try:
             while not self._global_exit_event.is_set():
                 self._global_exit_event.wait(timeout=self.__config.shutdown_poll_interval)

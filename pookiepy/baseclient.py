@@ -30,7 +30,7 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcEmpty
 
 from pookiepy.tools import set_metadata
-from pookiepy.schema_version import SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
 
 
 class _StreamError:  # pylint: disable=too-few-public-methods
@@ -56,10 +56,12 @@ class ClientConfig:
     receive_queue_maxsize: int = 0
     # timeout in seconds to wait for server welcome message after connecting
     connection_check_timeout: float = 5.0
+    # application-managed schema version string sent as gRPC metadata on connect
+    schema_version: str = ""
     # gRPC channel options
     ssl_credentials: grpc.ChannelCredentials = None
     # extra/extend (key, value) metadata tuples appended to every gRPC stream call;
-    # the schema-version entry is always prepended automatically
+    # the configured schema-version entry is always prepended automatically
     ext_metadata: list = field(default_factory=list)
     # gRPC compression algorithm applied to client-sent messages.
     # Must be enabled on BOTH server and client to compress both directions.
@@ -121,7 +123,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self._setup_connection()
 
         # if connection fails exception will be raised before
-        self.logger.info("Client %s connected (schema=%s)", self, SCHEMA_VERSION)
+        self.logger.info(
+            "Client %s connected (schema=%s)",
+            self,
+            self.__config.schema_version,
+        )
 
 
     def _setup_connection(self):
@@ -192,7 +198,9 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         self.stream = self.stub.DataChannel(
             self._request_generator(),
-            metadata=[(SCHEMA_VERSION_METADATA_KEY, SCHEMA_VERSION)] + self.__config.ext_metadata,
+            metadata=[
+                (SCHEMA_VERSION_METADATA_KEY, self.__config.schema_version)
+            ] + self.__config.ext_metadata,
             compression=self.__config.compression,
         )
 
