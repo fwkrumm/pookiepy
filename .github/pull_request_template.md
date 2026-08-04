@@ -19,7 +19,7 @@ Mention any alternative approaches or solutions you explored.
 ## Checklist
 - [ ] Tests added or updated for the change
 - [ ] `unittest discover` passes locally
-- [ ] Proto changes regenerated via `_generate_interfaces.bat` (if applicable)
+- [ ] Proto changes regenerated via `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto`
 - [ ] No hardcoded credentials or secrets
 
 ## Additional Context
