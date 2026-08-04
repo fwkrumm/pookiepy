@@ -363,7 +363,7 @@ If you modify `pookiepy/message.proto` after cloning the repository, regenerate 
 python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto
 ```
 
-Note that all clients which connect to a server have to use the same proto schema version i.e. the same proto file. The different signals for the clients must be used in substructures:
+Note that all clients which connect to a server should use the same proto layout. For runtime checking, set matching manual schema labels on both sides, for example `ClientConfig(schema_version="chat-v1")` and `ServerConfig(schema_version="chat-v1")`. If both values stay empty, the connection is allowed and the server logs a warning that schema validation could not run. The different signals for the clients must be used in substructures:
 
 ```proto
 message Payload {
@@ -433,8 +433,10 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.7                      | Fix race condition which allowed clients to put data before welcome message. |
 | 0.0.8                      | Fix link in readme for pypi page. |
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
-| 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
+| 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup. |
 | 0.0.11                     | Add deprecation warning because of project rename. |
-| 0.0.12                     | Project renamed to pookiepy |
-| 0.0.13                     | Revert publish via token and add note concerning old project name |
-| 0.0.14                     | Minor bug fixes |
+| 0.0.12                     | Project renamed to pookiepy. |
+| 0.0.13                     | Revert publish via token and add note concerning old project name. |
+| 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
+| 0.0.15                     | Minor bug fixes TBD |
+

@@ -103,6 +103,7 @@ config = ServerConfig(
     max_workers=10,            # thread pool size (>= expected concurrent clients)
     max_queue_elements=0,      # per-client queue depth (0 = unlimited)
     shutdown_poll_interval=0.1,
+    schema_version="chat-v1", # optional manual schema/version string
 )
 BaseServer(port=50051, config=config)
 ```
@@ -181,6 +182,7 @@ with MyClient(port=50051) as client:
 config = ClientConfig(
     receive_queue_maxsize=0,        # 0 = unlimited
     connection_check_timeout=5.0,   # seconds waiting for server welcome
+    schema_version="chat-v1",      # must match server when either side sets it
     ext_metadata=[],                # extra (key, value) gRPC call metadata tuples
     compression=None,               # optional grpc.Compression.Gzip / Deflate
     grpc_options=[
@@ -259,7 +261,11 @@ with TimedEvent(s=0.01, n=100) as te:
 
 ### Schema compatibility
 
-Framework auto-attaches schema-version metadata on each stream call. Server rejects schema mismatch with `FAILED_PRECONDITION`.
+Framework auto-attaches `ClientConfig.schema_version` as gRPC metadata on each stream call. Server compares it against `ServerConfig.schema_version` during connect.
+
+- If both values are empty strings, connection continues and server logs `cannot check schema because empty`.
+- If either side sets a value, both values must match exactly or server aborts with `FAILED_PRECONDITION`.
+- Prefer human-managed labels such as `chat-v1`, `2026-08-proto`, or package release versions.
 
 ### Logging
 
