@@ -17,7 +17,7 @@ use uuid::Uuid;
 use crate::data_register::{notification_channel, DataRegister, NotificationRx};
 use crate::pb::stream_server::{Stream, StreamServer};
 use crate::pb::{DataPoint, Message, MetaInformation, ServerProvides};
-use crate::schema_version::{schema_version, SCHEMA_VERSION_METADATA_KEY};
+use crate::schema_version::SCHEMA_VERSION_METADATA_KEY;
 
 static PERF_COUNTER_START: OnceLock<Instant> = OnceLock::new();
 
@@ -27,7 +27,7 @@ pub struct ServerConfig {
     pub max_queue_elements: usize,
     pub response_stream_buffer: usize,
     pub shutdown_poll_interval: Duration,
-    pub strict_schema_version: bool,
+    pub schema_version: String,
     pub warning_client_threshold: Option<usize>,
     pub accept_gzip: bool,
     pub send_gzip: bool,
@@ -39,7 +39,7 @@ impl Default for ServerConfig {
             max_queue_elements: 0,
             response_stream_buffer: 64,
             shutdown_poll_interval: Duration::from_millis(100),
-            strict_schema_version: false,
+            schema_version: String::new(),
             warning_client_threshold: Some(32),
             accept_gzip: true,
             send_gzip: true,
@@ -194,7 +194,7 @@ impl<H: ServerHooks> BaseServer<H> {
             "server {} started at {} (schema={})",
             self.name,
             self.addr,
-            schema_version()
+            self.config.schema_version
         );
 
         let mut service = StreamServer::new(self.clone());
@@ -228,28 +228,24 @@ impl<H: ServerHooks> BaseServer<H> {
     }
 
     fn handle_schema(&self, metadata: &MetadataMap, peer: &Peer) -> Option<Status> {
-        let client_schema_value = metadata.get(SCHEMA_VERSION_METADATA_KEY)?;
+        let client_schema = metadata
+            .get(SCHEMA_VERSION_METADATA_KEY)
+            .and_then(|value| value.to_str().ok())
+            .unwrap_or("");
+        let server_schema = self.config.schema_version.as_str();
 
-        let Ok(client_schema) = client_schema_value.to_str() else {
+        if server_schema.is_empty() && client_schema.is_empty() {
+            warn!("{}: cannot check schema because empty", peer.peer);
             return None;
-        };
+        }
 
-        let server_schema = schema_version();
         if client_schema == server_schema {
             return None;
         }
 
-        if self.config.strict_schema_version {
-            return Some(Status::failed_precondition(format!(
-                "Proto schema mismatch: server={server_schema}, client={client_schema}"
-            )));
-        }
-
-        warn!(
-            "{}: schema mismatch tolerated strict_schema_version=false server={} client={}",
-            peer.peer, server_schema, client_schema
-        );
-        None
+        Some(Status::failed_precondition(format!(
+            "Proto schema mismatch: server={server_schema}, client={client_schema}"
+        )))
     }
 
     fn spawn_outgoing_task(
@@ -505,15 +501,15 @@ mod tests {
         DefaultHooks, Message, MetaInformation, Peer, ServerConfig,
     };
     use crate::pb::DataPoint;
-    use crate::schema_version::{schema_version, SCHEMA_VERSION_METADATA_KEY};
+    use crate::schema_version::SCHEMA_VERSION_METADATA_KEY;
 
-    fn test_server(strict_schema_version: bool) -> BaseServer<DefaultHooks> {
+    fn test_server(schema_version: &str) -> BaseServer<DefaultHooks> {
         BaseServer::new(
             "127.0.0.1:50051",
             "test-server",
             DefaultHooks,
             ServerConfig {
-                strict_schema_version,
+                schema_version: schema_version.to_owned(),
                 shutdown_poll_interval: Duration::from_millis(1),
                 ..ServerConfig::default()
             },
@@ -523,7 +519,7 @@ mod tests {
 
     #[test]
     fn shutdown_sets_global_exit_state() {
-        let server = test_server(false);
+        let server = test_server("");
         assert!(!server.is_shutdown());
 
         server.shutdown();
@@ -532,8 +528,8 @@ mod tests {
     }
 
     #[test]
-    fn strict_schema_mismatch_is_rejected() {
-        let server = test_server(true);
+    fn schema_mismatch_is_rejected() {
+        let server = test_server("server-v1");
         let peer = Peer::new("127.0.0.1:12345".to_owned());
         let mut metadata = tonic::metadata::MetadataMap::new();
         metadata.insert(
@@ -545,24 +541,35 @@ mod tests {
 
         let err = server
             .handle_schema(&metadata, &peer)
-            .expect("strict mismatch should reject");
+            .expect("mismatch should reject");
 
         assert_eq!(err.code(), Code::FailedPrecondition);
-        assert!(err.message().contains(schema_version()));
+        assert!(err.message().contains("server-v1"));
         assert!(err.message().contains("different-version"));
     }
 
     #[test]
-    fn permissive_schema_mismatch_is_accepted() {
-        let server = test_server(false);
+    fn schema_match_is_accepted() {
+        let server = test_server("server-v1");
         let peer = Peer::new("127.0.0.1:12345".to_owned());
         let mut metadata = tonic::metadata::MetadataMap::new();
         metadata.insert(
             SCHEMA_VERSION_METADATA_KEY,
-            "different-version"
+            "server-v1"
                 .parse()
                 .expect("metadata value should parse"),
         );
+
+        let result = server.handle_schema(&metadata, &peer);
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn empty_schema_on_both_sides_is_accepted() {
+        let server = test_server("");
+        let peer = Peer::new("127.0.0.1:12345".to_owned());
+        let metadata = tonic::metadata::MetadataMap::new();
 
         let result = server.handle_schema(&metadata, &peer);
 

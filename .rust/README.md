@@ -10,7 +10,7 @@ This Rust port was generated with AI assistance. Treat it as working draft code 
 - Welcome-first handshake compatible with Python BaseClient
 - Requires-based fan-out routing with per-message subscriptions
 - Metadata key x-schema-version handling
-- Configurable schema strictness (default false for interoperability)
+- Manual schema version check via ServerConfig.schema_version
 - Graceful shutdown trigger
 - Optional gzip compression on both directions
 
@@ -115,8 +115,8 @@ Set-Location ..; uv run python examples/interactive_streaming/run_text_client.py
 - Package name is message.proto.v3, same as Python proto.
 - First client message must contain metaInfo.clientInfo.
 - Server sends welcome message with metaInfo.serverInfo before require registration side effects are visible.
-- strict_schema_version defaults to false so mismatches are logged but tolerated.
-- If you need Python-equivalent hard reject on mismatch, set strict_schema_version to true in ServerConfig.
+- If both client and server schema strings are empty, connection continues and server logs cannot check schema because empty.
+- If at least one side sets schema string, both values must match exactly or server rejects with FAILED_PRECONDITION.
 
 ## ToDos
 
