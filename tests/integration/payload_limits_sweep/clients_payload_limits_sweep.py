@@ -39,6 +39,7 @@ STREAM_NAME = "bulk_payload"
 EXIT_NAME = "server-exit"
 SERVER_STARTUP_WAIT_S = 1.0
 SERVER_STOP_WAIT_S = 10.0
+SERVER_STARTUP_RETRIES = 5
 SEND_DRAIN_TIMEOUT_S = 20.0
 
 # Keep runtime bounded for CI while still collecting useful statistics.
@@ -167,6 +168,8 @@ def _start_server(max_send_bytes: int, max_receive_bytes: int, port: int) -> sub
     cmd = [
         sys.executable,
         str(script_path),
+        "--ip",
+        "127.0.0.1",
         "--port",
         str(port),
         "--max-send-message-length",
@@ -190,6 +193,31 @@ def _start_server(max_send_bytes: int, max_receive_bytes: int, port: int) -> sub
         )
 
     return proc
+
+
+def _start_server_with_retry(
+    max_send_bytes: int,
+    max_receive_bytes: int,
+) -> tuple[subprocess.Popen, int]:
+    """Start per-case server with bounded retries for ephemeral port races."""
+    last_error: RuntimeError | None = None
+
+    for attempt in range(1, SERVER_STARTUP_RETRIES + 1):
+        port = _pick_unused_port()
+        try:
+            return _start_server(max_send_bytes, max_receive_bytes, port), port
+        except RuntimeError as exc:
+            last_error = exc
+            if attempt == SERVER_STARTUP_RETRIES:
+                break
+            print(
+                "Server startup failed on port "
+                f"{port}; retrying with fresh port ({attempt}/{SERVER_STARTUP_RETRIES})."
+            )
+
+    raise last_error if last_error is not None else RuntimeError(
+        "Payload-limit sweep server failed to start."
+    )
 
 
 def _stop_server(proc: subprocess.Popen):
@@ -325,8 +353,10 @@ def _run_case_once(
     run_suffix: str,
 ) -> RunResult:
     """Run one benchmark case once with warmup and timed section."""
-    port = _pick_unused_port()
-    server_proc = _start_server(sweep_case.max_send_bytes, sweep_case.max_receive_bytes, port)
+    server_proc, port = _start_server_with_retry(
+        sweep_case.max_send_bytes,
+        sweep_case.max_receive_bytes,
+    )
 
     options = _build_client_options(sweep_case.max_send_bytes, sweep_case.max_receive_bytes)
     payload = b"X" * sweep_case.payload_bytes
@@ -430,8 +460,10 @@ def _run_case_once(
 
 def _run_limit_check(limit_case: LimitCheckCase) -> LimitCheckResult:  # pylint: disable=too-many-branches,too-many-statements
     """Validate one explicit message-size limit behavior case."""
-    port = _pick_unused_port()
-    server_proc = _start_server(limit_case.max_send_bytes, limit_case.max_receive_bytes, port)
+    server_proc, port = _start_server_with_retry(
+        limit_case.max_send_bytes,
+        limit_case.max_receive_bytes,
+    )
 
     options = _build_client_options(limit_case.max_send_bytes, limit_case.max_receive_bytes)
     payload = b"Y" * limit_case.payload_bytes

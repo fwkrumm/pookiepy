@@ -26,16 +26,21 @@ def _build_server_options(
 class PayloadLimitServer(IntegrationServer):
     """Relay server configured with explicit gRPC message-size limits."""
 
-    def __init__(self, port: int, max_send_bytes: int, max_receive_bytes: int):
+    def __init__(self, port: int, max_send_bytes: int, max_receive_bytes: int, ip: str):
         cfg = ServerConfig(
             server_options=_build_server_options(max_send_bytes, max_receive_bytes)
         )
-        super().__init__(port, config=cfg)
+        super().__init__(port, ip=ip, config=cfg)
 
 
 def _parse_args() -> argparse.Namespace:
     """Parse CLI args for server port and message-size limits."""
     parser = argparse.ArgumentParser(description="Payload-limit sweep -- server")
+    parser.add_argument(
+        "--ip",
+        default="127.0.0.1",
+        help="Server hostname or IP address (default: 127.0.0.1)",
+    )
     parser.add_argument("--port", type=int, required=True, help="Server port")
     parser.add_argument(
         "--max-send-message-length",
@@ -58,5 +63,6 @@ if __name__ == "__main__":
         port=args.port,
         max_send_bytes=args.max_send_message_length,
         max_receive_bytes=args.max_receive_message_length,
+        ip=args.ip,
     )
     server.serve_forever()

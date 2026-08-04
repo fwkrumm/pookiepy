@@ -8,7 +8,7 @@ reviewers: ''
 
 ## Related Problem
 Describe the issue this pull request addresses.
-Example: *I'm always frustrated when [...] because [...]*
+Example: *This pull request changes [...] because [...]*
 
 ## Proposed Solution
 Clearly explain the changes introduced in this pull request.
