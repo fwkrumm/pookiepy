@@ -437,3 +437,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.11                     | Add deprecation warning because of project rename. |
 | 0.0.12                     | Project renamed to pookiepy |
 | 0.0.13                     | Revert publish via token and add note concerning old project name |
+| 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
