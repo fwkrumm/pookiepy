@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from google.protobuf import struct_pb2
 from google.protobuf import json_format
 from pookiepy import message_pb2
+from pookiepy.exceptions import GrpcCustomInterfaceError
 
 def set_metadata(message: message_pb2.Message):
     """
@@ -178,8 +179,8 @@ def generate_message(message_name: str = "default_message",
     timestamp set in its metadata. If both payload types are empty, the message will have
     an empty payload.
 
-    TODO that this function will NOT work if the interface is changed. This will have to
-    be handled more gracefully in the future, possibly by a schema check?
+    If a custom interface changes payload field names, this helper raises
+    ``GrpcCustomInterfaceError`` with details on the missing field.
 
     Parameters
     ----------
@@ -201,15 +202,38 @@ def generate_message(message_name: str = "default_message",
     -------
     message_pb2.Message
         The generated Message object ready to be sent.
+
+    Raises
+    ------
+    GrpcCustomInterfaceError
+        If the active proto interface does not expose expected payload fields
+        (``structPayload`` / ``bytePayload``), which commonly happens when a
+        custom payload schema differs from the bundled one.
     """
     msg = message_pb2.Message()
     msg.metaInfo.messageName = message_name
 
     if struct_payload is not None:
-        msg.payload.structPayload.CopyFrom(json_to_struct(struct_payload))
+        try:
+            msg.payload.structPayload.CopyFrom(json_to_struct(struct_payload))
+        except AttributeError as exc:
+            raise GrpcCustomInterfaceError(
+                "Custom interface mismatch in generate_message(): expected payload "
+                "field 'structPayload' but active schema does not provide it. "
+                "If using pookiepy.custom_interface, align Payload field names or "
+                "build messages directly with your custom message_pb2 classes."
+            ) from exc
 
     if byte_payload is not None:
-        msg.payload.bytePayload = byte_payload
+        try:
+            msg.payload.bytePayload = byte_payload
+        except AttributeError as exc:
+            raise GrpcCustomInterfaceError(
+                "Custom interface mismatch in generate_message(): expected payload "
+                "field 'bytePayload' but active schema does not provide it. "
+                "If using pookiepy.custom_interface, align Payload field names or "
+                "build messages directly with your custom message_pb2 classes."
+            ) from exc
 
     if add_metadata:
         set_metadata(msg)
