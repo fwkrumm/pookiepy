@@ -192,9 +192,7 @@ impl<H: ServerHooks> BaseServer<H> {
 
         info!(
             "server {} started at {} (schema={})",
-            self.name,
-            self.addr,
-            self.config.schema_version
+            self.name, self.addr, self.config.schema_version
         );
 
         let mut service = StreamServer::new(self.clone());
@@ -555,9 +553,7 @@ mod tests {
         let mut metadata = tonic::metadata::MetadataMap::new();
         metadata.insert(
             SCHEMA_VERSION_METADATA_KEY,
-            "server-v1"
-                .parse()
-                .expect("metadata value should parse"),
+            "server-v1".parse().expect("metadata value should parse"),
         );
 
         let result = server.handle_schema(&metadata, &peer);
