@@ -438,5 +438,5 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.12                     | Project renamed to pookiepy. |
 | 0.0.13                     | Revert publish via token and add note concerning old project name. |
 | 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
-| 0.0.15                     | Minor bug fixes TBD |
+| 0.0.15                     | Add exception for custom interface mismatch, add `__version__` to `__all__`. |
 
