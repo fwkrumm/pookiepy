@@ -181,7 +181,7 @@ class TimedEvent:
 
     Usage::
 
-        with timedevent(s=0.01, n=100) as te:
+        with TimedEvent(s=0.01, n=100) as te:
             for tick in te:
                 # executed exactly n times, once per timer tick
 
@@ -290,10 +290,7 @@ class TimedEvent:
 
 if __name__ == "__main__":
 
-
-
     demo_logger = get_logger("timer_demo")
-
     demo_logger.info("Starting timer demo with compensation enabled...")
 
     with TimedEvent(s=0.01, n=10, compensation=True, logger=demo_logger) as te:

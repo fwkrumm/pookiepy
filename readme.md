@@ -449,8 +449,10 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.7                      | Fix race condition which allowed clients to put data before welcome message. |
 | 0.0.8                      | Fix link in readme for pypi page. |
 | 0.0.9                      | Minor performance adjustments, adding compression parameter, changing logging parameters. |
-| 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup |
+| 0.0.10                     | Add on_data_yield hook, added responseToId field, more explicit logging for startup. |
 | 0.0.11                     | Add deprecation warning because of project rename. |
-| 0.0.12                     | Project renamed to pookiepy |
-| 0.0.13                     | Revert publish via token and add note concerning old project name |
+| 0.0.12                     | Project renamed to pookiepy. |
+| 0.0.13                     | Revert publish via token and add note concerning old project name. |
 | 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
+| 0.0.15                     | Add exception for custom interface mismatch, add `__version__` to `__all__`. |
+

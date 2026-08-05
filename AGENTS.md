@@ -107,6 +107,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `GrpcResourceExhaustedError` | msg exceeds size limit |
 | `GrpcServerNoAnswerReceivedError` | no server response |
 | `GrpcValueError` | bad arg types |
+| `GrpcCustomInterfaceError` | helper expects bundled payload field names but active custom proto differs |
 | `ClientExit` | `run_event` cleared during `get_data()` |
 | `GrpcEmpty` | `get_data()` timeout |
 
@@ -116,9 +117,9 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 **Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `Message`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
-**Timer** (`pookiepy/timer.py`): `timedevent(s, n)` context manager --- drift-compensated, RT priority.
+**Timer** (`pookiepy/timer.py`): `TimedEvent` context manager (canonical) + `timedevent(s, n)` alias (compat) --- drift-compensated, RT priority.
 ```python
-with timedevent(s=0.01, n=100) as te:
+with TimedEvent(s=0.01, n=100) as te:
     for tick in te: ...
 ```
 

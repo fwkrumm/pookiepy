@@ -249,12 +249,12 @@ evaluate_history(reply, lambda point: print(point))
 
 ### Timers
 
-`timedevent` provides drift-compensated periodic scheduling.
+`TimedEvent` provides drift-compensated periodic scheduling.
 
 ```python
-from pookiepy.timer import timedevent
+from pookiepy.timer import TimedEvent
 
-with timedevent(s=0.01, n=100) as te:
+with TimedEvent(s=0.01, n=100) as te:
     for tick in te:
         ...
 ```
