@@ -8,6 +8,7 @@ Tests cover:
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from google.protobuf import struct_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -15,6 +16,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
 from pookiepy import message_pb2
+from pookiepy.exceptions import GrpcCustomInterfaceError
 from pookiepy.tools import evaluate_history, generate_message, json_to_struct, set_metadata, struct_to_json
 
 
@@ -247,6 +249,34 @@ class TestGenerateMessage(unittest.TestCase):
         self.assertEqual(msg.metaInfo.messageName, "sensor_data")
         self.assertTrue(msg.metaInfo.messageId)
         self.assertTrue(msg.metaInfo.HasField("timestamp"))
+
+    def test_struct_payload_missing_field_raises_custom_interface_error(self):
+        """Missing structPayload field raises GrpcCustomInterfaceError with guidance."""
+        fake_msg = mock.MagicMock()
+        fake_msg.metaInfo = mock.MagicMock()
+        fake_msg.metaInfo.messageName = ""
+        fake_msg.payload = object()  # no structPayload/bytePayload attributes
+
+        with mock.patch("pookiepy.tools.message_pb2.Message", return_value=fake_msg):
+            with self.assertRaises(GrpcCustomInterfaceError) as err:
+                generate_message(struct_payload={"k": "v"})
+
+        self.assertIn("structPayload", str(err.exception))
+        self.assertIn("Custom interface mismatch", str(err.exception))
+
+    def test_byte_payload_missing_field_raises_custom_interface_error(self):
+        """Missing bytePayload field raises GrpcCustomInterfaceError with guidance."""
+        fake_msg = mock.MagicMock()
+        fake_msg.metaInfo = mock.MagicMock()
+        fake_msg.metaInfo.messageName = ""
+        fake_msg.payload = object()  # no structPayload/bytePayload attributes
+
+        with mock.patch("pookiepy.tools.message_pb2.Message", return_value=fake_msg):
+            with self.assertRaises(GrpcCustomInterfaceError) as err:
+                generate_message(byte_payload=b"x")
+
+        self.assertIn("bytePayload", str(err.exception))
+        self.assertIn("Custom interface mismatch", str(err.exception))
 
 if __name__ == "__main__":
     unittest.main()

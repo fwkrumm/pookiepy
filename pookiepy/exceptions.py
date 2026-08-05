@@ -23,3 +23,6 @@ class ClientExit(Exception):
 
 class GrpcEmpty(queue.Empty):
     """custom Empty exception for gRPC client queues."""
+
+class GrpcCustomInterfaceError(GrpcValueError):
+    """Raised when runtime custom proto schema is incompatible with helper utilities."""
