@@ -41,8 +41,8 @@ impl Default for ServerConfig {
             shutdown_poll_interval: Duration::from_millis(100),
             schema_version: String::new(),
             warning_client_threshold: Some(32),
-            accept_gzip: true,
-            send_gzip: true,
+            accept_gzip: false,
+            send_gzip: false,
         }
     }
 }
@@ -191,8 +191,12 @@ impl<H: ServerHooks> BaseServer<H> {
         self.hooks.on_init().await;
 
         info!(
-            "server {} started at {} (schema={})",
-            self.name, self.addr, self.config.schema_version
+            "server {} started at {} (schema={}, accept_gzip={}, send_gzip={})",
+            self.name,
+            self.addr,
+            self.config.schema_version,
+            self.config.accept_gzip,
+            self.config.send_gzip
         );
 
         let mut service = StreamServer::new(self.clone());

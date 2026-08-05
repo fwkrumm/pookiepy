@@ -93,7 +93,7 @@ impl DataRegister {
         &self,
         sender_client_id: &str,
         message_name: &str,
-        data: Message,
+        mut data: Message,
         target_client_id: Option<&str>,
     ) {
         let recipients: Vec<(String, NotificationTx)> = {
@@ -118,8 +118,15 @@ impl DataRegister {
         };
 
         let mut disconnected_clients = Vec::new();
-        for (client_id, tx) in recipients {
-            if tx.send(data.clone()).await.is_err() {
+        let recipient_count = recipients.len();
+        for (index, (client_id, tx)) in recipients.into_iter().enumerate() {
+            let payload = if index + 1 == recipient_count {
+                std::mem::take(&mut data)
+            } else {
+                data.clone()
+            };
+
+            if tx.send(payload).await.is_err() {
                 disconnected_clients.push(client_id);
             }
         }

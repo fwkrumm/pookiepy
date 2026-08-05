@@ -85,19 +85,19 @@ cd .rust && cargo build
 Default bind address is [::]:50051.
 
 ```bash
-cd .rust && cargo run
+cd .rust && cargo run --release
 ```
 
 Custom bind address and server name:
 
 ```bash
-cd .rust && pookiepy_RUST_ADDR='[::]:50051' pookiepy_RUST_NAME='server-rs' cargo run
+cd .rust && pookiepy_RUST_ADDR='[::]:50051' pookiepy_RUST_NAME='server-rs' cargo run --release
 ```
 
 On Windows PowerShell:
 
 ```powershell
-Set-Location .rust; $env:pookiepy_RUST_ADDR='[::]:50051'; $env:pookiepy_RUST_NAME='server-rs'; cargo run
+Set-Location .rust; $env:pookiepy_RUST_ADDR='[::]:50051'; $env:pookiepy_RUST_NAME='server-rs'; cargo run --release
 ```
 
 ## Test with Python client
