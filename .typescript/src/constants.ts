@@ -1,0 +1,7 @@
+export const SCHEMA_VERSION_METADATA_KEY = "x-pookiepy-schema-version";
+
+export const DEFAULT_WAIT_DONE_ADDITIONAL_SLEEP_MS = 500;
+export const DEFAULT_CONNECTION_CHECK_TIMEOUT_MS = 5_000;
+export const DEFAULT_CHANNEL_READY_TIMEOUT_MS = 2_000;
+export const RECEIVE_POLL_SLICE_MS = 1_000;
+export const DISCONNECT_WAIT_TIMEOUT_MS = 5_000;

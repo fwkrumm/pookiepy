@@ -4,6 +4,9 @@ __pycache__
 .coverage
 uv.lock
 .lurus
+.typescript/node_modules/
+.typescript/dist/
+.typescript/.vitest/
 
 # Generated protobuf files --- regenerated at build/CI time
 pookiepy/message_pb2.py

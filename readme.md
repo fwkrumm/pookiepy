@@ -2,6 +2,8 @@
 
 **pookiepy** is a Python framework for building asynchronous gRPC bidirectional-streaming services. Subclass `BaseServer` and `BaseClient`, override the hooks you need --- the framework handles all gRPC plumbing.
 
+Experimental TypeScript client port lives in [.typescript/README.md](.typescript/README.md). It currently focuses on `BaseClient` parity and keeps the main package Python-first.
+
 [![PyPI](https://img.shields.io/pypi/v/pookiepy)](https://pypi.org/project/pookiepy/)
 [![Python](https://img.shields.io/pypi/pyversions/pookiepy)](https://pypi.org/project/pookiepy/)
 [![License](https://img.shields.io/badge/license-BSD%203--Clause-blue)](https://github.com/fwkrumm/pookiepy/blob/master/LICENSE.txt)

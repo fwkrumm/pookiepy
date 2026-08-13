@@ -1,0 +1,32 @@
+{
+  "name": "pookiepy-typescript",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript BaseClient port for pookiepy",
+  "type": "commonjs",
+  "scripts": {
+    "proto:gen": "npm run proto:clean && node ./scripts/generate-proto.js",
+    "proto:clean": "node ./scripts/clean-generated.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --ignore-pattern \"src/generated/**\"",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.13.4",
+    "google-protobuf": "^3.21.4",
+    "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "@types/google-protobuf": "^3.15.12",
+    "@types/node": "^22.18.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "eslint": "^9.34.0",
+    "grpc_tools_node_protoc_ts": "^5.3.3",
+    "grpc-tools": "^1.13.0",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.67.0",
+    "vitest": "^2.1.9"
+  }
+}
