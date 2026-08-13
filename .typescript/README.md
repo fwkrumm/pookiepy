@@ -1,3 +1,7 @@
+# ToDo
+
+- [ ] Add custom grpc interface support
+
 # pookiepy TypeScript BaseClient
 
 TypeScript port of pookiepy BaseClient design. Goal: same developer experience and lifecycle contract, implemented with idiomatic Node async primitives.
