@@ -2,10 +2,17 @@ const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const pluginPath = path.join(root, "node_modules", ".bin", "protoc-gen-ts.cmd");
-const protocBin = path.join(root, "node_modules", ".bin", "grpc_tools_node_protoc.cmd");
+const isWindows = process.platform === "win32";
+const pluginPath = path.join(
+  root,
+  "node_modules",
+  ".bin",
+  isWindows ? "protoc-gen-ts.cmd" : "protoc-gen-ts"
+);
+const protocCli = require.resolve("grpc-tools/bin/protoc.js");
 
 const args = [
+  protocCli,
   "--js_out=import_style=commonjs,binary:./src/generated",
   "--grpc_out=grpc_js:./src/generated",
   `--plugin=protoc-gen-ts=${pluginPath}`,
@@ -15,10 +22,9 @@ const args = [
   "../pookiepy/message.proto"
 ];
 
-const result = spawnSync(protocBin, args, {
+const result = spawnSync(process.execPath, args, {
   cwd: root,
-  stdio: "inherit",
-  shell: true
+  stdio: "inherit"
 });
 
 if (result.status !== 0) {

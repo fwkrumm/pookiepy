@@ -35,6 +35,32 @@ afterEach(async () => {
 });
 
 describe("BaseClient lifecycle", () => {
+  it("resets to disconnected after failed run so caller can retry", async () => {
+    const client = new TestClient({
+      port: 49001,
+      provides: ["foo"],
+      config: {
+        channelReadyTimeoutMs: 100
+      }
+    });
+    activeClients.push(client);
+
+    await expect(client.run()).rejects.toBeInstanceOf(GrpcConnectionError);
+    expect(client.connectionState).toBe("disconnected");
+
+    const server = await startTestServer({ firstResponse: "welcome" });
+    activeServers.push(server);
+
+    const retryClient = new TestClient({
+      port: server.port,
+      provides: ["foo"]
+    });
+    activeClients.push(retryClient);
+
+    await retryClient.run();
+    expect(retryClient.connectionState).toBe("connected");
+  });
+
   it("handshake success stores serverSessionId", async () => {
     const server = await startTestServer({ firstResponse: "welcome" });
     activeServers.push(server);

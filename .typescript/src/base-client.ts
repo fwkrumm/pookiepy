@@ -97,39 +97,46 @@ export class BaseClient {
     this.state.transition("connecting");
     this.resetPerConnectionState();
 
-    const transportOptions: {
-      address: string;
-      grpcOptions: ReadonlyArray<readonly [string, string | number | boolean]>;
-      credentials?: import("@grpc/grpc-js").ChannelCredentials;
-      compression?: number;
-    } = {
-      address: `${this.ip}:${this.port}`,
-      grpcOptions: this.configData.grpcOptions
-    };
+    try {
+      const transportOptions: {
+        address: string;
+        grpcOptions: ReadonlyArray<readonly [string, string | number | boolean]>;
+        credentials?: import("@grpc/grpc-js").ChannelCredentials;
+        compression?: number;
+      } = {
+        address: `${this.ip}:${this.port}`,
+        grpcOptions: this.configData.grpcOptions
+      };
 
-    if (this.configData.sslCredentials) {
-      transportOptions.credentials = this.configData.sslCredentials;
+      if (this.configData.sslCredentials) {
+        transportOptions.credentials = this.configData.sslCredentials;
+      }
+
+      if (this.configData.compression !== null) {
+        transportOptions.compression = this.configData.compression;
+      }
+
+      this.transport = new GrpcTransport(transportOptions);
+
+      await this.transport.waitForReady(this.configData.channelReadyTimeoutMs);
+
+      const metadata = this.buildMetadata();
+      this.stream = this.transport.openDataChannel(metadata);
+
+      this.startReceiveLoop(this.stream);
+      this.startSendLoop(this.stream);
+
+      this.enqueueHandshakeMessage();
+      await this.waitForHandshakeWelcome();
+
+      this.state.transition("connected");
+      await this.onInit();
+    } catch (error) {
+      if (this.state.state !== "disconnected") {
+        await this.disconnect();
+      }
+      throw error;
     }
-
-    if (this.configData.compression !== null) {
-      transportOptions.compression = this.configData.compression;
-    }
-
-    this.transport = new GrpcTransport(transportOptions);
-
-    await this.transport.waitForReady(this.configData.channelReadyTimeoutMs);
-
-    const metadata = this.buildMetadata();
-    this.stream = this.transport.openDataChannel(metadata);
-
-    this.startReceiveLoop(this.stream);
-    this.startSendLoop(this.stream);
-
-    this.enqueueHandshakeMessage();
-    await this.waitForHandshakeWelcome();
-
-    this.state.transition("connected");
-    await this.onInit();
   }
 
   async disconnect(): Promise<void> {
