@@ -270,6 +270,7 @@ EchoServer().serve_forever()
 ```python
 from pookiepy.baseclient import BaseClient
 from pookiepy.tools import generate_message
+from pookiepy.exceptions import ClientExit, GrpcEmpty
 import pookiepy.message_pb2 as pb2
 
 
@@ -284,7 +285,10 @@ class EchoClient(BaseClient):
 
 client = EchoClient()
 client.send_data(generate_message("request", byte_payload=b"hello, pookiepy!"))
-client.spin(timeout=5.0)   # calls on_receive() per message; returns on timeout/disconnect
+try:
+    client.spin(timeout=5.0)   # calls on_receive() per message
+except (ClientExit, GrpcEmpty):
+    pass   # timeout/disconnect
 client.disconnect()
 ```
 

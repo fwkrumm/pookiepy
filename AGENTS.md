@@ -75,8 +75,8 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `get_data(timeout)` | poll `receive_queue`; raises `GrpcEmpty`/`ClientExit` |
 | `wait_done(additional_sleep=0.5)` | block until `send_queue.join()` + grace sleep (yielded to gRPC, not ACKed) |
 | `disconnect()` | clear `run_event`, cancel stream, close channel, join thread |
-| `spin(timeout=None)` | `get_data()` → `on_receive()`; False on timeout/disconnect |
-| `spin_forever(timeout=None)` | loop `spin()` until False |
+| `spin(timeout=None)` | `get_data()` → `on_receive()`; raises on timeout/disconnect |
+| `spin_forever(timeout=None)` | loop `spin()`; stop on timeout/disconnect or `StopSpin` |
 
 **Hooks:** `on_init` (after each `_setup_connection()`), `on_receive(data)`, `on_shutdown`
 
@@ -104,6 +104,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `GrpcCustomInterfaceError` | helper expects bundled payload field names but active custom proto differs |
 | `ClientExit` | `run_event` cleared during `get_data()` |
 | `GrpcEmpty` | `get_data()` timeout |
+| `StopSpin` | explicit signal to stop `spin_forever()` without disconnect |
 
 ## pookiepy Utils
 

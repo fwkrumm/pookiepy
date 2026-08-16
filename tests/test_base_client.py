@@ -23,7 +23,7 @@ import grpc
 
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient, ClientConfig
-from pookiepy.exceptions import ClientExit, GrpcValueError
+from pookiepy.exceptions import ClientExit, GrpcValueError, StopSpin
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
 
 
@@ -174,11 +174,10 @@ class TestDisconnect(unittest.TestCase):
 class TestHooks(unittest.TestCase):
     """Tests for BaseClient hook methods (on_receive, on_shutdown)."""
 
-    def test_on_receive_default_returns_true(self):
-        """Default on_receive logs a warning and returns True."""
+    def test_on_receive_default_returns_none(self):
+        """Default on_receive is a warning-only hook and returns None."""
         client = _client()
-        result = client.on_receive(message_pb2.Message())
-        self.assertTrue(result)
+        self.assertIsNone(client.on_receive(message_pb2.Message()))
 
     def test_on_receive_override_called_by_spin(self):
         """spin() calls the overridden on_receive with the dequeued Message."""
@@ -215,6 +214,66 @@ class TestHooks(unittest.TestCase):
         client.receive_queue.put(msg)
 
         self.assertEqual(client.spin(), {"ok": True})
+
+    def test_spin_propagates_nonblocking_empty_queue(self):
+        """spin() raises queue.Empty when called nonblocking on an empty queue."""
+        client = _client()
+
+        with self.assertRaises(queue.Empty):
+            client.spin(timeout=0)
+
+    def test_spin_propagates_client_exit(self):
+        """spin() raises ClientExit when run_event is cleared while waiting."""
+        client = _client()
+        client.run_event.clear()
+
+        with self.assertRaises(ClientExit):
+            client.spin()
+
+    def test_spin_forever_does_not_stop_on_false(self):
+        """False from on_receive is a normal value, not a loop-control signal."""
+        received = []
+
+        class _Client(BaseClient):
+            def on_receive(self, data):
+                received.append(data)
+                if len(received) == 2:
+                    self.run_event.clear()
+                return False
+
+        with patch.object(BaseClient, "run", lambda self: None):
+            client = _Client(name="spin-false", port=50099, provides=["foo"])
+        client.channel = MagicMock()
+        client.receive_queue.put(message_pb2.Message())
+        client.receive_queue.put(message_pb2.Message())
+
+        client.spin_forever()
+
+        self.assertEqual(len(received), 2)
+
+    def test_spin_forever_stops_on_stop_spin(self):
+        """StopSpin from on_receive stops processing without clearing run_event."""
+        class _Client(BaseClient):
+            def on_receive(self, data):
+                _ = data
+                raise StopSpin()
+
+        with patch.object(BaseClient, "run", lambda self: None):
+            client = _Client(name="stop-spin", port=50099, provides=["foo"])
+        client.channel = MagicMock()
+        client.receive_queue.put(message_pb2.Message())
+
+        client.spin_forever()
+
+        self.assertTrue(client.run_event.is_set())
+
+    def test_spin_forever_stops_on_timeout_exception(self):
+        """spin_forever exits when spin() raises timeout/disconnect exceptions."""
+        client = _client()
+
+        client.spin_forever(timeout=0)
+
+        self.assertTrue(client.run_event.is_set())
 
     def test_on_shutdown_hook_called_on_disconnect(self):
         """on_shutdown is called when disconnect() is invoked."""
