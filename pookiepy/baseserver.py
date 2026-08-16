@@ -348,7 +348,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                             )
 
                         yield data
-                        self.logger.idebug("%s: sent notification", peer)
+                        self.logger.idebug("%s: sent notification", connection_peer)
                     except queue.Empty:
                         continue
             finally:

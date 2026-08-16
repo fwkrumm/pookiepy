@@ -189,6 +189,8 @@ class TestLifecycleHooks(unittest.TestCase):
              patch.object(queue.Queue, "get", fake_queue_get):
             generator = server.DataChannel(iter(()), context)
             yielded = next(generator)
+            with self.assertRaises(StopIteration):
+                next(generator)
 
         self.assertIs(yielded, msg)
         self.assertEqual(len(recorded), 1)
