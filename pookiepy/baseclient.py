@@ -14,7 +14,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Union
+from typing import Any
 
 import grpc
 
@@ -413,8 +413,6 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         GrpcValueError
             If the data is not of type message_pb2.Message or if the message name
             is not in the provides list.
-        GrpcValueError
-            _description_
         """
         if not isinstance(data, message_pb2.Message):
             raise GrpcValueError(
@@ -558,7 +556,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
 
 
-    def spin(self, timeout: float = None) -> Union[bool, any]:
+    def spin(self, timeout: float = None) -> Any:
         """
         Process a single message from the receive queue.
 
@@ -569,8 +567,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        Union[bool, any]
-            return value can be anything the user adds via on_receive hook
+        Any
+            Returns False on disconnect/timeout. Otherwise returns whatever on_receive returns.
         """
         try:
             data = self.get_data(timeout=timeout)

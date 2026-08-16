@@ -8,17 +8,30 @@ fan-outs incoming data to all subscribed clients (excluding the sender).
 import threading
 import queue
 import logging
+from dataclasses import dataclass
 
 from pookiepy import message_pb2
 from pookiepy.exceptions import GrpcValueError
 
-# make configurable? currently no specific reason for the value
-WARNING_AT_QUEUE_SIZE = 100_000
+DEFAULT_QUEUE_WARNING_THRESHOLD = 100_000
 
-class DataRegister():
+
+@dataclass(frozen=True, slots=True)
+class DeliveryResult:
+    """Delivery outcome for a fan-out attempt."""
+
+    delivered: tuple[str, ...] = ()
+    dropped: tuple[str, ...] = ()
+
+
+class DataRegister:
     """Server-side routing table mapping message names to per-client notification queues."""
 
-    def __init__(self, logger: logging.Logger):
+    def __init__(
+        self,
+        logger: logging.Logger,
+        queue_warning_threshold: int | None = DEFAULT_QUEUE_WARNING_THRESHOLD,
+    ):
         """
         data register for payloads
 
@@ -29,6 +42,7 @@ class DataRegister():
         """
 
         self._logger = logger
+        self._queue_warning_threshold = queue_warning_threshold
 
         # register will contain messageName -> dict of clientId to notification queue
         self._register: dict[str, dict[str, queue.Queue]] = {}
@@ -42,7 +56,7 @@ class DataRegister():
     def add_notification_queue_for_message_name(self,
                                                client_id: str,
                                                message_name: str,
-                                               notification_queue: queue.Queue) -> int:
+                                               notification_queue: queue.Queue) -> None:
         """
         add notification queue for a client for a given message_name
 
@@ -52,8 +66,7 @@ class DataRegister():
             notification_queue (queue.Queue): notification queue
 
         Returns:
-            int: position of notification queue within message_name. server keeps track of this.
-                required so that in case of client disconnect the queue can be removed
+            None
         """
         with self._meta_lock:
             self._register.setdefault(message_name, {})
@@ -110,7 +123,7 @@ class DataRegister():
                                  client_id: str,
                                  message_name: str,
                                  data: message_pb2.Message,
-                                 target_client_id: str = None) -> tuple[tuple[str], tuple[str]]:
+                                 target_client_id: str = None) -> DeliveryResult:
         """
         add payload for given message_name
 
@@ -123,11 +136,10 @@ class DataRegister():
                 None, which means all clients will be notified.
 
         Returns:
-            tuple[tuple[str], tuple[str]]: tuple of two tuples,
-                first tuple contains client_ids for which data was added successfully,
-                second tuple contains client_ids for which data could not be added
-                    (e.g. because queue was full)
-                if both are empty, then no notification queue exists for this message_name
+            DeliveryResult: dataclass with ``delivered`` and ``dropped`` client id tuples.
+                ``dropped`` is non-empty only when a bounded subscriber queue is full or when
+                a targeted client id is missing. If both tuples are empty, no notification queue
+                exists for this message_name.
 
         Raises:
             GrpcValueError: if data are not of type message_pb2.Message. the latter is the only
@@ -144,7 +156,7 @@ class DataRegister():
 
         if lock is None:
             self._logger.debug("No notification queue exists for message_name: %s", message_name)
-            return ((), ())
+            return DeliveryResult()
 
         with lock:
             client_dict = self._register.get(message_name, {})
@@ -153,7 +165,7 @@ class DataRegister():
                 self._logger.warning(
                     "No notification queue exists for message_name: %s", message_name
                 )
-                return ((), ())
+                return DeliveryResult()
             subscribers = dict(client_dict)  # shallow copy --- puts happen outside the lock
 
         if target_client_id:
@@ -164,11 +176,20 @@ class DataRegister():
                 self._logger.error("Target client %s not found for message_name %s. If you "\
                                    "specify a specific target to notifiy it is expected to exist.",
                                    target_client_id, message_name)
-                return ((), (target_client_id,))
+                return DeliveryResult(dropped=(target_client_id,))
 
-            # queue found, add data
-            q.put(data, block=False)
-            return ((target_client_id,), ())
+            try:
+                q.put(data, block=False)
+            except queue.Full:
+                self._logger.error(
+                    "Queue full for target client %s for message_name %s. Data not added.",
+                    target_client_id,
+                    message_name,
+                )
+                return DeliveryResult(dropped=(target_client_id,))
+
+            self._warn_if_queue_growing(target_client_id, message_name, q)
+            return DeliveryResult(delivered=(target_client_id,))
 
 
         return_ok = []
@@ -190,15 +211,42 @@ class DataRegister():
                 q.put(data, block=False)
                 return_ok.append(name)
             except queue.Full:
-                # should we catch other errors?
                 self._logger.error("Queue full for client %s for message_name "\
                                     "%s. Data not added.", name, message_name)
                 return_nok.append(name)
+                continue
 
-            if q.qsize() > WARNING_AT_QUEUE_SIZE:
-                self._logger.warning("Queue size for client %s for message_name %s is "
-                                     "%s, which is above the warning threshold of %s. Consider "\
-                                     "increasing the threshold or check if clients consume data.",
-                                     name, message_name, q.qsize(), WARNING_AT_QUEUE_SIZE)
+            self._warn_if_queue_growing(name, message_name, q)
 
-        return (tuple(return_ok), tuple(return_nok))
+        return DeliveryResult(
+            delivered=tuple(return_ok),
+            dropped=tuple(return_nok),
+        )
+
+    def _warn_if_queue_growing(
+        self,
+        client_id: str,
+        message_name: str,
+        notification_queue: queue.Queue,
+    ):
+        """Emit best-effort queue growth warnings.
+
+        Unbounded queues (maxsize=0) can never raise ``queue.Full``. In that
+        default mode this warning is the only built-in signal that consumers are
+        falling behind. Bounded queues are required for actual backpressure.
+        """
+        threshold = self._queue_warning_threshold
+        if threshold is None:
+            return
+
+        current_size = notification_queue.qsize()
+        if current_size > threshold:
+            self._logger.warning(
+                "Queue size for client %s for message_name %s is %s, which is above the "
+                "warning threshold of %s. Bounded queues are required for backpressure; "
+                "unbounded queues only emit this warning.",
+                client_id,
+                message_name,
+                current_size,
+                threshold,
+            )

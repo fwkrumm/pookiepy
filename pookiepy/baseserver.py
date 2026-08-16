@@ -37,6 +37,9 @@ class ServerConfig():
     # Each connected client occupies one thread for the full connection lifetime.
     # Set to at least the expected number of concurrent clients.
     max_workers: int | None = None
+    # queue size at which a warning is logged for a subscriber queue.
+    # None disables warnings. This is also used for unbounded queues where queue.Full never fires.
+    queue_warning_threshold: int | None = 100_000
     # interval in seconds for the serve_forever shutdown-detection watchdog
     shutdown_poll_interval: float = 0.1
     # application-managed schema version string expected from connecting clients
@@ -107,12 +110,16 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self._name = name
         self.logger = get_logger(name=self._name)
 
-        # routes incoming messages to per-client notification queues
-        self._data_register = DataRegister(self.logger)
-        self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
-
         self.__ssl_credentials = ssl_credentials
         self.__config = config or ServerConfig()
+
+        # routes incoming messages to per-client notification queues
+        self._data_register = DataRegister(
+            self.logger,
+            queue_warning_threshold=self.__config.queue_warning_threshold,
+        )
+        self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
+
         self._port = port
         self._ip = ip
         self._uid = str(uuid.uuid4())
@@ -268,7 +275,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
         # get ip from context; client id received at first message receive
         # peer contains all important information peer context, client id, session id, etc
-        peer = Peer(peer=context.peer(), session_id=str(uuid.uuid4()))
+        connection_peer = Peer(peer=context.peer(), session_id=str(uuid.uuid4()))
 
         # queue for notifications to client
         notification_queue = queue.Queue(maxsize=self.__config.max_queue_elements)
@@ -287,7 +294,10 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                 current_count, self.__config.effective_max_workers
             )
 
-        self.logger.idebug("%s: connected to DataChannel. Checking permissions", peer)
+        self.logger.idebug(
+            "%s: connected to DataChannel. Checking permissions",
+            connection_peer,
+        )
 
         try:
             # Verify application-managed schema compatibility before processing any messages.
@@ -296,11 +306,11 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             server_schema = self.__config.schema_version
 
             if not server_schema and not client_schema:
-                self.logger.warning("%s: cannot check schema because empty", peer)
+                self.logger.warning("%s: cannot check schema because empty", connection_peer)
             elif client_schema != server_schema:
                 self.logger.error(
                     "%s: schema mismatch - server=%s client=%s. Rejecting connection.",
-                    peer,
+                    connection_peer,
                     server_schema,
                     client_schema,
                 )
@@ -313,13 +323,13 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             # Process messages
             t = threading.Thread(
                 target=self._handle_client_receive,
-                args=(request_iterator, context, peer, notification_queue, exit_event),
+                args=(request_iterator, context, connection_peer, notification_queue, exit_event),
                 daemon=True,
             )
             t.start()
             try:
                 while not (exit_event.is_set() or self._global_exit_event.is_set()):
-                    self.logger.idebug("%s: main thread running", peer)
+                    self.logger.idebug("%s: main thread running", connection_peer)
                     try:
                         data =  notification_queue.get(timeout=1)  # wait for data to send to client
                         if data.history:
@@ -329,18 +339,24 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                             data.history[-1].sendTimestamp = datetime.now(timezone.utc)
 
                         try:
-                            self.on_data_yield(peer, data)
+                            self.on_data_yield(connection_peer, data)
                         except Exception as exc:  # pylint: disable=broad-exception-caught
-                            self.logger.error("%s: error in on_data_yield hook: %s", peer, exc)
+                            self.logger.error(
+                                "%s: error in on_data_yield hook: %s",
+                                connection_peer,
+                                exc,
+                            )
 
                         yield data
                         self.logger.idebug("%s: sent notification", peer)
                     except queue.Empty:
                         continue
             finally:
-                self._data_register.remove_notification_queues_for_client(peer.client_id)
-                self.on_client_disconnect(peer)
-                self.logger.iinfo("%s: disconnected", peer)
+                self._data_register.remove_notification_queues_for_client(
+                    connection_peer.client_id
+                )
+                self.on_client_disconnect(connection_peer)
+                self.logger.iinfo("%s: disconnected", connection_peer)
         finally:
             with self.__connected_clients_lock:
                 self.__connected_clients -= 1
@@ -357,12 +373,19 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         """
         Start the server and wait for termination
         """
-        executor = futures.ThreadPoolExecutor(max_workers=self.__config.max_workers)
+        executor = futures.ThreadPoolExecutor(
+            max_workers=self.__config.effective_max_workers
+        )
         self.logger.iinfo(
             "max_workers set to %d (effective). "
             "Each connected client occupies one thread for its full connection lifetime.",
             self.__config.effective_max_workers
         )
+        if self.__config.max_queue_elements == 0:
+            self.logger.iinfo(
+                "Per-client notification queues are unbounded. queue.Full will never fire; "
+                "set ServerConfig.max_queue_elements > 0 to enable backpressure."
+            )
         server = grpc.server(
             executor,
             options=self.__config.server_options,

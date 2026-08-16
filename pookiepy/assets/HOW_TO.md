@@ -101,7 +101,8 @@ self._data_register.add_data_for_message_name("", "my_topic", msg)
 ```python
 config = ServerConfig(
     max_workers=10,            # thread pool size (>= expected concurrent clients)
-    max_queue_elements=0,      # per-client queue depth (0 = unlimited)
+    max_queue_elements=0,      # per-client queue depth (0 = unlimited; no backpressure)
+    queue_warning_threshold=100_000,  # warn when subscribers fall behind; None disables
     shutdown_poll_interval=0.1,
     schema_version="chat-v1", # optional manual schema/version string
 )

@@ -200,6 +200,22 @@ class TestHooks(unittest.TestCase):
         self.assertEqual(len(received), 1)
         self.assertIs(received[0], msg)
 
+    def test_spin_returns_on_receive_value(self):
+        """spin() returns the exact value produced by on_receive()."""
+        class _Client(BaseClient):
+            def on_receive(self, data):
+                _ = data
+                return {"ok": True}
+
+        with patch.object(BaseClient, "run", lambda self: None):
+            client = _Client(name="spin-return", port=50099, provides=["foo"])
+        client.channel = MagicMock()
+
+        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        client.receive_queue.put(msg)
+
+        self.assertEqual(client.spin(), {"ok": True})
+
     def test_on_shutdown_hook_called_on_disconnect(self):
         """on_shutdown is called when disconnect() is invoked."""
         shutdown_called = threading.Event()
