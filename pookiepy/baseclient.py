@@ -641,6 +641,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         This is a best-effort notification point that occurs when the message is
         handed off to the gRPC stream iterator, not when the server has processed it.
+
+        Parameters
+        ----------
+        data : message_pb2.Message
+            The message that is about to be yielded to the gRPC stream.
         """
 
     def on_init(self):
