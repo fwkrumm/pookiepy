@@ -408,6 +408,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         ----------
         data : message_pb2.Message
             The message to be sent to the gRPC server.
+        add_history : bool, optional
+            If True, automatically append a DataPoint to the message's history
+            documenting the send and process times of the message. This however can only
+            be compared among different clients if the run on the same machine or
+            the machines are properly synchronized. Default is False.
 
         Raises
         ------
