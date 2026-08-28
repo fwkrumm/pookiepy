@@ -139,3 +139,10 @@ grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psuti
 ## TODOs
 
 - `wait_done()` = yielded to gRPC, not server ACK.
+
+## Compatibility documentation workflow
+
+- When changing a breaking public API, signature, return value, exception, or user-visible behavior, create or update `docs/required_adjustments/<version>.md`.
+- Base adjustment notes on the branch diff against `master` and state exact migration actions for users upgrading from the previous version.
+- Keep adjustment notes concise. Distinguish required migrations from optional configuration changes.
+- Do not edit generated protobuf files directly; document schema compatibility changes separately when proto regeneration is required.
