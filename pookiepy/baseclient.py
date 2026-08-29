@@ -19,6 +19,7 @@ from typing import Any
 import grpc
 from google.protobuf.message import Message as PookieMessage
 
+from pookiepy import tools
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
 from pookiepy.exceptions import GrpcConnectionError, \
@@ -29,7 +30,6 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               StopSpin, \
                               GrpcEmpty
 
-from pookiepy.tools import set_metadata
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
 
@@ -305,7 +305,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     )
                     data.history[-1].sendTimestamp = datetime.now(timezone.utc)
                 # if meta data have not been set, set them automatically
-                set_metadata(data)
+                tools.set_metadata(data)
 
                 if not data.metaInfo.timestamp:
                     raise GrpcValueError("PookieMessage timestamp is not set "\
@@ -643,6 +643,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 self.logger.iinfo("StopSpin received, stopping spin_forever")
                 break
 
+    def generate_message(self, *args) -> PookieMessage:
+        """
+        Generate a new PookieMessage using the client's proto interface.
+
+        For doc string see ``pookiepy.tools.generate_message``.
+        """
+        return tools.generate_message(*args, proto_interface=self._proto_interface)
 #
 # Hooks
 #

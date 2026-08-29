@@ -21,11 +21,10 @@ from typing import Iterator
 import grpc
 from google.protobuf.message import Message as PookieMessage
 
-
+from pookiepy import tools
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
 from pookiepy.data_register import DataRegister
-from pookiepy.tools import set_metadata
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
 @dataclass
@@ -252,7 +251,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
                             )
                         )
                     )
-                    set_metadata(welcome_message)
+                    tools.set_metadata(welcome_message)
                     notification_queue.put(welcome_message)
 
                     for require in requires:
@@ -445,6 +444,14 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
             executor.shutdown(wait=True)
         self.logger.iinfo("server stopped")
 
+
+    def generate_message(self, *args) -> PookieMessage:
+        """
+        Generate a new PookieMessage using the server's proto interface.
+
+        For doc string see ``pookiepy.tools.generate_message``.
+        """
+        return tools.generate_message(*args, proto_interface=self._proto_interface)
 
 #
 # Hooks

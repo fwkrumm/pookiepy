@@ -410,7 +410,7 @@ class MyClient(BaseClient):
 
 if __name__ == "__main__":
     client = MyClient(port=50051)
-    client.send_data(generate_message("my_request", proto_interface=PROTO_INTERFACE))
+    client.send_data(client.generate_message("my_request"))
     client.spin_forever(timeout=5.0)
     client.disconnect()
 '''
