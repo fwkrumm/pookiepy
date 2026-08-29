@@ -166,7 +166,8 @@ class TestLifecycleHooks(unittest.TestCase):
             def on_data_yield(self, peer, data):
                 recorded.append((peer, data))
 
-        server = _Server(port=50092)
+        # explicitly set schema_version to empty string to avoid defaulting to DEFAULT_SCHEMA_VERSION
+        server = _Server(port=50092, config=ServerConfig(schema_version=""))
         context = MagicMock()
         context.peer.return_value = "fake-peer"
         context.invocation_metadata.return_value = []
@@ -232,9 +233,9 @@ class TestServerConfig(unittest.TestCase):
         cfg = ServerConfig(max_workers=None)
         self.assertGreaterEqual(cfg.effective_max_workers, 1)
 
-    def test_schema_version_default_is_empty(self):
-        """ServerConfig.schema_version defaults to an empty string."""
-        self.assertEqual(ServerConfig().schema_version, "")
+    def test_schema_version_default_is_none(self):
+        """ServerConfig.schema_version defaults to None."""
+        self.assertIsNone(ServerConfig().schema_version)
 
     def test_compression_default_is_none(self):
         """ServerConfig.compression defaults to None (no compression)."""

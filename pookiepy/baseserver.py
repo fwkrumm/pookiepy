@@ -21,11 +21,12 @@ from typing import Iterator
 import grpc
 from google.protobuf.message import Message as PookieMessage
 
+
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
 from pookiepy.data_register import DataRegister
 from pookiepy.tools import set_metadata
-from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
 @dataclass
 class ServerConfig():
@@ -43,7 +44,9 @@ class ServerConfig():
     # interval in seconds for the serve_forever shutdown-detection watchdog
     shutdown_poll_interval: float = 0.1
     # application-managed schema version string expected from connecting clients
-    schema_version: str = ""
+    # will be set to a default value if at runtime no custom interface is provided and
+    # schema version is not explicitly set by the user
+    schema_version: str = None
     # gRPC compression algorithm applied to server-sent messages.
     # Must be enabled on BOTH server and client to compress both directions.
     # If only the server sets this, only server->client messages are compressed;
@@ -111,7 +114,17 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
         self.__ssl_credentials = ssl_credentials
         self.__config = config or ServerConfig()
-        self._proto_interface = proto_interface or _bundled_interface()
+
+        if proto_interface is None:
+            self._proto_interface = _bundled_interface()
+            if self.__config.schema_version is None:
+                self.__config.schema_version = DEFAULT_SCHEMA_VERSION
+        else:
+            self._proto_interface = proto_interface
+
+        if self.__config.schema_version is None:
+            self.__config.schema_version = ""
+
         self._message_pb2 = self._proto_interface.message_pb2
         self._message_pb2_grpc = self._proto_interface.message_pb2_grpc
 
@@ -132,7 +145,9 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
         self.on_init()
 
-        self.logger.iinfo("initialized %s", self._name)
+        self.logger.iinfo("initialized %s, using schema version %s",
+                          self._name,
+                          self.__config.schema_version)
 
 
     def __repr__(self):
@@ -429,7 +444,6 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
             # shutdown executor i.e. wait for all DataChannel threads to finish
             executor.shutdown(wait=True)
         self.logger.iinfo("server stopped")
-
 
 
 #

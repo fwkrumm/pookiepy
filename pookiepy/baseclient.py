@@ -30,7 +30,7 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcEmpty
 
 from pookiepy.tools import set_metadata
-from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
 
 class _StreamError:  # pylint: disable=too-few-public-methods
@@ -57,7 +57,9 @@ class ClientConfig:
     # timeout in seconds to wait for server welcome message after connecting
     connection_check_timeout: float = 5.0
     # application-managed schema version string sent as gRPC metadata on connect
-    schema_version: str = ""
+    # will be set to a default value if at runtime no custom interface is provided and
+    # schema version is not explicitly set by the user
+    schema_version: str = None
     # gRPC channel options
     ssl_credentials: grpc.ChannelCredentials = None
     # extra/extend (key, value) metadata tuples appended to every gRPC stream call;
@@ -97,7 +99,17 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger = get_logger(name=f"Client-{name}")
 
         self.__config = config or ClientConfig()
-        self._proto_interface = proto_interface or _bundled_interface()
+
+        if proto_interface is None:
+            self._proto_interface = _bundled_interface()
+            if self.__config.schema_version is None:
+                self.__config.schema_version = DEFAULT_SCHEMA_VERSION
+        else:
+            self._proto_interface = proto_interface
+
+        if self.__config.schema_version is None:
+            self.__config.schema_version = ""
+
         self._message_pb2 = self._proto_interface.message_pb2
         self._message_pb2_grpc = self._proto_interface.message_pb2_grpc
         self.ip = ip

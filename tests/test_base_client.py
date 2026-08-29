@@ -328,8 +328,8 @@ class TestClientConfig(unittest.TestCase):
         self.assertGreater(ClientConfig().connection_check_timeout, 0)
 
     def test_default_schema_version_is_empty(self):
-        """ClientConfig.schema_version defaults to an empty string."""
-        self.assertEqual(ClientConfig().schema_version, "")
+        """ClientConfig.schema_version defaults to None."""
+        self.assertIsNone(ClientConfig().schema_version)
 
     def test_custom_config_applied(self):
         """A custom ClientConfig is stored and applied on the client instance."""

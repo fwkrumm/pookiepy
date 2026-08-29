@@ -19,25 +19,29 @@ message PookieMessage {
 
 message MetaInformation {
     google.protobuf.Timestamp timestamp = 1;
-    string messageId = 2; // unique message id (uuid4)
-    string responseToId = 3; // in case the message is an answer to a previous message, this field can be written to contain the original message id
-    ClientProvides clientInfo = 4; // only filled by clients
-    ServerProvides serverInfo = 5; // only filled by server
-    string messageName = 6; // name of the data
+    string messageName = 2; // name of the data
+    string messageId = 3; // unique message id (uuid4)
+    string responseToId = 4; // in case the message is an answer to a previous message, this field can be written to contain the original message id
+    reserved 5,6,7,8,9;
+    ClientProvides clientInfo = 10; // only filled by clients
+    ServerProvides serverInfo = 11; // only filled by server
+
 }
 
 message DataPoint {
     string name = 1; // the worker (client or server) which set the data
     google.protobuf.Timestamp receiveTimestamp = 2; // timestamp data data receive/sent; required synced time
     google.protobuf.Timestamp sendTimestamp = 3; // timestamp data data receive/sent; required synced time
-    double perfCounter = 4;  // time diff between receive and sent i.e. process time
+    reserved 4,5,6,7,8,9;
+    double perfCounter = 10;  // time diff between receive and sent i.e. process time
 }
 
 message ClientProvides {
     string uuid = 1;
     string name = 2;
-    repeated string requires = 3;
-    repeated string provides = 4;
+    reserved 3,4,5,6,7,8,9;
+    repeated string requires = 10;
+    repeated string provides = 11;
 }
 
 message ServerProvides {
