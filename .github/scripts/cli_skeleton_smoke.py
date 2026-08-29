@@ -58,27 +58,46 @@ def format_process_failure(
     )
 
 
+def print_output(label: str, stdout: str | None, stderr: str | None = None) -> None:
+    """Print labelled child output without adding empty log sections."""
+    if stdout and stdout.strip():
+        print(f"--- {label} stdout ---\n{stdout.rstrip()}", flush=True)
+    if stderr and stderr.strip():
+        print(f"--- {label} stderr ---\n{stderr.rstrip()}", flush=True)
+
+
 def run_checked(
     command: list[str],
     *,
     cwd: Path,
     environment: dict[str, str],
+    label: str,
     timeout: int = COMMAND_TIMEOUT_SECONDS,
 ) -> subprocess.CompletedProcess[str]:
     """Run one command and require clean completion without a traceback."""
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=timeout,
-    )
+    print(f"[run] {label} (cwd={cwd})", flush=True)
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        print_output(label, exc.stdout, exc.stderr)
+        raise TimeoutError(
+            f"{label} exceeded {timeout}s timeout: {' '.join(command)}"
+        ) from exc
+
+    print_output(label, result.stdout, result.stderr)
     if result.returncode != 0:
         raise RuntimeError(format_process_failure(command, result))
     if TRACEBACK_MARKER in result.stdout or TRACEBACK_MARKER in result.stderr:
         raise RuntimeError(format_process_failure(command, result))
+    print(f"[ok] {label}", flush=True)
     return result
 
 
@@ -109,6 +128,7 @@ def generate(
         [sys.executable, "-m", "pookiepy", flag],
         cwd=output_dir,
         environment=environment,
+        label=f"Generate with {flag}",
     )
 
 
@@ -120,6 +140,7 @@ def assert_files(output_dir: Path, expected_names: set[str]) -> None:
             f"Generated files differ in {output_dir}: "
             f"expected={sorted(expected_names)}, actual={sorted(actual_names)}"
         )
+    print(f"[ok] Generated files: {', '.join(sorted(actual_names))}", flush=True)
 
 
 def compile_python_files(paths: Iterable[Path]) -> None:
@@ -127,6 +148,7 @@ def compile_python_files(paths: Iterable[Path]) -> None:
     for path in paths:
         source = path.read_text(encoding="utf-8")
         compile(source, str(path), "exec")
+        print(f"[ok] Python syntax: {path.name}", flush=True)
 
 
 def compile_proto(output_dir: Path, environment: dict[str, str]) -> None:
@@ -144,12 +166,17 @@ def compile_proto(output_dir: Path, environment: dict[str, str]) -> None:
         ],
         cwd=output_dir,
         environment=environment,
+        label="Compile generated message.proto",
     )
 
     generated_names = {"message_pb2.py", "message_pb2_grpc.py", "message_pb2.pyi"}
     missing_names = [name for name in generated_names if not (output_dir / name).is_file()]
     if missing_names:
         raise AssertionError(f"protoc did not generate: {sorted(missing_names)}")
+    print(
+        f"[ok] Protobuf files: {', '.join(sorted(generated_names))}",
+        flush=True,
+    )
 
 
 def validate_proto(output_dir: Path, environment: dict[str, str]) -> None:
@@ -173,6 +200,7 @@ assert hasattr(message_pb2_grpc, "add_StreamServicer_to_server")
         [sys.executable, "-c", code],
         cwd=output_dir,
         environment=environment,
+        label="Validate generated protobuf descriptors",
     )
 
 
@@ -216,11 +244,18 @@ def wait_for_server(
                 with socket.socket(family, socktype, proto) as probe:
                     probe.settimeout(0.25)
                     probe.connect(address)
+                    print(
+                        f"[ok] Generated server listening on localhost:{port}",
+                        flush=True,
+                    )
                     return
             except OSError:
                 continue
         time.sleep(0.1)
-    raise TimeoutError(f"Generated server did not listen on port {port}")
+    raise TimeoutError(
+        f"Generated server did not listen on port {port}\n"
+        f"--- server output ---\n{read_process_log(log_file)}"
+    )
 
 
 def stop_process(process: subprocess.Popen[str]) -> None:
@@ -280,12 +315,14 @@ def run_generated_pair(
             stderr=subprocess.STDOUT,
             text=True,
         ) as server:
+            failure: Exception | None = None
             try:
                 wait_for_server(server, port, server_log)
                 run_checked(
                     [sys.executable, "-c", client_code(custom_interface)],
                     cwd=client_dir,
                     environment=pair_environment,
+                    label="Start generated client and send one message",
                 )
                 if server.poll() is not None:
                     raise RuntimeError(
@@ -293,10 +330,21 @@ def run_generated_pair(
                         f"{server.returncode}\n"
                         f"--- output ---\n{read_process_log(server_log)}"
                     )
+            except (RuntimeError, TimeoutError, AssertionError) as exc:
+                failure = exc
             finally:
                 stop_process(server)
 
             server_output = read_process_log(server_log)
+
+    print_output("generated server", server_output)
+    print(f"[ok] Generated server stopped (port {port})", flush=True)
+
+    if failure is not None:
+        raise RuntimeError(
+            f"Generated server/client pair failed: {failure}\n"
+            f"--- server output ---\n{server_output}"
+        ) from failure
 
     if TRACEBACK_MARKER in server_output:
         raise RuntimeError(
@@ -377,6 +425,7 @@ def run_smoke_suite(project_root: Path) -> None:
             [sys.executable, "-c", "import server_skeleton, client_skeleton"],
             cwd=custom_dir,
             environment=environment,
+            label="Import custom-interface skeleton modules",
         )
         run_generated_pair(custom_dir, custom_dir, environment, custom_interface=True)
 
