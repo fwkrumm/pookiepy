@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
 from pookiepy import message_pb2
-from pookiepy.data_register import DataRegister
+from pookiepy.data_register import DataRegister, DeliveryResult
 from pookiepy.exceptions import GrpcValueError
 
 
@@ -68,10 +68,10 @@ class TestAddDataFanOut(unittest.TestCase):
         self.dr.add_notification_queue_for_message_name("c2", "topic", q2)
         self.dr.add_notification_queue_for_message_name("sender", "topic", q_sender)
 
-        ok, _ = self.dr.add_data_for_message_name("sender", "topic", _msg())
+        result = self.dr.add_data_for_message_name("sender", "topic", _msg())
 
-        self.assertIn("c1", ok)
-        self.assertIn("c2", ok)
+        self.assertIn("c1", result.delivered)
+        self.assertIn("c2", result.delivered)
         self.assertEqual(q1.qsize(), 1)
         self.assertEqual(q2.qsize(), 1)
         self.assertEqual(q_sender.qsize(), 0)  # sender must be skipped
@@ -81,15 +81,16 @@ class TestAddDataFanOut(unittest.TestCase):
         q1 = queue.Queue()
         self.dr.add_notification_queue_for_message_name("c1", "topic", q1)
 
-        ok, _ = self.dr.add_data_for_message_name("unrelated_sender", "topic", _msg())
+        result = self.dr.add_data_for_message_name("unrelated_sender", "topic", _msg())
 
-        self.assertIn("c1", ok)
+        self.assertIn("c1", result.delivered)
         self.assertEqual(q1.qsize(), 1)
 
     def test_unknown_topic_returns_empty_tuples(self):
-        """Publishing to an unregistered topic returns ((), ()) without raising."""
+        """Publishing to an unregistered topic returns an empty DeliveryResult."""
         result = self.dr.add_data_for_message_name("c1", "nonexistent", _msg("nonexistent"))
-        self.assertEqual(result, ((), ()))
+        self.assertEqual(result.delivered, ())
+        self.assertEqual(result.dropped, ())
 
     def test_wrong_data_type_raises_grpc_value_error(self):
         """Passing a non-Message value raises GrpcValueError."""
@@ -103,22 +104,35 @@ class TestAddDataFanOut(unittest.TestCase):
         self.dr.add_notification_queue_for_message_name("c1", "topic", q1)
         self.dr.add_notification_queue_for_message_name("c2", "topic", q2)
 
-        ok, _ = self.dr.add_data_for_message_name("sender", "topic", _msg(), target_client_id="c1")
+        result = self.dr.add_data_for_message_name(
+            "sender", "topic", _msg(), target_client_id="c1"
+        )
 
-        self.assertIn("c1", ok)
+        self.assertIn("c1", result.delivered)
         self.assertEqual(q1.qsize(), 1)
         self.assertEqual(q2.qsize(), 0)
+
+    def test_named_result_fields_are_available(self):
+        """DeliveryResult exposes explicit named fields."""
+        q1 = queue.Queue()
+        self.dr.add_notification_queue_for_message_name("c1", "topic", q1)
+
+        result = self.dr.add_data_for_message_name("sender", "topic", _msg())
+
+        self.assertIsInstance(result, DeliveryResult)
+        self.assertEqual(result.delivered, ("c1",))
+        self.assertEqual(result.dropped, ())
 
     def test_targeted_delivery_missing_client_returns_nok(self):
         """A targetClientId that is not subscribed is returned in the nok tuple."""
         self.dr.add_notification_queue_for_message_name("c1", "topic", queue.Queue())
 
-        ok, nok = self.dr.add_data_for_message_name(
+        result = self.dr.add_data_for_message_name(
             "sender", "topic", _msg(), target_client_id="ghost"
         )
 
-        self.assertIn("ghost", nok)
-        self.assertEqual(ok, ())
+        self.assertIn("ghost", result.dropped)
+        self.assertEqual(result.delivered, ())
 
     def test_full_queue_returns_client_in_nok(self):
         """A subscriber with a full queue has its client id placed in the nok tuple."""
@@ -126,10 +140,10 @@ class TestAddDataFanOut(unittest.TestCase):
         q.put("placeholder")  # fill it
         self.dr.add_notification_queue_for_message_name("c1", "topic", q)
 
-        ok, nok = self.dr.add_data_for_message_name("sender", "topic", _msg())
+        result = self.dr.add_data_for_message_name("sender", "topic", _msg())
 
-        self.assertIn("c1", nok)
-        self.assertEqual(ok, ())
+        self.assertIn("c1", result.dropped)
+        self.assertEqual(result.delivered, ())
 
     def test_returned_message_is_exact_object_put(self):
         """The exact Message object put by the sender arrives in the
@@ -167,8 +181,8 @@ class TestRemoveClient(unittest.TestCase):
         q = queue.Queue()
         self.dr.add_notification_queue_for_message_name("c1", "topic", q)
         self.dr.remove_notification_queues_for_client("c1")
-        ok, _ = self.dr.add_data_for_message_name("sender", "topic", _msg())
-        self.assertEqual(ok, ())
+        result = self.dr.add_data_for_message_name("sender", "topic", _msg())
+        self.assertEqual(result.delivered, ())
         self.assertEqual(q.qsize(), 0)
 
     def test_remove_nonexistent_client_returns_zero(self):
@@ -214,9 +228,9 @@ class TestConcurrentAccess(unittest.TestCase):
 
         self.assertEqual(errors, [], f"Unexpected errors: {errors}")
 
-        ok, nok = dr.add_data_for_message_name("outsider", "topic", _msg())
-        self.assertEqual(len(ok), 20)
-        self.assertEqual(len(nok), 0)
+        result = dr.add_data_for_message_name("outsider", "topic", _msg())
+        self.assertEqual(len(result.delivered), 20)
+        self.assertEqual(len(result.dropped), 0)
         for q in queues:
             self.assertEqual(q.qsize(), 1)
 

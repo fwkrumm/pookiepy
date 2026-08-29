@@ -75,8 +75,8 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `get_data(timeout)` | poll `receive_queue`; raises `GrpcEmpty`/`ClientExit` |
 | `wait_done(additional_sleep=0.5)` | block until `send_queue.join()` + grace sleep (yielded to gRPC, not ACKed) |
 | `disconnect()` | clear `run_event`, cancel stream, close channel, join thread |
-| `spin(timeout=None)` | `get_data()` → `on_receive()`; False on timeout/disconnect |
-| `spin_forever(timeout=None)` | loop `spin()` until False |
+| `spin(timeout=None)` | `get_data()` → `on_receive()`; raises on timeout/disconnect |
+| `spin_forever(timeout=None)` | loop `spin()`; stop on timeout/disconnect or `StopSpin` |
 
 **Hooks:** `on_init` (after each `_setup_connection()`), `on_receive(data)`, `on_shutdown`
 
@@ -104,6 +104,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `GrpcCustomInterfaceError` | helper expects bundled payload field names but active custom proto differs |
 | `ClientExit` | `run_event` cleared during `get_data()` |
 | `GrpcEmpty` | `get_data()` timeout |
+| `StopSpin` | explicit signal to stop `spin_forever()` without disconnect |
 
 ## pookiepy Utils
 
@@ -138,3 +139,10 @@ grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psuti
 ## TODOs
 
 - `wait_done()` = yielded to gRPC, not server ACK.
+
+## Compatibility documentation workflow
+
+- When changing a breaking public API, signature, return value, exception, or user-visible behavior, create or update `docs/required_adjustments/<version>.md`.
+- Base adjustment notes on the branch diff against `master` and state exact migration actions for users upgrading from the previous version.
+- Keep adjustment notes concise. Distinguish required migrations from optional configuration changes.
+- Do not edit generated protobuf files directly; document schema compatibility changes separately when proto regeneration is required.

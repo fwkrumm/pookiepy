@@ -32,6 +32,7 @@
 - [ToDos and Roadmap](#todos-and-roadmap)
 - [Known Issues and Troubleshooting](#known-issues-and-troubleshooting)
 - [Contributing](#contributing)
+- [Compatibility Adjustments](#compatibility-adjustments)
 - [License](#license)
 - [Release History](#release-history)
 
@@ -270,6 +271,7 @@ EchoServer().serve_forever()
 ```python
 from pookiepy.baseclient import BaseClient
 from pookiepy.tools import generate_message
+from pookiepy.exceptions import ClientExit, GrpcEmpty
 import pookiepy.message_pb2 as pb2
 
 
@@ -284,7 +286,10 @@ class EchoClient(BaseClient):
 
 client = EchoClient()
 client.send_data(generate_message("request", byte_payload=b"hello, pookiepy!"))
-client.spin(timeout=5.0)   # calls on_receive() per message; returns on timeout/disconnect
+try:
+    client.spin(timeout=5.0)   # calls on_receive() per message
+except (ClientExit, GrpcEmpty):
+    pass   # timeout/disconnect
 client.disconnect()
 ```
 
@@ -408,6 +413,14 @@ TBD
 Contributions are welcome. Please open an issue first for major changes so the approach can be discussed. For bug fixes and small improvements, a pull request is sufficient.
 
 ---
+<a name="compatibility-adjustments"></a>
+<a id="compatibility-adjustments"></a>
+
+## Compatibility Adjustments
+
+Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.16 adjustment notes](docs/required_adjustments/0.0.16.md) when upgrading from 0.0.15.
+
+---
 <a name="license"></a>
 <a id="license"></a>
 
@@ -439,4 +452,5 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.13                     | Revert publish via token and add note concerning old project name. |
 | 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
 | 0.0.15                     | Add exception for custom interface mismatch, add `__version__` to `__all__`. |
+| 0.0.16                     | Change client spin control flow and server delivery-result APIs; add queue-growth configuration. |
 

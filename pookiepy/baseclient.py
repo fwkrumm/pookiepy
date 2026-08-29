@@ -14,7 +14,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Union
+from typing import Any
 
 import grpc
 
@@ -27,6 +27,7 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcResourceExhaustedError, \
                               GrpcValueError, \
                               ClientExit, \
+                              StopSpin, \
                               GrpcEmpty
 
 from pookiepy.tools import set_metadata
@@ -407,14 +408,17 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         ----------
         data : message_pb2.Message
             The message to be sent to the gRPC server.
+        add_history : bool, optional
+            If True, automatically append a DataPoint to the message's history
+            documenting the send and process times of the message. This however can only
+            be compared among different clients if the run on the same machine or
+            the machines are properly synchronized. Default is False.
 
         Raises
         ------
         GrpcValueError
             If the data is not of type message_pb2.Message or if the message name
             is not in the provides list.
-        GrpcValueError
-            _description_
         """
         if not isinstance(data, message_pb2.Message):
             raise GrpcValueError(
@@ -558,7 +562,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
 
 
-    def spin(self, timeout: float = None) -> Union[bool, any]:
+    def spin(self, timeout: float = None) -> Any:
         """
         Process a single message from the receive queue.
 
@@ -569,23 +573,37 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        Union[bool, any]
-            return value can be anything the user adds via on_receive hook
+        Any
+            Whatever on_receive returns.
+
+        Raises
+        ------
+        ClientExit
+            If the client disconnects while waiting for a message.
+        GrpcEmpty
+            If timeout expires before a message arrives.
+        queue.Empty
+            If timeout=0 and the queue is empty.
         """
         try:
             data = self.get_data(timeout=timeout)
             return self.on_receive(data)
         except ClientExit:
-            self.logger.iinfo("ClientExit received, stopping spin")
-            return False
+            self.logger.iinfo("ClientExit received in spin()")
+            raise
         except GrpcEmpty:
-            self.logger.iinfo("No message received within timeout, stopping spin")
-            return False
+            self.logger.iinfo("No message received within timeout in spin()")
+            raise
+        except queue.Empty:
+            self.logger.iinfo("No message available for nonblocking spin() call")
+            raise
 
     def spin_forever(self, timeout: float = None):
         """
         Continuously process messages from the receive queue until the client is disconnected.
-        spin() has to return explicitly false to stop the loop.
+
+        Raise StopSpin from on_receive() to stop processing while keeping the client connected.
+        The return value of on_receive(), including False, is otherwise ignored.
 
         NOTE that if you use spin_forever() the data are not returned to the caller. In that
         case you should not return the actual data via on_receive.
@@ -596,7 +614,16 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             Per-message timeout passed to spin(). None = wait forever per message.
         """
         while self.run_event.is_set():
-            if self.spin(timeout=timeout) is False:
+            try:
+                self.spin(timeout=timeout)
+            except ClientExit:
+                self.logger.iinfo("ClientExit received, stopping spin_forever")
+                break
+            except (GrpcEmpty, queue.Empty):
+                self.logger.iinfo("No message received within timeout, stopping spin_forever")
+                break
+            except StopSpin:
+                self.logger.iinfo("StopSpin received, stopping spin_forever")
                 break
 
 #
@@ -614,6 +641,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         This is a best-effort notification point that occurs when the message is
         handed off to the gRPC stream iterator, not when the server has processed it.
+
+        Parameters
+        ----------
+        data : message_pb2.Message
+            The message that is about to be yielded to the gRPC stream.
         """
 
     def on_init(self):
@@ -622,13 +654,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.Message) -> Any:
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
 
-        NOTE that if you return False, and only then, spin_forever()
-            will stop processing further messages.
+        Return values are passed through by spin() and ignored by spin_forever().
+        Raise StopSpin to stop spin_forever() without disconnecting.
 
         Parameters
         ----------
@@ -640,12 +672,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        bool
-            Whether the message was handled successfully.
+        Any
+            Optional value returned by spin().
         """
         self.logger.warning("Received data but on_receive() is not implemented. Data metaInfo: %s",
                             data.metaInfo)
-        return True
 
     def on_shutdown(self):
         """

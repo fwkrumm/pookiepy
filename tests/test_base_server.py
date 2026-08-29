@@ -189,6 +189,8 @@ class TestLifecycleHooks(unittest.TestCase):
              patch.object(queue.Queue, "get", fake_queue_get):
             generator = server.DataChannel(iter(()), context)
             yielded = next(generator)
+            with self.assertRaises(StopIteration):
+                next(generator)
 
         self.assertIs(yielded, msg)
         self.assertEqual(len(recorded), 1)
@@ -225,6 +227,11 @@ class TestServerName(unittest.TestCase):
 class TestServerConfig(unittest.TestCase):
     """Tests for ServerConfig defaults and compression field."""
 
+    def test_effective_max_workers_matches_python_default_formula(self):
+        """effective_max_workers mirrors ThreadPoolExecutor default sizing."""
+        cfg = ServerConfig(max_workers=None)
+        self.assertGreaterEqual(cfg.effective_max_workers, 1)
+
     def test_schema_version_default_is_empty(self):
         """ServerConfig.schema_version defaults to an empty string."""
         self.assertEqual(ServerConfig().schema_version, "")
@@ -249,6 +256,41 @@ class TestServerConfig(unittest.TestCase):
         server = BaseServer(port=50088, config=cfg)
         self.assertEqual(server.config.compression, grpc.Compression.Gzip)
         self.assertEqual(server.config.schema_version, "v1")
+
+    def test_queue_warning_threshold_passed_to_data_register(self):
+        """BaseServer forwards queue warning threshold into the routing table."""
+        cfg = ServerConfig(queue_warning_threshold=123)
+        server = BaseServer(port=50088, config=cfg)
+        self.assertEqual(server._data_register._queue_warning_threshold, 123)  # pylint: disable=protected-access
+
+
+class TestServeForever(unittest.TestCase):
+    """Tests for serve_forever startup wiring."""
+
+    @patch("pookiepy.baseserver.message_pb2_grpc.add_StreamServicer_to_server")
+    @patch("pookiepy.baseserver.grpc.server")
+    @patch("pookiepy.baseserver.futures.ThreadPoolExecutor")
+    def test_serve_forever_uses_effective_max_workers(
+        self,
+        mock_executor,
+        mock_grpc_server,
+        mock_add_servicer,
+    ):
+        """serve_forever passes the resolved worker count into ThreadPoolExecutor."""
+        cfg = ServerConfig(max_workers=None)
+        server = BaseServer(port=50081, config=cfg)
+        server.global_exit_event.set()
+
+        mock_server_instance = MagicMock()
+        mock_stop_event = MagicMock()
+        mock_stop_event.wait.return_value = True
+        mock_server_instance.stop.return_value = mock_stop_event
+        mock_grpc_server.return_value = mock_server_instance
+
+        server.serve_forever()
+
+        mock_executor.assert_called_once_with(max_workers=cfg.effective_max_workers)
+        mock_add_servicer.assert_called_once()
 
 
 class TestSchemaValidation(unittest.TestCase):
