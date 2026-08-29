@@ -13,7 +13,7 @@ pookiepy/logger.py                # GrpcLogger + rotating file logger
 pookiepy/tools.py                 # set_metadata, generate_message, evaluate_history
 pookiepy/timer.py                 # high-precision periodic timer (multiprocessing)
 pookiepy/schema_version.py        # schema-version metadata key for compat check
-pookiepy/custom_interface.py      # runtime .proto compile+load
+pookiepy/custom_interface.py      # validated precompiled protobuf module injection
 pookiepy/message.proto         # proto source (one service, one bidirectional RPC)
 pookiepy/message_pb2*.py       # generated --- DO NOT EDIT
 ```

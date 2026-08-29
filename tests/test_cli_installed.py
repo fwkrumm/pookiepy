@@ -438,11 +438,50 @@ class TestInstalledCLI(unittest.TestCase):
         server_src = server.read_text(encoding="utf-8")
         client_src = client.read_text(encoding="utf-8")
         self.assertIn("ProtoInterface", server_src)
-        self.assertIn("proto_interface=PROTO_INTERFACE", server_src)
+        self.assertIn("proto_interface: ProtoInterface = PROTO_INTERFACE", server_src)
+        self.assertIn("proto_interface=proto_interface", server_src)
         self.assertIn("ProtoInterface", client_src)
-        self.assertIn("proto_interface=PROTO_INTERFACE", client_src)
+        self.assertIn("proto_interface: ProtoInterface = PROTO_INTERFACE", client_src)
+        self.assertIn("proto_interface=proto_interface", client_src)
         self.assertNotIn("compile_and_register", server_src)
         self.assertNotIn("compile_and_register", client_src)
+
+        compile_result = subprocess.run(
+            [
+                str(self._python),
+                "-m",
+                "grpc_tools.protoc",
+                "-I.",
+                "--python_out=.",
+                "--grpc_python_out=.",
+                "--pyi_out=.",
+                "message.proto",
+            ],
+            cwd=str(self._work_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(compile_result.returncode, 0, msg=compile_result.stderr)
+
+        import_result = subprocess.run(
+            [
+                str(self._python),
+                "-c",
+                (
+                    "import inspect, server_skeleton, client_skeleton; "
+                    "assert inspect.signature(server_skeleton.MyServer).parameters"
+                    "['proto_interface'].default is server_skeleton.PROTO_INTERFACE; "
+                    "assert inspect.signature(client_skeleton.MyClient).parameters"
+                    "['proto_interface'].default is client_skeleton.PROTO_INTERFACE"
+                ),
+            ],
+            cwd=str(self._work_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(import_result.returncode, 0, msg=import_result.stderr)
 
         # Instructions must also be printed.
         self.assertIn("Next steps", result.stdout)

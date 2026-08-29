@@ -30,9 +30,7 @@ if __name__ == "__main__":
     message1 = generate_message(message_name="test_message", proto_interface=PROTO_INTERFACE)
     message2 = generate_message(message_name="test_message", proto_interface=PROTO_INTERFACE)
 
-    # the generate message currently would only set the message name; for custom interfaces
-    # that function needs to be implemented by the dev. here we simpply set the values manually.
-    # NOTE that intellisense might not work properly (yet).
+    # Custom payload fields remain application-specific and are set directly.
     message1.payload.onlyAFloatPayload=1.1
     message2.payload.onlyAFloatPayload=2.2
 

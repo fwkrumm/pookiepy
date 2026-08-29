@@ -300,8 +300,12 @@ PROTO_INTERFACE = ProtoInterface(message_pb2, message_pb2_grpc)
 class MyServer(BaseServer):
     """Server skeleton with custom interface. Override the hooks you need."""
 
-    def __init__(self, port: int = 50051):
-        super().__init__(port=port, name="MyServer", proto_interface=PROTO_INTERFACE)
+    def __init__(
+        self,
+        port: int = 50051,
+        proto_interface: ProtoInterface = PROTO_INTERFACE,
+    ):
+        super().__init__(port=port, name="MyServer", proto_interface=proto_interface)
 
     def on_init(self):
         """Called once after __init__ completes. Set up server-side state here."""
@@ -371,13 +375,17 @@ PROTO_INTERFACE = ProtoInterface(message_pb2, message_pb2_grpc)
 class MyClient(BaseClient):
     """Client skeleton with custom interface. Override the hooks you need."""
 
-    def __init__(self, port: int = 50051):
+    def __init__(
+        self,
+        port: int = 50051,
+        proto_interface: ProtoInterface = PROTO_INTERFACE,
+    ):
         super().__init__(
             name="my-client",
             port=port,
             provides=["my_request"],
             requires=["my_response"],
-            proto_interface=PROTO_INTERFACE,
+            proto_interface=proto_interface,
         )
 
     def on_init(self):
@@ -486,7 +494,7 @@ Next steps
 
 2.  Compile your proto (requires grpcio-tools):
 
-        python -m grpc_tools.protoc -I<directory-containing-message.proto> --python_out=<same-directory> --grpc_python_out=<same-directory> --pyi_out=<same-directory> message.proto
+        python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. message.proto
 
     This produces  message_pb2.py,  message_pb2_grpc.py, and  message_pb2.pyi
     next to your  message.proto.
