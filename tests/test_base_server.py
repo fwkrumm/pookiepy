@@ -166,7 +166,8 @@ class TestLifecycleHooks(unittest.TestCase):
             def on_data_yield(self, peer, data):
                 recorded.append((peer, data))
 
-        # explicitly set schema_version to empty string to avoid defaulting to DEFAULT_SCHEMA_VERSION
+        # explicitly set schema_version to empty string to
+        #  avoid defaulting to DEFAULT_SCHEMA_VERSION
         server = _Server(port=50092, config=ServerConfig(schema_version=""))
         context = MagicMock()
         context.peer.return_value = "fake-peer"
