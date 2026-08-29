@@ -303,9 +303,15 @@ class MyServer(BaseServer):
     def __init__(
         self,
         port: int = 50051,
+        config: ServerConfig = None,
         proto_interface: ProtoInterface = PROTO_INTERFACE,
     ):
-        super().__init__(port=port, name="MyServer", proto_interface=proto_interface)
+        super().__init__(
+            port=port,
+            name="MyServer",
+            config=config or ServerConfig(schema_version="pookiepy.schema.test"),
+            proto_interface=proto_interface,
+        )
 
     def on_init(self):
         """Called once after __init__ completes. Set up server-side state here."""
@@ -378,6 +384,7 @@ class MyClient(BaseClient):
     def __init__(
         self,
         port: int = 50051,
+        config: ClientConfig = None,
         proto_interface: ProtoInterface = PROTO_INTERFACE,
     ):
         super().__init__(
@@ -385,6 +392,7 @@ class MyClient(BaseClient):
             port=port,
             provides=["my_request"],
             requires=["my_response"],
+            config=config or ClientConfig(schema_version="pookiepy.schema.test"),
             proto_interface=proto_interface,
         )
 
@@ -505,9 +513,21 @@ Next steps
         import message_pb2
         import message_pb2_grpc
         from pookiepy.custom_interface import ProtoInterface
+        from pookiepy.baseclient import ClientConfig
+        from pookiepy.baseserver import ServerConfig
 
         proto_interface = ProtoInterface(message_pb2, message_pb2_grpc)
-        server = MyServer(port=50051, proto_interface=proto_interface)
+        schema_version = "pookiepy.schema.test"
+        server = MyServer(
+            port=50051,
+            config=ServerConfig(schema_version=schema_version),
+            proto_interface=proto_interface,
+        )
+        client = MyClient(
+            port=50051,
+            config=ClientConfig(schema_version=schema_version),
+            proto_interface=proto_interface,
+        )
 """
 
 

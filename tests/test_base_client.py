@@ -86,6 +86,20 @@ class TestSendData(unittest.TestCase):
         self.assertEqual(self.client.send_queue.qsize(), 5)
 
 
+class TestGenerateMessage(unittest.TestCase):
+    """Tests for BaseClient.generate_message()."""
+
+    def test_generates_message_with_struct_payload(self):
+        """The client helper uses the client's configured protobuf interface."""
+        client = _client()
+
+        message = client.generate_message("foo", {"value": 42})
+
+        self.assertIsInstance(message, message_pb2.PookieMessage)
+        self.assertEqual(message.metaInfo.messageName, "foo")
+        self.assertEqual(message.payload.structPayload["value"], 42)
+
+
 # ---------------------------------------------------------------------------
 # get_data
 # ---------------------------------------------------------------------------

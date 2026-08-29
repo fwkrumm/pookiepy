@@ -164,7 +164,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         self,
         request_iterator: Iterator[PookieMessage],
         context,
-        peer: "Peer",
+        peer: Peer,
         notification_queue: queue.Queue,
         exit_event: threading.Event,
     ) -> None:
@@ -448,6 +448,10 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
     def generate_message(self, *args) -> PookieMessage:
         """
         Generate a new PookieMessage using the server's proto interface.
+
+        NOTE that this will probably not be used by the server since usually
+        the clients provide the data and the server only forwards it to other clients.
+        However, this is provided for completeness.
 
         For doc string see ``pookiepy.tools.generate_message``.
         """

@@ -123,10 +123,10 @@ class DataRegister:
         return removed_count
 
     def add_data_for_message_name(self,
-                                 client_id: str,
-                                 message_name: str,
-                                 data: PookieMessage,
-                                 target_client_id: str = None) -> DeliveryResult:
+                                  client_id: str,
+                                  message_name: str,
+                                  data: PookieMessage,
+                                  target_client_id: str = None) -> DeliveryResult:
         """
         add payload for given message_name
 

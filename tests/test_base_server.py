@@ -52,6 +52,20 @@ class TestDefaultHooks(unittest.TestCase):
         self.assertIsNone(self.server.on_client_disconnect(self.peer))
 
 
+class TestGenerateMessage(unittest.TestCase):
+    """Tests for BaseServer.generate_message()."""
+
+    def test_generates_message_with_byte_payload(self):
+        """The server helper uses the server's configured protobuf interface."""
+        server = _make_server()
+
+        message = server.generate_message("foo", None, b"payload")
+
+        self.assertIsInstance(message, message_pb2.PookieMessage)
+        self.assertEqual(message.metaInfo.messageName, "foo")
+        self.assertEqual(message.payload.bytePayload, b"payload")
+
+
 class TestShutdown(unittest.TestCase):
     """Tests for BaseServer.shutdown()."""
 
