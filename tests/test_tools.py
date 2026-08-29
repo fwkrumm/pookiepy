@@ -257,9 +257,10 @@ class TestGenerateMessage(unittest.TestCase):
         fake_msg.metaInfo.messageName = ""
         fake_msg.payload = object()  # no structPayload/bytePayload attributes
 
-        with mock.patch("pookiepy.tools.message_pb2.Message", return_value=fake_msg):
-            with self.assertRaises(GrpcCustomInterfaceError) as err:
-                generate_message(struct_payload={"k": "v"})
+        interface = mock.MagicMock()
+        interface.message_pb2.Message.return_value = fake_msg
+        with self.assertRaises(GrpcCustomInterfaceError) as err:
+            generate_message(struct_payload={"k": "v"}, proto_interface=interface)
 
         self.assertIn("structPayload", str(err.exception))
         self.assertIn("Custom interface mismatch", str(err.exception))
@@ -271,9 +272,10 @@ class TestGenerateMessage(unittest.TestCase):
         fake_msg.metaInfo.messageName = ""
         fake_msg.payload = object()  # no structPayload/bytePayload attributes
 
-        with mock.patch("pookiepy.tools.message_pb2.Message", return_value=fake_msg):
-            with self.assertRaises(GrpcCustomInterfaceError) as err:
-                generate_message(byte_payload=b"x")
+        interface = mock.MagicMock()
+        interface.message_pb2.Message.return_value = fake_msg
+        with self.assertRaises(GrpcCustomInterfaceError) as err:
+            generate_message(byte_payload=b"x", proto_interface=interface)
 
         self.assertIn("bytePayload", str(err.exception))
         self.assertIn("Custom interface mismatch", str(err.exception))

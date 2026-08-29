@@ -22,8 +22,8 @@ Usage
 import threading
 import time
 
+from google.protobuf.message import Message as ProtobufMessage
 from pookiepy.baseserver import BaseServer, Peer
-from pookiepy import message_pb2
 
 
 SHUTDOWN_DELAY = 1  # seconds to wait before shutting down after receiving "server-exit"
@@ -48,14 +48,14 @@ class IntegrationServer(BaseServer):
         self._active_client_lock = threading.Lock()
         super().__init__(port, *args, ip=ip, **kwargs)
 
-    def on_client_accepted(self, peer: Peer, request: message_pb2.Message):
+    def on_client_accepted(self, peer: Peer, request: ProtobufMessage):
         """Track accepted integration clients for disconnect-based shutdown fallback."""
         client_id = request.metaInfo.clientInfo.uuid or peer.client_id
         if client_id:
             with self._active_client_lock:
                 self._active_client_ids.add(client_id)
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: ProtobufMessage) -> bool:
         """Handle ``"server-exit"`` in pipeline mode, then forward the message.
 
         Subclasses should call ``super().on_receive(peer, request)`` after their

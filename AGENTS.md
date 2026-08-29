@@ -34,7 +34,8 @@ Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.
 ## BaseServer --- [pookiepy/BaseServer.py](pookiepy/BaseServer.py)
 
 ```python
-BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None)
+BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None,
+           proto_interface=None)
 # config = ServerConfig(max_workers, max_queue_elements, shutdown_poll_interval, schema_version, server_options)
 ```
 
@@ -58,7 +59,7 @@ Schema check: compares `ClientConfig.schema_version` vs `ServerConfig.schema_ver
 
 ```python
 BaseClient(identifier, port, provides=None, requires=None, ip="localhost",
-           config=None)
+           config=None, proto_interface=None)
 # config = ClientConfig(receive_queue_maxsize, connection_check_timeout, schema_version, ssl_credentials, grpc_options)
 ```
 
@@ -120,7 +121,7 @@ with TimedEvent(s=0.01, n=100) as te:
 
 **Schema version** (`pookiepy/schema_version.py`): metadata-key constant only. Actual schema/version string comes from `ClientConfig.schema_version` / `ServerConfig.schema_version`.
 
-**Custom interface** (`pookiepy/custom_interface.py`): `compile_proto(proto_path, out_dir)` + `load_module(...)` --- runtime proto compile/load without touching `pookiepy/`.
+**Custom interface** (`pookiepy/custom_interface.py`): compile protobuf modules externally, construct `ProtoInterface(message_pb2, message_pb2_grpc)`, then pass `proto_interface=` to each client/server. No runtime compilation or global module replacement.
 
 ## Design Patterns
 

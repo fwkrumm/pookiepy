@@ -147,6 +147,21 @@ python -m pookiepy --generate-interface-with-skeletons
 
 to generate the skeletons along with a copy of the `message.proto` interface file in the current directory to modify which is then used by the skeletons.
 
+### Custom protobuf interface
+
+Pookiepy accepts precompiled protobuf modules through one explicit interface object. Compile the schema outside pookiepy, import both generated modules, then inject the same object into each matching client and server:
+
+```python
+from my_proto import message_pb2, message_pb2_grpc
+from pookiepy.custom_interface import ProtoInterface
+
+proto_interface = ProtoInterface(message_pb2, message_pb2_grpc)
+server = MyServer(port=50051, proto_interface=proto_interface)
+client = MyClient(port=50051, proto_interface=proto_interface)
+```
+
+Pookiepy performs no runtime compilation or global module registration. Omitting `proto_interface` uses the bundled schema. Custom client and server schemas must be wire-compatible.
+
 ---
 
 <a name="parameters"></a>
@@ -173,7 +188,7 @@ options:
   --generate-how-to     Copy HOW_TO.md into the current directory
   --generate-interface  Copy message.proto into the current directory and print customisation instructions
   --generate-interface-with-skeletons
-                        Copy message.proto and write server_skeleton.py + client_skeleton.py that load the custom interface at startup via compile_and_register()
+                        Copy message.proto and write server_skeleton.py + client_skeleton.py that inject precompiled custom protobuf modules
 
 examples:
   python -m pookiepy --generate                          # skeleton + HOW_TO

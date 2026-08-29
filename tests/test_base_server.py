@@ -267,14 +267,12 @@ class TestServerConfig(unittest.TestCase):
 class TestServeForever(unittest.TestCase):
     """Tests for serve_forever startup wiring."""
 
-    @patch("pookiepy.baseserver.message_pb2_grpc.add_StreamServicer_to_server")
     @patch("pookiepy.baseserver.grpc.server")
     @patch("pookiepy.baseserver.futures.ThreadPoolExecutor")
     def test_serve_forever_uses_effective_max_workers(
         self,
         mock_executor,
         mock_grpc_server,
-        mock_add_servicer,
     ):
         """serve_forever passes the resolved worker count into ThreadPoolExecutor."""
         cfg = ServerConfig(max_workers=None)
@@ -287,7 +285,11 @@ class TestServeForever(unittest.TestCase):
         mock_server_instance.stop.return_value = mock_stop_event
         mock_grpc_server.return_value = mock_server_instance
 
-        server.serve_forever()
+        with patch.object(
+            server._message_pb2_grpc,  # pylint: disable=protected-access
+            "add_StreamServicer_to_server",
+        ) as mock_add_servicer:
+            server.serve_forever()
 
         mock_executor.assert_called_once_with(max_workers=cfg.effective_max_workers)
         mock_add_servicer.assert_called_once()

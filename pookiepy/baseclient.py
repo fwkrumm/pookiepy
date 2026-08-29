@@ -17,10 +17,9 @@ from datetime import datetime, timezone
 from typing import Any
 
 import grpc
+from google.protobuf.message import Message as ProtobufMessage
 
-from pookiepy import message_pb2
-from pookiepy import message_pb2_grpc
-
+from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
 from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcTimeoutError, \
@@ -92,11 +91,15 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                  provides: list[str] = None,
                  requires: list[str] = None,
                  ip: str = "localhost",
-                 config: ClientConfig = None):
+                 config: ClientConfig = None,
+                 proto_interface: ProtoInterface = None):
 
         self.logger = get_logger(name=f"Client-{name}")
 
         self.__config = config or ClientConfig()
+        self._proto_interface = proto_interface or _bundled_interface()
+        self._message_pb2 = self._proto_interface.message_pb2
+        self._message_pb2_grpc = self._proto_interface.message_pb2_grpc
         self.ip = ip
 
         # the following methods have to be overwritten by user in subclass
@@ -147,7 +150,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         # but this is necessary to ensure a clean state on reconnect.
         # The old ones will be garbage collected after disconnect and should
         # not cause any issues.
-        self.stub = message_pb2_grpc.StreamStub(self.channel)
+        self.stub = self._message_pb2_grpc.StreamStub(self.channel)
         self.send_queue = queue.Queue()
         self.receive_queue = queue.Queue(maxsize=self.__config.receive_queue_maxsize)
         self.server_session_id = ""
@@ -209,9 +212,9 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger.iinfo(
             "Connected to server at port %d sending connect message", self.port
         )
-        first_message = message_pb2.Message(
-            metaInfo=message_pb2.MetaInformation(
-                clientInfo=message_pb2.ClientProvides(
+        first_message = self._message_pb2.Message(
+            metaInfo=self._message_pb2.MetaInformation(
+                clientInfo=self._message_pb2.ClientProvides(
                     uuid=self.uuid,
                     name=self.name,
                     requires=self.requires,
@@ -276,12 +279,12 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Yields
         ------
-        message_pb2.Message
+        google.protobuf.message.Message
             message to send
         """
         while self.run_event.is_set():
             try:
-                data: message_pb2.Message = self.send_queue.get(timeout=1)
+                data: ProtobufMessage = self.send_queue.get(timeout=1)
                 self.logger.idebug("Sending message to server: %s", data.metaInfo)
                 if data.history:
                     # if there is a history extend it
@@ -365,7 +368,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         try:
             for response in self.stream:
                 if response.history:
-                    response.history.append(message_pb2.DataPoint(
+                    response.history.append(self._message_pb2.DataPoint(
                         name=self.name,
                         receiveTimestamp=datetime.now(timezone.utc),
                         perfCounter=time.perf_counter()
@@ -400,13 +403,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         finally:
             self.logger.iinfo("Receive loop terminated")
 
-    def send_data(self, data: message_pb2.Message, add_history: bool = False):
+    def send_data(self, data: ProtobufMessage, add_history: bool = False):
         """
         put data to queue from where they will be sent to grpc server
 
         Parameters
         ----------
-        data : message_pb2.Message
+        data : google.protobuf.message.Message
             The message to be sent to the gRPC server.
         add_history : bool, optional
             If True, automatically append a DataPoint to the message's history
@@ -417,12 +420,12 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Raises
         ------
         GrpcValueError
-            If the data is not of type message_pb2.Message or if the message name
+            If data does not use the configured Message type or if the message name
             is not in the provides list.
         """
-        if not isinstance(data, message_pb2.Message):
+        if not isinstance(data, self._message_pb2.Message):
             raise GrpcValueError(
-                f"Data must be of type message_pb2.Message, but got {type(data)}"
+                f"Data must use the client's configured Message type, but got {type(data)}"
             )
 
         if data.metaInfo.messageName not in self.provides:
@@ -437,7 +440,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 raise GrpcValueError("Data already has history, this will automatically extend "\
                                      "the history throughtout the data flow, so add_history "\
                                      "should not be used in this case.")
-            data.history.append(message_pb2.DataPoint(
+            data.history.append(self._message_pb2.DataPoint(
                 name=self.name,
                 receiveTimestamp=datetime.now(timezone.utc),
                 perfCounter=time.perf_counter())
@@ -498,7 +501,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             # also catch AttributeError and RuntimeError just to be safe
             pass
 
-    def get_data(self, timeout: float = None) -> message_pb2.Message:
+    def get_data(self, timeout: float = None) -> ProtobufMessage:
         """
         Get a response from the receive queue.
 
@@ -515,7 +518,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        message_pb2.Message
+        google.protobuf.message.Message
             The received message
 
         Raises
@@ -635,7 +638,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """Client configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, data: message_pb2.Message):
+    def on_data_yield(self, data: ProtobufMessage):
         """
         Hook called right before a message is yielded from the client request generator.
 
@@ -644,7 +647,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        data : message_pb2.Message
+        data : google.protobuf.message.Message
             The message that is about to be yielded to the gRPC stream.
         """
 
@@ -654,7 +657,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: message_pb2.Message) -> Any:
+    def on_receive(self, data: ProtobufMessage) -> Any:
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
@@ -664,7 +667,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        data : message_pb2.Message
+        data : google.protobuf.message.Message
             The message received from the server. This is passed directly from the receive loop, so
             it is not removed from the receive queue yet. If you want to remove it from the queue,
             you can call get_data() in this function, but be aware that this will block until a new

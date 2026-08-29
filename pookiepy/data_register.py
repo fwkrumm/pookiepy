@@ -10,7 +10,7 @@ import queue
 import logging
 from dataclasses import dataclass
 
-from pookiepy import message_pb2
+from google.protobuf.message import Message as ProtobufMessage
 from pookiepy.exceptions import GrpcValueError
 
 
@@ -29,6 +29,7 @@ class DataRegister:
         self,
         logger: logging.Logger,
         queue_warning_threshold: int | None = None,
+        message_type: type[ProtobufMessage] = None,
     ):
         """
         data register for payloads
@@ -41,6 +42,10 @@ class DataRegister:
 
         self._logger = logger
         self._queue_warning_threshold = queue_warning_threshold
+        if message_type is None:
+            from pookiepy import message_pb2  # pylint: disable=import-outside-toplevel
+            message_type = message_pb2.Message
+        self._message_type = message_type
 
         # register will contain messageName -> dict of clientId to notification queue
         self._register: dict[str, dict[str, queue.Queue]] = {}
@@ -120,7 +125,7 @@ class DataRegister:
     def add_data_for_message_name(self,
                                  client_id: str,
                                  message_name: str,
-                                 data: message_pb2.Message,
+                                 data: ProtobufMessage,
                                  target_client_id: str = None) -> DeliveryResult:
         """
         add payload for given message_name
@@ -144,10 +149,12 @@ class DataRegister:
                 data format which grpc clients should receive!
         """
 
-        if not isinstance(data, message_pb2.Message):
+        if not isinstance(data, self._message_type):
             # the data from the register are directly yield to grpc clients
-            raise GrpcValueError(f"Data is not of type Message but {type(data)}. Data cannot "\
-                                 "put to register since they will be forwarded to grpc clients.")
+            raise GrpcValueError(
+                f"Data does not use the configured Message type: {type(data)}. Data cannot "
+                "be put into the register because it will be forwarded to gRPC clients."
+            )
 
         with self._meta_lock:
             lock = self._locks.get(message_name)

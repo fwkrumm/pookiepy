@@ -272,64 +272,53 @@ Framework auto-attaches `ClientConfig.schema_version` as gRPC metadata on each s
 
 Prefer `self.logger` in `BaseServer`/`BaseClient` subclasses. Built-in logger supports console + rotating file logs and custom levels: `INTERNAL_INFO`, `INTERNAL_DEBUG`.
 
-## Custom Interface (Runtime Proto)
+## Custom Interface
 
-Use custom `.proto` instead of bundled one without editing `pookiepy/`. Proto must keep same message/service structure: `Message`, `ClientProvides`, `ServerProvides`, `StreamStub`, `StreamServicer`.
+Custom interfaces use precompiled protobuf modules. Pookiepy never compiles or dynamically loads `.proto` files at runtime.
 
-### Compile/register at startup
+### Workflow
 
-```python
-from pookiepy.custom_interface import compile_and_register
+1. Keep the required `Message`, metadata, history, client/server information, and bidirectional `Stream.DataChannel` definitions.
+2. Compile the schema outside pookiepy:
 
-# compile my_proto/message.proto; register as pookiepy.message_pb2 / pookiepy.message_pb2_grpc
-pb2, pb2_grpc = compile_and_register(
-    proto_path="my_proto/message.proto",
-    package="pookiepy",        # replaces built-in modules under this package name
-    out_dir="my_proto/",       # optional; temp dir if omitted
-)
+```bash
+python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. my_proto/message.proto
 ```
 
-Call before importing `BaseServer`/`BaseClient`. After registration, pookiepy internals automatically use custom modules.
+3. Import both generated modules, create one interface object, and inject it:
+
+```python
+from my_proto import message_pb2, message_pb2_grpc
+from pookiepy.custom_interface import ProtoInterface
+from pookiepy.baseserver import BaseServer
+
+proto_interface = ProtoInterface(message_pb2, message_pb2_grpc)
+server = BaseServer(port=50051, proto_interface=proto_interface)
+```
+
+Clients use the same pattern:
+
+```python
+from pookiepy.baseclient import BaseClient
+
+client = BaseClient(port=50051, proto_interface=proto_interface)
+```
+
+Client and server schemas must be wire-compatible.
+Omitting `proto_interface` selects the bundled interface.
 
 ### Typical layout
 
 ```text
 my_project/
     my_proto/
+        __init__.py
         message.proto       # custom proto (same service structure)
-    _proto_setup.py         # side-effect import: compile + register
+        message_pb2.py      # generated
+        message_pb2_grpc.py # generated
     server.py
     client.py
 ```
-
-`_proto_setup.py`:
-
-```python
-from pathlib import Path
-from pookiepy.custom_interface import compile_and_register
-
-compile_and_register(
-    proto_path=Path(__file__).parent / "my_proto" / "message.proto",
-    package="pookiepy",
-    out_dir=Path(__file__).parent / "my_proto",
-)
-```
-
-`server.py` / `client.py`:
-
-```python
-import _proto_setup  # must be first; registers custom proto before pookiepy imports
-from pookiepy.baseserver import BaseServer
-```
-
-### Lower-level functions
-
-| Function | Purpose |
-|---|---|
-| `compile_proto(proto_path, out_dir=None) → Path` | Run `grpc_tools.protoc`; return output dir. |
-| `load_pb_modules_from_dir(dir_path, package, register=True) → (pb2, pb2_grpc)` | Load generated `message_pb2.py` + `message_pb2_grpc.py` from directory. |
-| `validate_interface(pb2, pb2_grpc)` | Assert required symbols exist; raise `RuntimeError` otherwise. |
-| `resolve_modules(message_module, grpc_module, module_path, package)` | Multi-mode resolver: accepts module objects, import strings, or directory path; falls back to bundled modules. |
 
 ## Messages
 
