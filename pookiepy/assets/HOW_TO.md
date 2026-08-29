@@ -16,7 +16,7 @@ Server routes by `messageName` (no extra RPC methods needed).
 from pookiepy.baseserver import BaseServer, Peer, ServerConfig
 from pookiepy.baseclient import BaseClient, ClientConfig
 from pookiepy.tools import generate_message, struct_to_json, json_to_struct, evaluate_history
-from pookiepy.exceptions import GrpcEmpty, ClientExit, GrpcConnectionError
+from pookiepy.exceptions import ClientExit, GrpcConnectionError, GrpcEmpty, StopSpin
 import pookiepy.message_pb2 as message_pb2
 ```
 
@@ -101,7 +101,8 @@ self._data_register.add_data_for_message_name("", "my_topic", msg)
 ```python
 config = ServerConfig(
     max_workers=10,            # thread pool size (>= expected concurrent clients)
-    max_queue_elements=0,      # per-client queue depth (0 = unlimited)
+    max_queue_elements=0,      # per-client queue depth (0 = unlimited; no backpressure)
+    queue_warning_threshold=100_000,  # warn when subscribers fall behind; None disables
     shutdown_poll_interval=0.1,
     schema_version="chat-v1", # optional manual schema/version string
 )
@@ -135,11 +136,11 @@ class MyClient(BaseClient):
         # after each connection (initial + reconnect)
         pass
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.Message) -> Any:
         # called by spin()/spin_forever() per message
         name = data.metaInfo.messageName
         payload = struct_to_json(data.payload.structPayload)  # dict
-        return True
+        return {"name": name, "payload": payload}
 
     def on_data_yield(self, data: message_pb2.Message):
         # just before client-side yield to gRPC stream
@@ -158,7 +159,7 @@ client = MyClient(port=50051)   # connects immediately in __init__
 
 # option A: hook-based (non-blocking send + blocking receive loop)
 client.send_data(generate_message("my_request"))
-client.spin_forever(timeout=5.0)   # calls on_receive(); stops on timeout/disconnect
+client.spin_forever(timeout=5.0)   # calls on_receive(); stops on timeout/disconnect/StopSpin
 
 # option B: manual polling
 client.send_data(generate_message("my_request"))
@@ -209,8 +210,8 @@ client = MyClient(port=50051, config=ClientConfig(
 | `send_data` | `(msg: Message, add_history=False)` | Enqueue send. `messageName` must be in `provides`; `add_history` appends first `DataPoint`. |
 | `get_data` | `(timeout=None) → Message` | Poll receive queue. `None`=wait forever, `0`=non-blocking. |
 | `wait_done` | `(additional_sleep=0.5)` | Block until all queued sends yielded to gRPC. |
-| `spin` | `(timeout=None) → bool` | One `get_data` then `on_receive`; `False` on timeout/disconnect. |
-| `spin_forever` | `(timeout=None)` | Loop `spin` until `False`. |
+| `spin` | `(timeout=None) → Any` | One `get_data` then `on_receive`; raises on timeout/disconnect. |
+| `spin_forever` | `(timeout=None)` | Loop via `spin`; stops on timeout/disconnect exceptions or `StopSpin`. |
 | `disconnect` | `()` | Stop threads, close channel. |
 
 ## Features LLM Should Know
@@ -425,6 +426,7 @@ Delivery only to clients whose `requires` contains `messageName`. If none requir
 |---|---|
 | `GrpcEmpty` | `get_data(timeout)` expired without message. |
 | `ClientExit` | `get_data()` interrupted because client disconnected. |
+| `StopSpin` | Stop `spin_forever()` without disconnecting. |
 | `GrpcConnectionError` | Connection failed, or `wait_done()` called while disconnected. |
 | `GrpcTimeoutError` | RPC `DEADLINE_EXCEEDED`. |
 | `GrpcValueError` | `messageName` not in `provides`, or wrong type passed to `send_data`. |
