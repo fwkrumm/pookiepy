@@ -127,7 +127,7 @@ class MyServer(BaseServer):
     # Client lifecycle hooks
     # ------------------------------------------------------------------
 
-    def on_client_connect(self, request: message_pb2.Message, context) -> bool:
+    def on_client_connect(self, request: message_pb2.PookieMessage, context) -> bool:
         """
         Called on the *first* message from a new client, before it is registered.
 
@@ -141,7 +141,7 @@ class MyServer(BaseServer):
         """
         return True
 
-    def on_client_accepted(self, peer: Peer, request: message_pb2.Message):
+    def on_client_accepted(self, peer: Peer, request: message_pb2.PookieMessage):
         """
         Called after a client has been fully registered.
         peer fields are all populated at this point.
@@ -153,10 +153,10 @@ class MyServer(BaseServer):
         pass
 
     # ------------------------------------------------------------------
-    # Message hook
+    # PookieMessage hook
     # ------------------------------------------------------------------
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         """
         Called for every subsequent message from an accepted client.
 
@@ -228,10 +228,10 @@ class MyClient(BaseClient):
         pass
 
     # ------------------------------------------------------------------
-    # Message hook
+    # PookieMessage hook
     # ------------------------------------------------------------------
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """
         Called by spin() / spin_forever() for each message received from the server.
 
@@ -315,14 +315,14 @@ class MyServer(BaseServer):
         """Called during shutdown. Clean up resources here."""
         pass
 
-    def on_client_connect(self, request: message_pb2.Message, context) -> bool:
+    def on_client_connect(self, request: message_pb2.PookieMessage, context) -> bool:
         """
         Called on the first message from a new client, before it is registered.
         Return True to accept, False to reject (triggers PERMISSION_DENIED).
         """
         return True
 
-    def on_client_accepted(self, peer: Peer, request: message_pb2.Message):
+    def on_client_accepted(self, peer: Peer, request: message_pb2.PookieMessage):
         """Called after a client has been fully registered."""
         pass
 
@@ -330,7 +330,7 @@ class MyServer(BaseServer):
         """Called when an accepted client\'s stream closes."""
         pass
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         """
         Called for every subsequent message from an accepted client.
 
@@ -396,7 +396,7 @@ class MyClient(BaseClient):
         """Called during disconnect(). Clean up resources here."""
         pass
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """
         Called by spin() / spin_forever() for each received message.
 
@@ -489,7 +489,7 @@ _INTERFACE_INSTRUCTIONS = """
 Next steps
 ----------
 1.  Edit  message.proto  --- change the Payload message to suit your needs.
-    Do NOT rename or remove the Service, Message, MetaInformation, DataPoint,
+    Do NOT rename or remove the Service, PookieMessage, MetaInformation, DataPoint,
     ClientProvides, or ServerProvides definitions; pookiepy depends on them.
 
 2.  Compile your proto (requires grpcio-tools):

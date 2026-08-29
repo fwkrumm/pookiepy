@@ -106,7 +106,7 @@ if __name__ == "__main__":
 
     # shut down server
     config.send_data(
-        message_pb2.Message(
+        message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="server-exit")
         )
     )

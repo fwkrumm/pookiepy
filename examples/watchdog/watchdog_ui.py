@@ -104,7 +104,7 @@ class WatchdogPoller(BaseClient):
             requires=[WATCHDOG_STATS],
         )
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Parse incoming stats snapshot and store for the API to serve."""
         raw = struct_to_json(data.payload.structPayload)
         clients = raw.get("clients", {})
@@ -129,7 +129,7 @@ class WatchdogPoller(BaseClient):
         """Send a user-typed message through the gRPC stream.
 
         Args:
-            text: Message text to deliver as ``"ui_event"`` struct payload.
+            text: PookieMessage text to deliver as ``"ui_event"`` struct payload.
         """
         self.send_data(generate_message(UI_EVENT, struct_payload={"text": text}))
 
@@ -737,7 +737,7 @@ function setStatus(text, color) {
   statusTimer = setTimeout(() => { statusMsg.style.opacity = '0'; }, 2200);
 }
 
-async function sendMessage() {
+async function sendPookieMessage() {
   const text = input.value.trim();
   if (!text) return;
   sendBtn.disabled = true;
@@ -770,9 +770,9 @@ async function sendMessage() {
   }
 }
 
-sendBtn.addEventListener('click', sendMessage);
+sendBtn.addEventListener('click', sendPookieMessage);
 input.addEventListener('keydown', e => {
-  if (e.key === 'Enter')  sendMessage();
+  if (e.key === 'Enter')  sendPookieMessage();
   if (e.key === 'Escape') { input.value = ''; charCount.textContent = '0/200'; }
 });
 

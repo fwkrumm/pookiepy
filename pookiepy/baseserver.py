@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Iterator
 
 import grpc
-from google.protobuf.message import Message as ProtobufMessage
+from google.protobuf.message import Message as ProtobufPookieMessage
 
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
@@ -119,7 +119,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         self._data_register = DataRegister(
             self.logger,
             queue_warning_threshold=self.__config.queue_warning_threshold,
-            message_type=self._message_pb2.Message,
+            message_type=self._message_pb2.PookieMessage,
         )
         self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
 
@@ -148,7 +148,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
     def _handle_client_receive(  # pylint: disable=too-many-arguments,R0917
         self,
-        request_iterator: Iterator[ProtobufMessage],
+        request_iterator: Iterator[ProtobufPookieMessage],
         context,
         peer: "Peer",
         notification_queue: queue.Queue,
@@ -161,7 +161,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        request_iterator : Iterator[google.protobuf.message.Message]
+        request_iterator : Iterator[google.protobuf.message.PookieMessage]
             Iterator over incoming messages from the client.
         context : _type_
             gRPC context for the current RPC.
@@ -174,7 +174,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         """
         try:
             for request in request_iterator:
-                request: ProtobufMessage
+                request: ProtobufPookieMessage
 
                 if request.history:
                     request.history.append(
@@ -228,7 +228,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
                     # registration there would be a race where a data message arrives first,
                     # causing _check_connection() on the client to consume the wrong message
                     # and subsequent get_data() calls to return the welcome (empty payload).
-                    welcome_message = self._message_pb2.Message(
+                    welcome_message = self._message_pb2.PookieMessage(
                         metaInfo=self._message_pb2.MetaInformation(
                             serverInfo=self._message_pb2.ServerProvides(
                                 serverId=self._uid,
@@ -273,7 +273,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
     def DataChannel(  # pylint: disable=invalid-name
         self,
-        request_iterator: Iterator[ProtobufMessage],
+        request_iterator: Iterator[ProtobufPookieMessage],
         context,
     ):
         """
@@ -446,7 +446,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         """Server configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, peer: Peer, data: ProtobufMessage):
+    def on_data_yield(self, peer: Peer, data: ProtobufPookieMessage):
         """
         Hook called right before a message is yielded to a client stream.
 
@@ -466,7 +466,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
     def on_receive(self,
                    peer: Peer,
-                   request: ProtobufMessage,
+                   request: ProtobufPookieMessage,
                    ) -> bool:
         """
         Called when a message is received. Override to handle incoming messages.
@@ -475,7 +475,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         ----------
         peer : Peer
             The peer that sent the message
-        request : google.protobuf.message.Message
+        request : google.protobuf.message.PookieMessage
             The message sent by the client
 
         Returns
@@ -486,7 +486,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         return True
 
     def on_client_connect(self,
-                          data: ProtobufMessage,
+                          data: ProtobufPookieMessage,
                           context: grpc.ServicerContext
                           ) -> bool:
         """
@@ -497,7 +497,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        data : google.protobuf.message.Message
+        data : google.protobuf.message.PookieMessage
             The message sent by the client
         context : grpc.ServicerContext
             The RPC context (can be used to abort connection)
@@ -520,14 +520,14 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         """
         # pylint: disable=unused-argument
 
-    def on_client_accepted(self, peer: Peer, request: ProtobufMessage):
+    def on_client_accepted(self, peer: Peer, request: ProtobufPookieMessage):
         """Called after a client has been accepted and registered.
 
         Parameters
         ----------
         peer : Peer
             The accepted peer.
-        request : google.protobuf.message.Message
+        request : google.protobuf.message.PookieMessage
             The first connect message containing ``clientInfo``.
         """
         # pylint: disable=unused-argument

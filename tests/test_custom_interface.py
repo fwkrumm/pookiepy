@@ -39,7 +39,7 @@ class TestProtoInterface(unittest.TestCase):
         with self.assertRaises(GrpcCustomInterfaceError) as raised:
             ProtoInterface(empty_pb2, empty_grpc)
         message = str(raised.exception)
-        self.assertIn("message_pb2.Message", message)
+        self.assertIn("message_pb2.PookieMessage", message)
         self.assertIn("message_pb2.MetaInformation", message)
         self.assertIn("message_pb2_grpc.StreamStub", message)
         self.assertIn("message_pb2_grpc.add_StreamServicer_to_server", message)
@@ -48,10 +48,10 @@ class TestProtoInterface(unittest.TestCase):
         custom_pb2 = _module_copy(message_pb2, "missing_message_field_pb2")
         descriptor = types.SimpleNamespace(
             fields_by_name={"metaInfo": object(), "history": object()},
-            full_name=message_pb2.Message.DESCRIPTOR.full_name,
+            full_name=message_pb2.PookieMessage.DESCRIPTOR.full_name,
         )
-        custom_pb2.Message = type("Message", (), {"DESCRIPTOR": descriptor})
-        with self.assertRaisesRegex(GrpcCustomInterfaceError, "Message.payload"):
+        custom_pb2.PookieMessage = type("PookieMessage", (), {"DESCRIPTOR": descriptor})
+        with self.assertRaisesRegex(GrpcCustomInterfaceError, "PookieMessage.payload"):
             ProtoInterface(custom_pb2, message_pb2_grpc)
 
     def test_reports_missing_metadata_field(self):
@@ -73,8 +73,8 @@ class TestProtoInterface(unittest.TestCase):
         method = types.SimpleNamespace(
             client_streaming=False,
             server_streaming=False,
-            input_type=message_pb2.Message.DESCRIPTOR,
-            output_type=message_pb2.Message.DESCRIPTOR,
+            input_type=message_pb2.PookieMessage.DESCRIPTOR,
+            output_type=message_pb2.PookieMessage.DESCRIPTOR,
         )
         service = types.SimpleNamespace(methods_by_name={"DataChannel": method})
         custom_pb2 = _module_copy(message_pb2, "unary_service_pb2")

@@ -22,7 +22,7 @@ class HistoryServer(IntegrationServer):
     producer → server → consumer is captured in the message's history field.
     """
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         self.logger.info(
             "Forwarding '%s' with %d history hop(s) from %s",
             request.metaInfo.messageName,

@@ -25,13 +25,13 @@ class TestSetMetadata(unittest.TestCase):
 
     def test_assigns_message_id_when_empty(self):
         """An empty message receives a non-empty messageId after set_metadata."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
         set_metadata(msg)
         self.assertTrue(msg.metaInfo.messageId)
 
     def test_assigned_message_id_is_32_char_hex(self):
         """Generated messageId is a 32-character hexadecimal string (uuid4().hex)."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
         set_metadata(msg)
         mid = msg.metaInfo.messageId
         self.assertEqual(len(mid), 32)
@@ -40,14 +40,14 @@ class TestSetMetadata(unittest.TestCase):
 
     def test_preserves_existing_message_id(self):
         """An already-set messageId is not overwritten by set_metadata."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
         msg.metaInfo.messageId = "fixed-id"
         set_metadata(msg)
         self.assertEqual(msg.metaInfo.messageId, "fixed-id")
 
     def test_preserves_existing_timestamp(self):
         """An already-set timestamp is not overwritten by set_metadata."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
         ts = Timestamp(seconds=1_000_000, nanos=0)
         msg.metaInfo.timestamp.CopyFrom(ts)
         set_metadata(msg)
@@ -60,7 +60,7 @@ class TestSetMetadata(unittest.TestCase):
         Timestamp, so the old ``if not message.metaInfo.timestamp`` guard was always
         False and the timestamp was never written.  The fix uses HasField instead.
         """
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
         self.assertFalse(msg.metaInfo.HasField("timestamp"))
         set_metadata(msg)
         self.assertTrue(
@@ -71,8 +71,8 @@ class TestSetMetadata(unittest.TestCase):
 
     def test_each_call_produces_unique_message_id(self):
         """Successive calls on different messages generate distinct messageId values."""
-        msg1 = message_pb2.Message()
-        msg2 = message_pb2.Message()
+        msg1 = message_pb2.PookieMessage()
+        msg2 = message_pb2.PookieMessage()
         set_metadata(msg1)
         set_metadata(msg2)
         self.assertNotEqual(msg1.metaInfo.messageId, msg2.metaInfo.messageId)
@@ -128,8 +128,8 @@ class TestEvaluateHistory(unittest.TestCase):
         dp.perfCounter = perf
         return dp
 
-    def _msg(self, *datapoints) -> message_pb2.Message:
-        msg = message_pb2.Message()
+    def _msg(self, *datapoints) -> message_pb2.PookieMessage:
+        msg = message_pb2.PookieMessage()
         for dp in datapoints:
             msg.history.append(dp)
         return msg
@@ -137,12 +137,12 @@ class TestEvaluateHistory(unittest.TestCase):
     def test_empty_history_logs_no_history_message(self):
         """Empty history emits a 'No history available' log line."""
         logs = []
-        evaluate_history(message_pb2.Message(), log_callback=logs.append)
+        evaluate_history(message_pb2.PookieMessage(), log_callback=logs.append)
         self.assertTrue(any("No history" in l for l in logs))
 
     def test_no_callback_defaults_to_print(self):
         """Omitting log_callback falls back to print without raising."""
-        evaluate_history(message_pb2.Message())  # must not raise
+        evaluate_history(message_pb2.PookieMessage())  # must not raise
 
     def test_single_hop_receive_only_shows_not_forwarded(self):
         """Single hop with receive but no send timestamp shows '<not forwarded>'."""
@@ -204,7 +204,7 @@ class TestEvaluateHistory(unittest.TestCase):
         self.assertTrue(any("my_event" in l for l in logs))
 
 
-class TestGenerateMessage(unittest.TestCase):
+class TestGeneratePookieMessage(unittest.TestCase):
     """Tests for generate_message() in pookiepy/tools.py."""
 
     def test_default_message_name(self):
@@ -234,8 +234,8 @@ class TestGenerateMessage(unittest.TestCase):
         self.assertEqual(msg.payload.bytePayload, b"")
 
     def test_returns_message_instance(self):
-        """generate_message always returns a message_pb2.Message."""
-        self.assertIsInstance(generate_message(), message_pb2.Message)
+        """generate_message always returns a message_pb2.PookieMessage."""
+        self.assertIsInstance(generate_message(), message_pb2.PookieMessage)
 
     def test_struct_and_byte_payload_both_set(self):
         """Both struct and byte payloads can coexist on the same message."""
@@ -258,7 +258,7 @@ class TestGenerateMessage(unittest.TestCase):
         fake_msg.payload = object()  # no structPayload/bytePayload attributes
 
         interface = mock.MagicMock()
-        interface.message_pb2.Message.return_value = fake_msg
+        interface.message_pb2.PookieMessage.return_value = fake_msg
         with self.assertRaises(GrpcCustomInterfaceError) as err:
             generate_message(struct_payload={"k": "v"}, proto_interface=interface)
 
@@ -273,7 +273,7 @@ class TestGenerateMessage(unittest.TestCase):
         fake_msg.payload = object()  # no structPayload/bytePayload attributes
 
         interface = mock.MagicMock()
-        interface.message_pb2.Message.return_value = fake_msg
+        interface.message_pb2.PookieMessage.return_value = fake_msg
         with self.assertRaises(GrpcCustomInterfaceError) as err:
             generate_message(byte_payload=b"x", proto_interface=interface)
 

@@ -110,7 +110,7 @@ def _build_client_options(
     return options
 
 
-def _history_e2e_ms(msg: message_pb2.Message) -> float | None:
+def _history_e2e_ms(msg: message_pb2.PookieMessage) -> float | None:
     """Compute end-to-end wall-clock latency from history timestamps."""
     if not msg.history:
         return None
@@ -271,7 +271,7 @@ class ReceiverClient(BaseClient):  # pylint: disable=too-many-instance-attribute
             config=cfg,
         )
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         if data.payload.bytePayload != self.expected_payload:
             raise AssertionError("Payload mismatch at receiver")
 

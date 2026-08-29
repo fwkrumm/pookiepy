@@ -10,7 +10,7 @@ import queue
 import logging
 from dataclasses import dataclass
 
-from google.protobuf.message import Message as ProtobufMessage
+from google.protobuf.message import Message as ProtobufPookieMessage
 from pookiepy.exceptions import GrpcValueError
 
 
@@ -29,7 +29,7 @@ class DataRegister:
         self,
         logger: logging.Logger,
         queue_warning_threshold: int | None = None,
-        message_type: type[ProtobufMessage] = None,
+        message_type: type[ProtobufPookieMessage] = None,
     ):
         """
         data register for payloads
@@ -44,7 +44,7 @@ class DataRegister:
         self._queue_warning_threshold = queue_warning_threshold
         if message_type is None:
             from pookiepy import message_pb2  # pylint: disable=import-outside-toplevel
-            message_type = message_pb2.Message
+            message_type = message_pb2.PookieMessage
         self._message_type = message_type
 
         # register will contain messageName -> dict of clientId to notification queue
@@ -125,7 +125,7 @@ class DataRegister:
     def add_data_for_message_name(self,
                                  client_id: str,
                                  message_name: str,
-                                 data: ProtobufMessage,
+                                 data: ProtobufPookieMessage,
                                  target_client_id: str = None) -> DeliveryResult:
         """
         add payload for given message_name
@@ -145,14 +145,14 @@ class DataRegister:
                 exists for this message_name.
 
         Raises:
-            GrpcValueError: if data are not of type message_pb2.Message. the latter is the only
-                data format which grpc clients should receive!
+            GrpcValueError: if data are not of type message_pb2.PookieMessage. the latter is
+                the only data format which grpc clients should receive!
         """
 
         if not isinstance(data, self._message_type):
             # the data from the register are directly yield to grpc clients
             raise GrpcValueError(
-                f"Data does not use the configured Message type: {type(data)}. Data cannot "
+                f"Data does not use the configured PookieMessage type: {type(data)}. Data cannot "
                 "be put into the register because it will be forwarded to gRPC clients."
             )
 

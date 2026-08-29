@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import grpc
-from google.protobuf.message import Message as ProtobufMessage
+from google.protobuf.message import Message as ProtobufPookieMessage
 
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
@@ -212,7 +212,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger.iinfo(
             "Connected to server at port %d sending connect message", self.port
         )
-        first_message = self._message_pb2.Message(
+        first_message = self._message_pb2.PookieMessage(
             metaInfo=self._message_pb2.MetaInformation(
                 clientInfo=self._message_pb2.ClientProvides(
                     uuid=self.uuid,
@@ -279,12 +279,12 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Yields
         ------
-        google.protobuf.message.Message
+        google.protobuf.message.PookieMessage
             message to send
         """
         while self.run_event.is_set():
             try:
-                data: ProtobufMessage = self.send_queue.get(timeout=1)
+                data: ProtobufPookieMessage = self.send_queue.get(timeout=1)
                 self.logger.idebug("Sending message to server: %s", data.metaInfo)
                 if data.history:
                     # if there is a history extend it
@@ -296,7 +296,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 set_metadata(data)
 
                 if not data.metaInfo.timestamp:
-                    raise GrpcValueError("Message timestamp is not set even after set_metadata()")
+                    raise GrpcValueError("PookieMessage timestamp is not set "\
+                                         "even after set_metadata()")
 
                 # so far the only line where the message id is logged
                 self.logger.idebug("Sending message with timestamp %s and messageId %s",
@@ -403,13 +404,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         finally:
             self.logger.iinfo("Receive loop terminated")
 
-    def send_data(self, data: ProtobufMessage, add_history: bool = False):
+    def send_data(self, data: ProtobufPookieMessage, add_history: bool = False):
         """
         put data to queue from where they will be sent to grpc server
 
         Parameters
         ----------
-        data : google.protobuf.message.Message
+        data : google.protobuf.message.PookieMessage
             The message to be sent to the gRPC server.
         add_history : bool, optional
             If True, automatically append a DataPoint to the message's history
@@ -420,19 +421,20 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Raises
         ------
         GrpcValueError
-            If data does not use the configured Message type or if the message name
+            If data does not use the configured PookieMessage type or if the message name
             is not in the provides list.
         """
-        if not isinstance(data, self._message_pb2.Message):
+        if not isinstance(data, self._message_pb2.PookieMessage):
             raise GrpcValueError(
-                f"Data must use the client's configured Message type, but got {type(data)}"
+                f"Data must use the client's configured PookieMessage type, but got {type(data)}"
             )
 
         if data.metaInfo.messageName not in self.provides:
             # actually we could work without this check and just let the user send whatever
             # they want, but this case we could not track "which data might be provided later on"
             raise GrpcValueError(
-                f"Message name {data.metaInfo.messageName} not in provides list {self.provides}"
+                f"PookieMessage name {data.metaInfo.messageName} not in "\
+                f"provides list {self.provides}"
             )
 
         if add_history:
@@ -501,7 +503,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             # also catch AttributeError and RuntimeError just to be safe
             pass
 
-    def get_data(self, timeout: float = None) -> ProtobufMessage:
+    def get_data(self, timeout: float = None) -> ProtobufPookieMessage:
         """
         Get a response from the receive queue.
 
@@ -518,7 +520,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        google.protobuf.message.Message
+        google.protobuf.message.PookieMessage
             The received message
 
         Raises
@@ -638,7 +640,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """Client configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, data: ProtobufMessage):
+    def on_data_yield(self, data: ProtobufPookieMessage):
         """
         Hook called right before a message is yielded from the client request generator.
 
@@ -647,7 +649,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        data : google.protobuf.message.Message
+        data : google.protobuf.message.PookieMessage
             The message that is about to be yielded to the gRPC stream.
         """
 
@@ -657,7 +659,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: ProtobufMessage) -> Any:
+    def on_receive(self, data: ProtobufPookieMessage) -> Any:
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
@@ -667,7 +669,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Parameters
         ----------
-        data : google.protobuf.message.Message
+        data : google.protobuf.message.PookieMessage
             The message received from the server. This is passed directly from the receive loop, so
             it is not removed from the receive queue yet. If you want to remove it from the queue,
             you can call get_data() in this function, but be aware that this will block until a new

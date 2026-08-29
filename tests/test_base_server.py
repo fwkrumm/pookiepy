@@ -36,16 +36,16 @@ class TestDefaultHooks(unittest.TestCase):
 
     def test_on_receive_returns_true(self):
         """Default on_receive returns True, meaning forward the message."""
-        self.assertTrue(self.server.on_receive(self.peer, message_pb2.Message()))
+        self.assertTrue(self.server.on_receive(self.peer, message_pb2.PookieMessage()))
 
     def test_on_client_connect_returns_true(self):
         """Default on_client_connect returns True, meaning accept the connection."""
         # context=None is fine for the default implementation
-        self.assertTrue(self.server.on_client_connect(message_pb2.Message(), None))
+        self.assertTrue(self.server.on_client_connect(message_pb2.PookieMessage(), None))
 
     def test_on_client_accepted_returns_none(self):
         """Default on_client_accepted is a no-op and returns None."""
-        self.assertIsNone(self.server.on_client_accepted(self.peer, message_pb2.Message()))
+        self.assertIsNone(self.server.on_client_accepted(self.peer, message_pb2.PookieMessage()))
 
     def test_on_client_disconnect_returns_none(self):
         """Default on_client_disconnect is a no-op and returns None."""
@@ -104,11 +104,11 @@ class TestLifecycleHooks(unittest.TestCase):
                 return False  # always drop
 
         srv = _Server(port=50096)
-        self.assertFalse(srv.on_receive(Peer("ip", "s"), message_pb2.Message()))
+        self.assertFalse(srv.on_receive(Peer("ip", "s"), message_pb2.PookieMessage()))
 
     def test_on_client_connect_override_receives_args(self):
         """on_client_connect override is called with (data, context) and can reject."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
 
         class _Server(BaseServer):
             received_data = None
@@ -128,7 +128,7 @@ class TestLifecycleHooks(unittest.TestCase):
     def test_on_client_accepted_override_receives_args(self):
         """on_client_accepted override is called with (peer, request)."""
         peer = Peer(peer="1.2.3.4:1111", session_id="s1", client_id="c1", name="worker")
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
 
         class _Server(BaseServer):
             received_peer = None
@@ -160,7 +160,7 @@ class TestLifecycleHooks(unittest.TestCase):
     def test_on_data_yield_hook_called_when_message_yielded(self):
         """on_data_yield is invoked when DataChannel yields a queued message."""
         recorded = []
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
 
         class _Server(BaseServer):
             def on_data_yield(self, peer, data):
@@ -300,7 +300,7 @@ class TestSchemaValidation(unittest.TestCase):
 
     def test_empty_server_and_client_schema_logs_warning(self):
         """Server warns when neither side provides a schema version string."""
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
         server = BaseServer(port=50087, config=ServerConfig(schema_version=""))
         server.logger.warning = MagicMock()
         context = MagicMock()

@@ -10,7 +10,7 @@ from pookiepy.exceptions import GrpcCustomInterfaceError
 
 
 _REQUIRED_MESSAGES = (
-    "Message",
+    "PookieMessage",
     "MetaInformation",
     "DataPoint",
     "ClientProvides",
@@ -66,10 +66,10 @@ def _service_errors(message_pb2: ModuleType) -> list[str]:
         errors.append("Stream.DataChannel client streaming")
     if not method.server_streaming:
         errors.append("Stream.DataChannel server streaming")
-    if method.input_type.full_name != message_pb2.Message.DESCRIPTOR.full_name:
-        errors.append("Stream.DataChannel input Message")
-    if method.output_type.full_name != message_pb2.Message.DESCRIPTOR.full_name:
-        errors.append("Stream.DataChannel output Message")
+    if method.input_type.full_name != message_pb2.PookieMessage.DESCRIPTOR.full_name:
+        errors.append("Stream.DataChannel input PookieMessage")
+    if method.output_type.full_name != message_pb2.PookieMessage.DESCRIPTOR.full_name:
+        errors.append("Stream.DataChannel output PookieMessage")
     return errors
 
 
@@ -85,12 +85,12 @@ def _validate_interface(message_pb2: ModuleType, message_pb2_grpc: ModuleType) -
         _missing_module_symbols(message_pb2_grpc, _REQUIRED_GRPC_SYMBOLS, "message_pb2_grpc")
     )
 
-    if hasattr(message_pb2, "Message"):
+    if hasattr(message_pb2, "PookieMessage"):
         errors.extend(
             _missing_message_fields(
-                message_pb2.Message,
+                message_pb2.PookieMessage,
                 _REQUIRED_MESSAGE_FIELDS,
-                "message_pb2.Message",
+                "message_pb2.PookieMessage",
             )
         )
         errors.extend(_service_errors(message_pb2))

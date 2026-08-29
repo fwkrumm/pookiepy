@@ -8,10 +8,10 @@ package message.proto.v3;
 // Communication service
 service Stream {
     // bi-directional sending and receiving of communication messages
-    rpc DataChannel(stream Message) returns (stream Message);
+    rpc DataChannel(stream PookieMessage) returns (stream PookieMessage);
 }
 
-message Message {
+message PookieMessage {
     MetaInformation metaInfo = 1; // slim meta information which are used internally and for logging
     repeated DataPoint history = 2;    // the client can extend this; not part of meta to not disturb logs
     Payload payload = 3;
@@ -48,7 +48,7 @@ message ServerProvides {
 
 
 //
-// The Message below can be exchanged by user-defined interfaces.
+// The PookieMessage below can be exchanged by user-defined interfaces.
 // If you are working within the sources, note that some of the examples
 // require the interface to not be adjusted.
 //

@@ -267,7 +267,7 @@ class EchoServer(BaseServer):
     def __init__(self):
         super().__init__(port=50051, name="echo-server")
 
-    def on_receive(self, peer: Peer, request: pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: pb2.PookieMessage) -> bool:
         if request.metaInfo.messageName == "request":
             reply = generate_message("response", byte_payload=request.payload.bytePayload)
             self._data_register.add_data_for_message_name(
@@ -295,7 +295,7 @@ class EchoClient(BaseClient):
         super().__init__(port=50051, name="echo-client",
                          provides=["request"], requires=["response"])
 
-    def on_receive(self, data: pb2.Message):
+    def on_receive(self, data: pb2.PookieMessage):
         print(f"Server replied: {data.payload.bytePayload.decode()}")
 
 

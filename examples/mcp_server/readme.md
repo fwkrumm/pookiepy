@@ -35,7 +35,7 @@ The server is a plain `BaseServer`. All domain logic lives in the three clients.
 | `RunnerClient.py` | Creates a venv, installs deps, runs `main.py`; reports output |
 | `LlmBridgeClient.py` | Autonomous agent: queries LLM → emits tool calls → feeds results back |
 
-## Message names
+## PookieMessage names
 
 | messageName         | Direction               | Payload fields                            |
 |---------------------|-------------------------|-------------------------------------------|

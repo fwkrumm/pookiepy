@@ -23,7 +23,7 @@ Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.
 Regen custom integration fixture with runtime-compatible pins:
 `uv run --isolated --with grpcio-tools==1.81.0 --with protobuf==6.33.5 python -m grpc_tools.protoc -I tests/integration/custom_interface --python_out=tests/integration/custom_interface --grpc_python_out=tests/integration/custom_interface --pyi_out=tests/integration/custom_interface tests/integration/custom_interface/custom_if/message.proto`
 
-## Proto --- Message fields
+## Proto --- PookieMessage fields
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -114,7 +114,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 **Logger** (`pookiepy/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console `coloredlogs` default `INFO`. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d at `INTERNAL_DEBUG`.
 
-**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `Message`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
+**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `PookieMessage`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
 **Timer** (`pookiepy/timer.py`): `TimedEvent` context manager (canonical) + `timedevent(s, n)` alias (compat) --- drift-compensated, RT priority.
 ```python

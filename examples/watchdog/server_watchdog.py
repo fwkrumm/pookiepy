@@ -43,7 +43,7 @@ class WatchdogServer(BaseServer):
         self._total_events: int = 0
         self._lock = threading.Lock()
 
-    def on_client_connect(self, data: message_pb2.Message, context) -> bool:
+    def on_client_connect(self, data: message_pb2.PookieMessage, context) -> bool:
         """Record a new client in the stats table.
 
         Args:
@@ -63,7 +63,7 @@ class WatchdogServer(BaseServer):
             }
         return True
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         """Dispatch incoming messages; reply to stat requests with unicast.
 
         Args:
@@ -121,11 +121,11 @@ class WatchdogServer(BaseServer):
         )
 
 
-def _payload_preview(data: message_pb2.Message) -> str:
+def _payload_preview(data: message_pb2.PookieMessage) -> str:
     """Return a short UTF-8 preview of whichever payload field is populated.
 
     Args:
-        data: Message whose payload to inspect.
+        data: PookieMessage whose payload to inspect.
 
     Returns:
         Up to 80-character preview string, or empty string if no payload.

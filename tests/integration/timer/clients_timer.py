@@ -57,7 +57,7 @@ class ReceiverClient(BaseClient):
             requires=[TICK_MESSAGE],
         )
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Increment counter; return True so spin_forever does not stop."""
         self.count += 1
         return True

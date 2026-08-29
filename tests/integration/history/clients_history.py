@@ -65,7 +65,7 @@ if __name__ == "__main__":
     try:
 
         # try to manually add history -> not the desired workflow, check that this casues an error.
-        msg = message_pb2.Message(
+        msg = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="ping"),
             history=[ # dont do that
                 message_pb2.DataPoint(

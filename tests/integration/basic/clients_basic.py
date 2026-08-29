@@ -18,7 +18,7 @@ class BasicClient(BaseClient):
                          requires=["test_message"])
         self.logger.info("initialized BasicClient")
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
 
         if self.name == "client1":
             # client1 should receive client2's message
