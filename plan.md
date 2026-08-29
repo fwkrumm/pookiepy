@@ -1,60 +1,83 @@
-# Explicit precompiled protobuf interfaces
+# Breaking rename: `Message` → `PookieMessage`
 
 ## Goal
 
-Replace global protobuf-module registration with one explicit dependency-injection path. Keep bundled behavior unchanged when no custom interface is supplied.
+Rename Pookiepy’s generic protocol-envelope protobuf message from `Message` to
+`PookieMessage`. This separates it from
+`google.protobuf.message.Message`, the generic protobuf base class.
 
-## Sole custom-interface workflow
+This is a breaking protocol/API change. Release it as the next breaking version.
 
-Users compile their `.proto` outside pookiepy, import both generated modules, construct one interface, then inject it:
+## Compatibility impact
 
-```python
-from my_proto import message_pb2, message_pb2_grpc
-from pookiepy.custom_interface import ProtoInterface
+- Preserve field numbers, field names, package name, and RPC name.
+- Serialized field layout remains unchanged.
+- gRPC service descriptors change from `message.proto.v3.Message` to
+  `message.proto.v3.PookieMessage`.
+- Old and new clients/servers must not be mixed.
+- Add `docs/required_adjustments/<next-breaking-version>.md` with migration
+  instructions and incompatibility warning.
 
-proto_interface = ProtoInterface(message_pb2, message_pb2_grpc)
-client = MyClient(port=50051, proto_interface=proto_interface)
-server = MyServer(port=50051, proto_interface=proto_interface)
-```
+## Implementation plan
 
-No runtime compiler, loader, import-string, directory, registration, or alternate module-pair API exists.
+1. Rename `message Message` to `message PookieMessage` in
+	`pookiepy/message.proto`.
+2. Update `Stream.DataChannel` request and response types.
+3. Apply same schema rename to the custom-interface fixture proto.
+4. Regenerate all protobuf Python and typing bindings with `uv`; never edit
+	generated files manually.
+5. Replace concrete runtime references to
+	`self._message_pb2.Message` with
+	`self._message_pb2.PookieMessage` in `BaseClient`, `BaseServer`,
+	`DataRegister`, and helpers.
+6. Update `ProtoInterface` required-symbol and descriptor validation to require
+	`PookieMessage`.
+7. Update `generate_message()` to construct `PookieMessage`.
+8. Update runtime error text, docstrings, type hints, CLI code, tests,
+	integrations, examples, README, HOW_TO, and repository guidance.
+9. Keep Google’s generic base type distinct:
 
-## Implementation
+	```python
+	from google.protobuf.message import Message as ProtobufMessage
+	```
 
-1. Make `ProtoInterface` a frozen two-module container with descriptor validation.
-2. Remove runtime compilation, dynamic loading, subprocess calls, and `sys.modules` mutation.
-3. Inject the interface into `BaseClient` and `BaseServer`; use bundled modules only when omitted.
-4. Remove generated `StreamServicer` inheritance and register each server through its selected module.
-5. Inject the selected `Message` type into `DataRegister` to preserve strict validation.
-6. Let `generate_message()` accept the same optional interface object.
-7. Update custom integration tests to import checked-in precompiled modules directly.
-8. Update CLI skeletons and documentation to show only the sole workflow above.
-9. Document migration from removed APIs in the next required-adjustments note.
+	`ProtobufMessage` means generic Google protobuf base class;
+	`message_pb2.PookieMessage` means Pookiepy protocol envelope.
+10. Search for stale `message_pb2.Message`, `.Message`, `Message.DESCRIPTOR`,
+	 `message.proto.v3.Message`, and validation/error text. Classify intentional
+	 Google protobuf references; remove stale Pookiepy references.
 
-## Validation
+## Custom-interface requirements
 
-`ProtoInterface` reports all missing requirements in one `GrpcCustomInterfaceError`:
+`ProtoInterface` must validate:
 
-- messages: `Message`, `MetaInformation`, `DataPoint`, `ClientProvides`, `ServerProvides`, `Payload`
-- `Message`: `metaInfo`, `history`, `payload`
-- `MetaInformation`: `timestamp`, `messageId`, `responseToId`, `clientInfo`, `serverInfo`, `messageName`
-- gRPC: `StreamStub`, `StreamServicer`, `add_StreamServicer_to_server`
-- bidirectional `Stream.DataChannel` using `Message` in both directions
+- `PookieMessage`
+- `MetaInformation`, `DataPoint`, `ClientProvides`, `ServerProvides`, `Payload`
+- `PookieMessage` fields: `metaInfo`, `history`, `payload`
+- bidirectional `Stream.DataChannel` using `PookieMessage`
+- required generated gRPC symbols
 
-## Design constraints
+Custom users must regenerate their interface and replace
+`message_pb2.Message()` with `message_pb2.PookieMessage()`.
 
-- Explicit over implicit.
-- One obvious custom-interface path.
-- No hidden filesystem, import, compilation, or global-state behavior.
-- Small validation functions with one task each.
-- No transport, queue, hook, routing, wire-schema, or schema-version redesign.
-- Generated protobuf files are regenerated externally, never edited manually.
+## Tests and validation
+
+- Add bundled-interface symbol and descriptor tests.
+- Add custom-interface validation and communication tests.
+- Verify old `Message` symbol is absent from generated Pookiepy modules.
+- Verify wrong protobuf types remain rejected.
+- Run unit tests, integration tests, CLI tests, and Pylint through `uv`.
+- Build package and verify generated descriptors.
+- Confirm generated files match proto sources.
 
 ## Completion criteria
 
-- Bundled users need no changes.
-- Custom clients and servers use instance-selected modules.
-- Multiple non-conflicting generated interfaces can coexist in one process.
-- No production custom-interface code invokes subprocesses or mutates `sys.modules`.
-- Removed API names appear only in migration documentation and negative tests.
-- Unit, integration, CLI, and lint checks pass through `uv`.
+- Bundled and custom interfaces use `PookieMessage`.
+- No stale Pookiepy `Message` references remain outside migration notes.
+- Generated bindings are regenerated, not hand-edited.
+- Documentation gives explicit migration examples.
+- Old/new protocol incompatibility is documented.
+
+---
+
+# Previous completed plan: explicit precompiled protobuf interfaces
