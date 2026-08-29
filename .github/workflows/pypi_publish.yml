@@ -37,7 +37,9 @@ jobs:
         run: uv pip install --system --only-binary grpcio-tools grpcio-tools
 
       - name: Generate proto
-        run: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+        run: >-
+          python -m grpc_tools.protoc -I. --python_out=.
+          --grpc_python_out=. --pyi_out=. pookiepy/message.proto
 
       - name: Build distribution packages (sdist + wheel)
         run: uv build

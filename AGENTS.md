@@ -20,6 +20,9 @@ pookiepy/message_pb2*.py       # generated --- DO NOT EDIT
 
 Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto`
 
+Regen custom integration fixture with runtime-compatible pins:
+`uv run --isolated --with grpcio-tools==1.81.0 --with protobuf==6.33.5 python -m grpc_tools.protoc -I tests/integration/custom_interface --python_out=tests/integration/custom_interface --grpc_python_out=tests/integration/custom_interface --pyi_out=tests/integration/custom_interface tests/integration/custom_interface/custom_if/message.proto`
+
 ## Proto --- Message fields
 
 | Field | Type | Purpose |
