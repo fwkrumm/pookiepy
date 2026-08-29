@@ -10,7 +10,7 @@ import queue
 import logging
 from dataclasses import dataclass
 
-from google.protobuf.message import Message as ProtobufPookieMessage
+from google.protobuf.message import Message as PookieMessage
 from pookiepy.exceptions import GrpcValueError
 
 
@@ -29,7 +29,7 @@ class DataRegister:
         self,
         logger: logging.Logger,
         queue_warning_threshold: int | None = None,
-        message_type: type[ProtobufPookieMessage] = None,
+        message_type: type[PookieMessage] = None,
     ):
         """
         data register for payloads
@@ -125,7 +125,7 @@ class DataRegister:
     def add_data_for_message_name(self,
                                  client_id: str,
                                  message_name: str,
-                                 data: ProtobufPookieMessage,
+                                 data: PookieMessage,
                                  target_client_id: str = None) -> DeliveryResult:
         """
         add payload for given message_name

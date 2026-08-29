@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from typing import Iterator
 
 import grpc
-from google.protobuf.message import Message as ProtobufPookieMessage
+from google.protobuf.message import Message as PookieMessage
 
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
@@ -148,7 +148,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
     def _handle_client_receive(  # pylint: disable=too-many-arguments,R0917
         self,
-        request_iterator: Iterator[ProtobufPookieMessage],
+        request_iterator: Iterator[PookieMessage],
         context,
         peer: "Peer",
         notification_queue: queue.Queue,
@@ -174,7 +174,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         """
         try:
             for request in request_iterator:
-                request: ProtobufPookieMessage
+                request: PookieMessage
 
                 if request.history:
                     request.history.append(
@@ -273,7 +273,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
     def DataChannel(  # pylint: disable=invalid-name
         self,
-        request_iterator: Iterator[ProtobufPookieMessage],
+        request_iterator: Iterator[PookieMessage],
         context,
     ):
         """
@@ -446,7 +446,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         """Server configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, peer: Peer, data: ProtobufPookieMessage):
+    def on_data_yield(self, peer: Peer, data: PookieMessage):
         """
         Hook called right before a message is yielded to a client stream.
 
@@ -466,7 +466,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
 
     def on_receive(self,
                    peer: Peer,
-                   request: ProtobufPookieMessage,
+                   request: PookieMessage,
                    ) -> bool:
         """
         Called when a message is received. Override to handle incoming messages.
@@ -486,7 +486,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         return True
 
     def on_client_connect(self,
-                          data: ProtobufPookieMessage,
+                          data: PookieMessage,
                           context: grpc.ServicerContext
                           ) -> bool:
         """
@@ -520,7 +520,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         """
         # pylint: disable=unused-argument
 
-    def on_client_accepted(self, peer: Peer, request: ProtobufPookieMessage):
+    def on_client_accepted(self, peer: Peer, request: PookieMessage):
         """Called after a client has been accepted and registered.
 
         Parameters

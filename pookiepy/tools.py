@@ -7,11 +7,11 @@ from datetime import datetime, timezone
 
 from google.protobuf import struct_pb2
 from google.protobuf import json_format
-from google.protobuf.message import Message as ProtobufPookieMessage
+from google.protobuf.message import Message as PookieMessage
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.exceptions import GrpcCustomInterfaceError
 
-def set_metadata(message: ProtobufPookieMessage):
+def set_metadata(message: PookieMessage):
     """
     Set metadata for a message before sending
 
@@ -85,7 +85,7 @@ def _log_transit_times(history, log_callback: callable) -> None:
             )
 
 
-def evaluate_history(data: ProtobufPookieMessage, log_callback: callable = None):
+def evaluate_history(data: PookieMessage, log_callback: callable = None):
     """
     AI GENERATED
 
@@ -171,7 +171,7 @@ def generate_message(message_name: str = "default_message",
                      byte_payload: bytes = None,
                      add_metadata: bool = False,
                      *,
-                     proto_interface: ProtoInterface = None) -> ProtobufPookieMessage:
+                     proto_interface: ProtoInterface = None) -> PookieMessage:
     """
     AI GENERATED
 

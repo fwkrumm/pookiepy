@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 import grpc
-from google.protobuf.message import Message as ProtobufPookieMessage
+from google.protobuf.message import Message as PookieMessage
 
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
@@ -284,7 +284,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """
         while self.run_event.is_set():
             try:
-                data: ProtobufPookieMessage = self.send_queue.get(timeout=1)
+                data: PookieMessage = self.send_queue.get(timeout=1)
                 self.logger.idebug("Sending message to server: %s", data.metaInfo)
                 if data.history:
                     # if there is a history extend it
@@ -404,7 +404,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         finally:
             self.logger.iinfo("Receive loop terminated")
 
-    def send_data(self, data: ProtobufPookieMessage, add_history: bool = False):
+    def send_data(self, data: PookieMessage, add_history: bool = False):
         """
         put data to queue from where they will be sent to grpc server
 
@@ -503,7 +503,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             # also catch AttributeError and RuntimeError just to be safe
             pass
 
-    def get_data(self, timeout: float = None) -> ProtobufPookieMessage:
+    def get_data(self, timeout: float = None) -> PookieMessage:
         """
         Get a response from the receive queue.
 
@@ -640,7 +640,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """Client configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, data: ProtobufPookieMessage):
+    def on_data_yield(self, data: PookieMessage):
         """
         Hook called right before a message is yielded from the client request generator.
 
@@ -659,7 +659,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: ProtobufPookieMessage) -> Any:
+    def on_receive(self, data: PookieMessage) -> Any:
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
