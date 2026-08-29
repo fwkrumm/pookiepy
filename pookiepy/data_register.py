@@ -13,8 +13,6 @@ from dataclasses import dataclass
 from pookiepy import message_pb2
 from pookiepy.exceptions import GrpcValueError
 
-DEFAULT_QUEUE_WARNING_THRESHOLD = 100_000
-
 
 @dataclass(frozen=True, slots=True)
 class DeliveryResult:
@@ -30,7 +28,7 @@ class DataRegister:
     def __init__(
         self,
         logger: logging.Logger,
-        queue_warning_threshold: int | None = DEFAULT_QUEUE_WARNING_THRESHOLD,
+        queue_warning_threshold: int | None = None,
     ):
         """
         data register for payloads
