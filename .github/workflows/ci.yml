@@ -173,10 +173,15 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system -r requirements.txt -r requirements_dev.txt
 
-      - name: Generate proto
-        run: >-
-          python -m grpc_tools.protoc -I. --python_out=.
-          --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+      - name: Generate protobuf interfaces
+        run: |
+          python -m grpc_tools.protoc -I. --python_out=. \
+            --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+          python -m grpc_tools.protoc -Itests/integration/custom_interface \
+            --python_out=tests/integration/custom_interface \
+            --grpc_python_out=tests/integration/custom_interface \
+            --pyi_out=tests/integration/custom_interface \
+            tests/integration/custom_interface/custom_if/message.proto
 
       - name: Run Pylint
         run: pylint pookiepy tests examples
