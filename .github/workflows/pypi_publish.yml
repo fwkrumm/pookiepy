@@ -33,15 +33,8 @@ jobs:
           enable-cache: true
           cache-suffix: ${{ github.job }}
 
-      - name: Install grpcio-tools for proto generation
-        run: uv pip install --system --only-binary grpcio-tools grpcio-tools
-
-      - name: Generate proto
-        run: >-
-          python -m grpc_tools.protoc -I. --python_out=.
-          --grpc_python_out=. --pyi_out=. pookiepy/message.proto
-
       - name: Build distribution packages (sdist + wheel)
+        # The PDM build hook generates bundled protobuf bindings in isolation.
         run: uv build
 
       - name: Publish to PyPI via Trusted Publishing

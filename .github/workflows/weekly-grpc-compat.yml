@@ -46,10 +46,8 @@ jobs:
           uv pip install --system --only-binary grpcio,grpcio-tools \
             -r requirements-weekly.txt coverage
 
-      - name: Generate proto
-        run: >-
-          python -m grpc_tools.protoc -I. --python_out=.
-          --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+      - name: Generate protobuf interfaces
+        uses: ./.github/actions/generate-protobuf
 
       - name: Run unit tests with coverage
         run: |
@@ -82,18 +80,10 @@ jobs:
           uv pip install --system --only-binary grpcio,grpcio-tools \
             -r requirements-weekly.txt
 
-      - name: Generate bundled protobuf interface
-        run: >-
-          python -m grpc_tools.protoc -I. --python_out=.
-          --grpc_python_out=. --pyi_out=. pookiepy/message.proto
-
-      - name: Generate custom integration interface
-        run: >-
-          python -m grpc_tools.protoc -Itests/integration/custom_interface
-          --python_out=tests/integration/custom_interface
-          --grpc_python_out=tests/integration/custom_interface
-          --pyi_out=tests/integration/custom_interface
-          tests/integration/custom_interface/custom_if/message.proto
+      - name: Generate protobuf interfaces
+        uses: ./.github/actions/generate-protobuf
+        with:
+          include-custom: "true"
 
       - name: Run integration tests
         run: python tests/integration/run_integration_tests.py
