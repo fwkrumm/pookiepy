@@ -92,7 +92,14 @@ def _start_receivers(port: int) -> tuple[list[ReceiverClient], list[threading.Th
 
 def _send_ticks(driver: TimerClient) -> None:
     """Send one message for every periodic timer event."""
-    with timer(s=TICK_INTERVAL, n=N_TICKS, logger=driver.logger) as ticks:
+    # gRPC already owns worker threads here. Avoid creating any child process,
+    # because gRPC C-core reports inherited poller descriptors on macOS.
+    with timer(
+        s=TICK_INTERVAL,
+        n=N_TICKS,
+        logger=driver.logger,
+        backend="thread",
+    ) as ticks:
         for tick_index in ticks:
             driver.send_data(
                 generate_message(TICK_MESSAGE, byte_payload=str(tick_index).encode())
