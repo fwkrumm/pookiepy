@@ -2,10 +2,16 @@
 ====================
 Plain relay server; all timer-driving logic lives in the client.
 """
+from pookiepy.baseserver import ServerConfig
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
 
+MAX_TIMER_CLIENTS = 64
+
 if __name__ == "__main__":
-    args = get_args("Timer test: timer-driven client sends tick messages to a subscriber")
-    s = IntegrationServer(args.port)
+    args = get_args("Timer test: 200 timed messages broadcast to 50 subscribers")
+    s = IntegrationServer(
+        args.port,
+        config=ServerConfig(max_workers=MAX_TIMER_CLIENTS),
+    )
     s.serve_forever()
