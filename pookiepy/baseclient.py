@@ -351,6 +351,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         self.logger.iinfo("Disconnecting client %s", self)
 
+        if not self.send_queue.empty():
+            self.logger.warning(
+                "Disconnecting client %s with non-empty send queue (%d messages)",
+                self,
+                self.send_queue.qsize()
+            )
+
         if not self.run_event.is_set():
             # already disconnected or never connected, do nothing
             self.logger.iinfo("Client %s is already disconnected or never connected", self)
@@ -464,12 +471,16 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger.idebug("Enqueued data %s", data.metaInfo)
 
     def wait_done(self, additional_sleep: float = WAIT_DONE_ADDITIONAL_SLEEP_DEFAULT):
-        """Block until all queued messages were handed to the gRPC stream.
+        """Block until all queued messages were handed to the gRPC stream. NOTE text below!
 
-        Important: this confirms only local hand-off to gRPC (``yield`` from the
+        Important NOTE: this confirms only local hand-off to gRPC (``yield`` from the
         request generator), not that the server application has already processed
         the message. If callers disconnect immediately afterwards, the stream may
         still be cancelled while the message is in-flight.
+
+        If you need a reliable guarantee that the server has processed all messages, you must
+        implement an application-level acknowledgment mechanism via hooks, i.e. the receiving
+        clients send confirmation messages the sender client can react on.
 
         The optional ``additional_sleep`` adds a best-effort grace window after
         ``send_queue.join()`` to reduce this race, especially on loaded CI runners

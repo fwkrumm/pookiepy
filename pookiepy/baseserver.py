@@ -308,8 +308,9 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
             current_count = self.__connected_clients
 
         if current_count >= self.__config.effective_max_workers:
+            # this is an important warning; make it more prominent in the logs?
             self.logger.warning(
-                "Connected clients (%d) reached max_workers (%d). "
+                "!!! Connected clients (%d) reached max_workers (%d). "
                 "The next client will stall until a slot opens. "
                 "Set ServerConfig.max_workers explicitly to handle more concurrent clients.",
                 current_count, self.__config.effective_max_workers

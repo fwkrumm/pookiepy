@@ -57,6 +57,9 @@ ulimit -s 256   # 256 KB stack; set in the launch script or systemd unit
 | 500–5000 | Migrate `BaseServer` to `grpc.aio` + `asyncio.Queue`. Keep sync hooks via `asyncio.to_thread()`. |
 | 5000+ | Python as leaf client only. Use Go or C++ for the fan-out broker. |
 
+Event at 100 threads, when using one timer with 10ms tick size, the Python GIL can become a
+bottleneck at least on Windows.
+
 ---
 
 ## Path to `grpc.aio` (500–5000 clients)
