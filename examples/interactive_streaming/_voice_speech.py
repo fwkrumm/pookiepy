@@ -18,6 +18,7 @@ class SpeechChunkBuffer:
         self._pending_text = ""
 
     def add(self, text: str, done: bool = False) -> list[str]:
+        """Append streamed text and return utterances ready for speech."""
         if text:
             self._pending_text += text
 
@@ -49,4 +50,5 @@ class SpeechChunkBuffer:
         return utterances
 
     def reset(self):
+        """Discard all buffered text."""
         self._pending_text = ""

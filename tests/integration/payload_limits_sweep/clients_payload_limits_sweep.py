@@ -139,8 +139,8 @@ def _iqr(values: list[float]) -> float:
     """Compute interquartile range (Q3-Q1) for at least two values."""
     if len(values) < 2:
         return 0.0
-    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
-    return q3 - q1
+    quartiles = statistics.quantiles(values, n=4, method="inclusive")
+    return quartiles[2] - quartiles[0]
 
 
 def _pick_unused_port() -> int:

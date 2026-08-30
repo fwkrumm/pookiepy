@@ -3,6 +3,7 @@ from examples.interactive_streaming.VoiceClient import VoiceClient
 
 
 def main():
+    """Run voice client until interrupted."""
     client = VoiceClient("voice-ui", 49999)
     try:
         client.listen_forever()

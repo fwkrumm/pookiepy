@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import os
 import tempfile
 from abc import ABC, abstractmethod
@@ -27,16 +28,14 @@ class EdgeNeuralSpeechBackend(SpeechBackend):
 
     def __init__(self, voice: str, rate: str):
         os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")
-        import edge_tts
-        import pygame
-
-        self._edge_tts = edge_tts
-        self._pygame = pygame
+        self._edge_tts = importlib.import_module("edge_tts")
+        self._pygame = importlib.import_module("pygame")
         self._voice = voice
         self._rate = rate
         self._pygame.mixer.init()
 
     def speak(self, text: str):
+        """Synthesize and play one neural speech segment."""
         audio_path = self._synthesize(text)
         try:
             sound = self._pygame.mixer.Sound(audio_path)
@@ -51,6 +50,7 @@ class EdgeNeuralSpeechBackend(SpeechBackend):
             os.unlink(audio_path)
 
     def _synthesize(self, text: str) -> str:
+        """Synthesize text into a temporary MP3 file."""
         file_descriptor, audio_path = tempfile.mkstemp(suffix=".mp3")
         os.close(file_descriptor)
         try:
@@ -66,6 +66,7 @@ class EdgeNeuralSpeechBackend(SpeechBackend):
         return audio_path
 
     def close(self):
+        """Release pygame audio resources."""
         self._pygame.mixer.quit()
 
 
@@ -73,14 +74,14 @@ class SystemSpeechBackend(SpeechBackend):
     """Offline fallback using an installed German system voice."""
 
     def __init__(self, preferred_language: str = "de"):
-        import pyttsx3
-
+        pyttsx3 = importlib.import_module("pyttsx3")
         self._engine = pyttsx3.init()
         self._engine.setProperty("rate", 168)
         self._select_voice(preferred_language)
 
     @staticmethod
     def _voice_score(voice, preferred_language: str) -> tuple[int, str]:
+        """Rank a system voice by preferred language match."""
         name = (getattr(voice, "name", "") or "").lower()
         languages = getattr(voice, "languages", []) or []
         language_text = " ".join(
@@ -96,12 +97,14 @@ class SystemSpeechBackend(SpeechBackend):
         return score, name
 
     def _select_voice(self, preferred_language: str):
+        """Select best available system voice for preferred language."""
         voices = self._engine.getProperty("voices") or []
         if voices:
             voice = max(voices, key=lambda item: self._voice_score(item, preferred_language))
             self._engine.setProperty("voice", voice.id)
 
     def speak(self, text: str):
+        """Speak text through installed operating-system voice."""
         self._engine.say(text)
         self._engine.runAndWait()
 
@@ -110,6 +113,7 @@ class ConsoleSpeechBackend(SpeechBackend):
     """Last-resort backend that preserves output as text."""
 
     def speak(self, text: str):
+        """Print text when no speech backend is available."""
         print(text, flush=True)
 
 
@@ -125,6 +129,7 @@ class FallbackSpeechBackend(SpeechBackend):
         self._primary_available = True
 
     def speak(self, text: str):
+        """Use neural speech, switching permanently after first failure."""
         if self._primary_available:
             try:
                 self._primary.speak(text)
@@ -140,6 +145,7 @@ class FallbackSpeechBackend(SpeechBackend):
         self._fallback.speak(text)
 
     def close(self):
+        """Release primary and fallback backend resources."""
         self._primary.close()
         self._fallback.close()
 

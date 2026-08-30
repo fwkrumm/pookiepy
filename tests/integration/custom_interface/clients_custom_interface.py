@@ -1,5 +1,6 @@
 """Custom-interface integration test using precompiled protobuf modules."""
-from custom_if import message_pb2, message_pb2_grpc
+import importlib
+
 from pookiepy.tools import generate_message
 from pookiepy.baseclient import BaseClient
 from pookiepy.custom_interface import ProtoInterface
@@ -7,6 +8,8 @@ from tests.integration._interface import get_args
 
 
 TIMEOUT = 1.0 # seconds
+message_pb2 = importlib.import_module("custom_if.message_pb2")
+message_pb2_grpc = importlib.import_module("custom_if.message_pb2_grpc")
 PROTO_INTERFACE = ProtoInterface(message_pb2, message_pb2_grpc)
 
 

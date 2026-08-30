@@ -25,18 +25,22 @@ class _SpeechWorker:
         self._stop_event = threading.Event()
 
     def start(self):
+        """Start background speech worker."""
         self._thread.start()
 
     def speak(self, text: str):
+        """Queue text for serialized speech output."""
         self._queue.put(text)
 
     def stop(self):
+        """Stop worker and release speech backend resources."""
         self._stop_event.set()
         self._queue.put(None)
         self._thread.join(timeout=5.0)
         self._backend.close()
 
     def _run(self):
+        """Process queued speech until stop sentinel arrives."""
         while True:
             try:
                 item = self._queue.get(timeout=0.5)
@@ -69,6 +73,7 @@ class VoiceClient(BaseClient):
         self.logger.setLevel("WARNING")
 
     def on_init(self):
+        """Create and start configured German speech backend."""
         if self._speech_worker is not None:
             return
 
@@ -86,6 +91,7 @@ class VoiceClient(BaseClient):
         self._speech_worker.start()
 
     def on_receive(self, data) -> bool:
+        """Buffer incoming LLM chunks and queue complete utterances."""
         try:
             payload = (
                 struct_to_json(data.payload.structPayload)
@@ -107,6 +113,7 @@ class VoiceClient(BaseClient):
         return True
 
     def on_shutdown(self):
+        """Stop speech output and clear pending text."""
         if self._speech_worker is None:
             return
 
@@ -115,6 +122,7 @@ class VoiceClient(BaseClient):
         self._speech_buffer.reset()
 
     def listen_forever(self):
+        """Process incoming response chunks until disconnected."""
         self.spin_forever()
 
 
