@@ -10,13 +10,14 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import os
-import socket
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import Iterable, TextIO
+
+import psutil
 
 
 COMMAND_TIMEOUT_SECONDS = 60
@@ -204,13 +205,6 @@ assert hasattr(message_pb2_grpc, "add_StreamServicer_to_server")
     )
 
 
-def pick_unused_port() -> int:
-    """Ask the OS for a currently unused loopback TCP port."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.bind(("127.0.0.1", 0))
-        return int(sock.getsockname()[1])
-
-
 def read_process_log(log_file: TextIO) -> str:
     """Read a child process log while preserving its append position."""
     log_file.flush()
@@ -220,40 +214,47 @@ def read_process_log(log_file: TextIO) -> str:
     return output
 
 
+def get_listening_port(process: subprocess.Popen[str]) -> int | None:
+    """Return child server's OS-assigned listening port, if available."""
+    try:
+        connections = psutil.Process(process.pid).net_connections(kind="inet")
+    except psutil.NoSuchProcess:
+        return None
+    listening_ports = {
+        int(connection.laddr.port)
+        for connection in connections
+        if connection.status == psutil.CONN_LISTEN
+    }
+    if len(listening_ports) > 1:
+        raise RuntimeError(
+            f"Generated server opened unexpected listening ports: "
+            f"{sorted(listening_ports)}"
+        )
+    return next(iter(listening_ports), None)
+
+
 def wait_for_server(
     process: subprocess.Popen[str],
-    port: int,
     log_file: TextIO,
-) -> None:
-    """Wait until generated server accepts TCP connections or exits."""
+) -> int:
+    """Wait until generated server listens and return its assigned port."""
     deadline = time.monotonic() + SERVER_STARTUP_TIMEOUT_SECONDS
-    addresses = socket.getaddrinfo(
-        "localhost",
-        port,
-        family=socket.AF_UNSPEC,
-        type=socket.SOCK_STREAM,
-    )
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError(
                 f"Generated server exited during startup with code {process.returncode}\n"
                 f"--- output ---\n{read_process_log(log_file)}"
             )
-        for family, socktype, proto, _, address in addresses:
-            try:
-                with socket.socket(family, socktype, proto) as probe:
-                    probe.settimeout(0.25)
-                    probe.connect(address)
-                    print(
-                        f"[ok] Generated server listening on localhost:{port}",
-                        flush=True,
-                    )
-                    return
-            except OSError:
-                continue
+        port = get_listening_port(process)
+        if port is not None:
+            print(
+                f"[ok] Generated server listening on localhost:{port}",
+                flush=True,
+            )
+            return port
         time.sleep(0.1)
     raise TimeoutError(
-        f"Generated server did not listen on port {port}\n"
+        "Generated server did not start listening\n"
         f"--- server output ---\n{read_process_log(log_file)}"
     )
 
@@ -292,10 +293,9 @@ def run_generated_pair(
     *,
     custom_interface: bool = False,
 ) -> None:
-    """Start generated server, connect generated client, then clean up server."""
-    port = pick_unused_port()
+    """Start generated server on an OS-assigned port, then run client."""
     pair_environment = environment.copy()
-    pair_environment["POOKIEPY_SMOKE_PORT"] = str(port)
+    pair_environment["POOKIEPY_SMOKE_PORT"] = "0"
     server_command = [
         sys.executable,
         "-c",
@@ -305,7 +305,7 @@ def run_generated_pair(
         ),
     ]
 
-    print(f"Starting generated pair on port {port}", flush=True)
+    print("Starting generated pair on OS-assigned port", flush=True)
     with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as server_log:
         with subprocess.Popen(
             server_command,
@@ -316,8 +316,10 @@ def run_generated_pair(
             text=True,
         ) as server:
             failure: Exception | None = None
+            port = 0
             try:
-                wait_for_server(server, port, server_log)
+                port = wait_for_server(server, server_log)
+                pair_environment["POOKIEPY_SMOKE_PORT"] = str(port)
                 run_checked(
                     [sys.executable, "-c", client_code(custom_interface)],
                     cwd=client_dir,
