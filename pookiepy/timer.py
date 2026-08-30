@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 from multiprocessing import synchronize
-from typing import Union
+from typing import Literal, Union
 
 import psutil
 
@@ -28,6 +28,10 @@ TIME_NS_OFFSET = len(str(int(time.time())))
 # empirically this is the lowest value we allow, however we only test for
 # relevant digit 2, the period time is 0.01 at lowest.
 MAX_RELEVANT_DIGIT_VALUE = 3
+# Spawn prevents child code from retaining copied parent state. On POSIX its
+# launcher may still briefly fork, so use TimedEvent(backend="thread") after
+# libraries such as gRPC have started threads or opened poller descriptors.
+_SPAWN_CONTEXT = multiprocessing.get_context("spawn")
 
 
 # the following dict determines the ''strength'' of the clock drift compensation.
@@ -71,9 +75,18 @@ def _cycles(n: int):
         yield from range(n)
 
 
+def _wait_for_next_tick(duration: float, stop_event: threading.Event = None) -> bool:
+    """Wait for one interval; return whether thread shutdown was requested."""
+    if stop_event is None:
+        time.sleep(duration)
+        return False
+    return stop_event.wait(timeout=duration)
+
+
 
 def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
-          enable_compensation: bool = True, logger_level: int = None):
+          enable_compensation: bool = True, logger_level: int = None,
+          stop_event: threading.Event = None):
     """
     Timer function that sets an event periodically.
 
@@ -95,6 +108,7 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
             a specific time interval (e.g. within 1 second there are 100 cycles at 0.01s period
             time; still not exact of course), however the compensation can cause some ticks to be
             shortened e.g. 0.008s instead of 0.01s.
+        stop_event: Optional thread-backend event used to request an early stop.
 
     Prints warning if event is still set from previous cycle (timer overrun).
     """
@@ -146,10 +160,15 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
             yield max(t - time.time(), 0)
 
     for i in _cycles(n):
+        if stop_event is not None and stop_event.is_set():
+            break
 
         event.set()
 
-        time.sleep(next(_tick(s))) # in newer Python versions we can use time.sleep directly,
+        sleep_duration = next(_tick(s))
+        if _wait_for_next_tick(sleep_duration, stop_event):
+            break
+        # in newer Python versions we can use time.sleep directly,
         # in older versions this did not work well because of clock precision.
 
         if event.is_set():
@@ -174,7 +193,7 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
                     relevant_digit + 1)
             # process exits naturally here when _cycles(n) is exhausted
 
-class TimedEvent:
+class TimedEvent:  # pylint: disable=too-many-instance-attributes
     """
     Context manager that drives periodic task execution using the existing
     timer function.
@@ -191,35 +210,65 @@ class TimedEvent:
         Period time in seconds between ticks.
     n : int
         Number of ticks (cycles) to run.
+    backend : {"process", "thread"}
+        ``"process"`` preserves process-isolated timing. ``"thread"`` avoids
+        creating a child after libraries such as gRPC have started threads.
 
     Notes
     -----
-    The timer runs in a daemon thread.  The context manager blocks in
-    ``__exit__`` until all ``n`` ticks have been issued or the ``for``
-    loop inside the ``with`` block has been exhausted.
+    The timer runs in either a spawn-isolated daemon process or a daemon thread.
+    The context manager blocks in ``__exit__`` until all ``n`` ticks have been
+    issued or the ``for`` loop inside the ``with`` block has been exhausted.
     """
 
-    def __init__(self, s: float, n: int, compensation: bool = True, logger: logging.Logger = None):
+    def __init__(
+        self,
+        s: float,
+        n: int,
+        compensation: bool = True,
+        logger: logging.Logger = None,
+        backend: Literal["process", "thread"] = "process",
+    ):
+        if backend not in ("process", "thread"):
+            raise ValueError(f"Unsupported timer backend: {backend}")
         self.s = s
         self.n = n
         self.compensation = compensation
-        self._event = multiprocessing.Event()
-        self._process: multiprocessing.Process = None
+        self._event = (
+            threading.Event() if backend == "thread" else _SPAWN_CONTEXT.Event()
+        )
+        self._stop_event = threading.Event()
+        self._worker: multiprocessing.Process | threading.Thread | None = None
+        self._backend = backend
         self.overrun_count: int = 0  # number of cycles where task exceeded the tick period
         self.logger = logger
 
     def __enter__(self) -> "TimedEvent":
-        self._process = multiprocessing.Process(
-            target=timer,
-            args=(self.n, self.s, self._event, self.compensation,
-                  self.logger.level if self.logger else None),
-            daemon=True,
+        timer_args = (
+            self.n,
+            self.s,
+            self._event,
+            self.compensation,
+            self.logger.level if self.logger else None,
+            self._stop_event if self._backend == "thread" else None,
         )
+        if self._backend == "thread":
+            self._worker = threading.Thread(target=timer, args=timer_args, daemon=True)
+        else:
+            self._worker = _SPAWN_CONTEXT.Process(
+                target=timer,
+                args=timer_args,
+                daemon=True,
+            )
+        self._worker.start()
 
         # set timer process to high priority to minimize the risk of timer
         # overruns due to scheduling delays (not yet optimal but this is not
         #  supposed to be a real-time application)
-        psutil_process = psutil.Process(self._process.pid)
+        if self._backend == "thread":
+            return self
+
+        psutil_process = psutil.Process(self._worker.pid)
         if sys.platform == "win32":  # Windows (either 32-bit or 64-bit)
             psutil_process.nice(psutil.REALTIME_PRIORITY_CLASS)
         elif sys.platform == "linux":  # Linux
@@ -227,13 +276,15 @@ class TimedEvent:
         else:  # MAC OS X or other (potentially)
             psutil_process.nice(20)
 
-        self._process.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
-        if self._process is not None:
-            self._process.terminate()
-            self._process.join()  # reap the process so no zombie is left on Unix/macOS
+        if self._worker is not None:
+            if self._backend == "process":
+                self._worker.terminate()
+            else:
+                self._stop_event.set()
+            self._worker.join()  # reap process or finish thread
         return False  # do not suppress exceptions
 
     def __iter__(self):
@@ -255,7 +306,7 @@ class TimedEvent:
         ``__iter__`` would then wait forever on a tick that the (now-finished)
         timer thread will never fire.  To guard against this, every wait uses a
         finite timeout (10 × period); if the timeout expires *and* the timer
-        thread is no longer alive, iteration stops early and the missed cycles
+        process is no longer alive, iteration stops early and the missed cycles
         are reported.
         """
         try:
@@ -265,7 +316,7 @@ class TimedEvent:
                 # block permanently.  Only bail out when the timeout expires
                 # AND the process is already dead (covers normal exit and crashes).
                 while not self._event.wait(timeout=10 * self.s):
-                    if not self._process.is_alive():
+                    if not self._worker.is_alive():
                         if self.logger:
                             self.logger.warning(
                                 "Timer process ended after %d ticks; %d tick(s) missed.",

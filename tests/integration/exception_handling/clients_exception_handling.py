@@ -59,7 +59,7 @@ class ReceiverClient(BaseClient):
             provides=["dummy"],
         )
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
         """Intentionally raise to test exception propagation from spin()."""
         raise ValueError(INTENTIONAL_ERROR)
 
@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
     # shut down server and sender
     sender.send_data(
-        message_pb2.Message(
+        message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="server-exit")
         )
     )

@@ -21,7 +21,7 @@ Effort to adopt:
 Status in pookiepy: Partly valid in principle, not true end-to-end in current API.
 
 Reason:
-- Current stub path serializes/deserializes protobuf Message objects each hop.
+- Current stub path serializes/deserializes protobuf PookieMessage objects each hop.
 - bytePayload helps avoid Struct overhead, but protobuf framing/parse still happens.
 
 Effort to improve:

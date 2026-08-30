@@ -6,6 +6,9 @@
 
 # interactive_streaming and mcp_server examples
 requests>=2.31.0
+pyttsx3>=2.98
+edge-tts>=7.0.2
+pygame>=2.6.1
 
 # watchdog Aero dashboard (tests/integration/watchdog/watchdog_ui.py)
 # and mcp_server UI task (examples/mcp_server/_task.py)

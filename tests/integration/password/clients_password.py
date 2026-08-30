@@ -32,8 +32,8 @@ class PasswordClient(BaseClient):
     Args:
         name: Client name used for logging and routing.
         port: gRPC server port.
-        provides: Message names this client will send.
-        requires: Message names this client wants to receive.
+        provides: PookieMessage names this client will send.
+        requires: PookieMessage names this client wants to receive.
         password: Plaintext password sent as ``x-password`` gRPC call metadata.
         config: Optional :class:`ClientConfig` override.
     """

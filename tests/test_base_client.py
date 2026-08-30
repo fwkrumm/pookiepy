@@ -56,21 +56,21 @@ class TestSendData(unittest.TestCase):
         self.client = _client(provides=["foo"])
 
     def test_valid_message_is_enqueued(self):
-        """A valid Message with a declared messageName is placed on the send queue."""
-        msg = message_pb2.Message(
+        """A valid PookieMessage with a declared messageName is placed on the send queue."""
+        msg = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="foo")
         )
         self.client.send_data(msg)
         self.assertEqual(self.client.send_queue.qsize(), 1)
 
     def test_wrong_type_raises_grpc_value_error(self):
-        """Passing a non-Message raises GrpcValueError."""
+        """Passing a non-PookieMessage raises GrpcValueError."""
         with self.assertRaises(GrpcValueError):
             self.client.send_data("not-a-message")
 
     def test_message_name_not_in_provides_raises(self):
         """A messageName absent from the provides list raises GrpcValueError."""
-        msg = message_pb2.Message(
+        msg = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="unknown")
         )
         with self.assertRaises(GrpcValueError):
@@ -79,11 +79,25 @@ class TestSendData(unittest.TestCase):
     def test_multiple_messages_all_enqueued(self):
         """Multiple consecutive send_data calls all land on the send queue."""
         for _ in range(5):
-            msg = message_pb2.Message(
+            msg = message_pb2.PookieMessage(
                 metaInfo=message_pb2.MetaInformation(messageName="foo")
             )
             self.client.send_data(msg)
         self.assertEqual(self.client.send_queue.qsize(), 5)
+
+
+class TestGenerateMessage(unittest.TestCase):
+    """Tests for BaseClient.generate_message()."""
+
+    def test_generates_message_with_struct_payload(self):
+        """The client helper uses the client's configured protobuf interface."""
+        client = _client()
+
+        message = client.generate_message("foo", {"value": 42})
+
+        self.assertIsInstance(message, message_pb2.PookieMessage)
+        self.assertEqual(message.metaInfo.messageName, "foo")
+        self.assertEqual(message.payload.structPayload["value"], 42)
 
 
 # ---------------------------------------------------------------------------
@@ -97,8 +111,8 @@ class TestGetData(unittest.TestCase):
         self.client = _client()
 
     def test_returns_message_when_available(self):
-        """Returns the first Message waiting in the receive queue."""
-        msg = message_pb2.Message(
+        """Returns the first PookieMessage waiting in the receive queue."""
+        msg = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="foo")
         )
         self.client.receive_queue.put(msg)
@@ -112,7 +126,7 @@ class TestGetData(unittest.TestCase):
 
     def test_timeout_zero_returns_message_when_available(self):
         """timeout=0 returns a waiting message without blocking."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
         self.client.receive_queue.put(msg)
         result = self.client.get_data(timeout=0)
         self.assertIs(result, msg)
@@ -177,11 +191,11 @@ class TestHooks(unittest.TestCase):
     def test_on_receive_default_returns_none(self):
         """Default on_receive is a warning-only hook and returns None."""
         client = _client()
-        self.assertIsNone(client.on_receive(message_pb2.Message()))
+        self.assertIsNone(client.on_receive(message_pb2.PookieMessage()))
 
     def test_on_receive_override_called_by_spin(self):
-        """spin() calls the overridden on_receive with the dequeued Message."""
-        received: list[message_pb2.Message] = []
+        """spin() calls the overridden on_receive with the dequeued PookieMessage."""
+        received: list[message_pb2.PookieMessage] = []
 
         class _Client(BaseClient):
             def on_receive(self, data):
@@ -192,7 +206,7 @@ class TestHooks(unittest.TestCase):
             client = _Client(name="hook-test", port=50099, provides=["foo"])
         client.channel = MagicMock()
 
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
         client.receive_queue.put(msg)
         client.spin()
 
@@ -210,7 +224,7 @@ class TestHooks(unittest.TestCase):
             client = _Client(name="spin-return", port=50099, provides=["foo"])
         client.channel = MagicMock()
 
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
         client.receive_queue.put(msg)
 
         self.assertEqual(client.spin(), {"ok": True})
@@ -244,8 +258,8 @@ class TestHooks(unittest.TestCase):
         with patch.object(BaseClient, "run", lambda self: None):
             client = _Client(name="spin-false", port=50099, provides=["foo"])
         client.channel = MagicMock()
-        client.receive_queue.put(message_pb2.Message())
-        client.receive_queue.put(message_pb2.Message())
+        client.receive_queue.put(message_pb2.PookieMessage())
+        client.receive_queue.put(message_pb2.PookieMessage())
 
         client.spin_forever()
 
@@ -261,7 +275,7 @@ class TestHooks(unittest.TestCase):
         with patch.object(BaseClient, "run", lambda self: None):
             client = _Client(name="stop-spin", port=50099, provides=["foo"])
         client.channel = MagicMock()
-        client.receive_queue.put(message_pb2.Message())
+        client.receive_queue.put(message_pb2.PookieMessage())
 
         client.spin_forever()
 
@@ -302,7 +316,7 @@ class TestHooks(unittest.TestCase):
             client = _Client(name="yield-hook-test", port=50099, provides=["foo"])
         client.channel = MagicMock()
 
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
         client.send_data(msg)
 
         generator = client._request_generator()  # pylint: disable=protected-access
@@ -328,8 +342,8 @@ class TestClientConfig(unittest.TestCase):
         self.assertGreater(ClientConfig().connection_check_timeout, 0)
 
     def test_default_schema_version_is_empty(self):
-        """ClientConfig.schema_version defaults to an empty string."""
-        self.assertEqual(ClientConfig().schema_version, "")
+        """ClientConfig.schema_version defaults to None."""
+        self.assertIsNone(ClientConfig().schema_version)
 
     def test_custom_config_applied(self):
         """A custom ClientConfig is stored and applied on the client instance."""

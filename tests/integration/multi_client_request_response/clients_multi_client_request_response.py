@@ -36,9 +36,9 @@ class RequestClient(BaseClient):
             ip=ip,
         )
         self.request_id: str | None = None
-        self.received: list[message_pb2.Message] = []
+        self.received: list[message_pb2.PookieMessage] = []
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
         self.received.append(data)
 
 
@@ -55,7 +55,7 @@ class ResponderClient(BaseClient):
         )
         self.handled_request_ids: list[str] = []
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
         req_id = data.metaInfo.messageId
         self.handled_request_ids.append(req_id)
 

@@ -1,35 +1,35 @@
 """Timer Test --- Clients
 ======================
-Shows how ``pookiepy/timer.py``'s ``timer()`` function drives a gRPC client.
+Shows how ``pookiepy/timer.py``'s ``TimedEvent`` drives gRPC clients.
 
 Scenario
 --------
-1. ``ReceiverClient`` connects and subscribes to ``"timer_tick"`` messages.
-2. ``TimerClient`` uses a background thread powered by the low-level ``timer()``
-   function to fire ``N_TICKS`` periodic events at ``TICK_INTERVAL`` seconds each,
-   sending one gRPC message per tick.
-3. After all ticks are sent, it triggers a graceful server shutdown.
-4. Assertions verify the receiver collected every tick.
-
-Note
-----
-The low-level ``timer()`` function is used instead of ``timedevent`` to avoid
-the psutil REALTIME priority escalation that requires admin rights on Windows.
+1. Fifty ``ReceiverClient`` instances subscribe to ``"timer_tick"`` messages.
+2. ``TimerClient`` sends 200 periodic events at 10 ms intervals.
+3. Assertions verify every receiver collected every tick.
+4. Each receiver reports its average observed tick interval.
 
 Run
 ---
     python tests/integration/timer/clients_timer.py
 """
+import logging
+import sys
 import threading
+import time
 
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient
-from pookiepy.timer import timer
+from pookiepy.timer import TimedEvent as timer
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
-N_TICKS = 5
-TICK_INTERVAL = 0.3   # 5 × 0.3 s = 1.5 s total drive time
+N_TICKS = 200
+N_RECEIVERS = 50
+# Short interval keeps example runtime near two seconds. Achievable precision
+# depends on OS timer resolution, scheduler load, hardware, and CI environment.
+TICK_INTERVAL = 0.01
+RECEIVE_TIMEOUT = 15.0
 TICK_MESSAGE = "timer_tick"
 
 
@@ -43,69 +43,129 @@ class TimerClient(BaseClient):
             provides=[TICK_MESSAGE, "server-exit"],
             requires=[],
         )
+        # Exclude synchronous per-message debug file writes from timing results.
+        self.logger.setLevel(logging.INFO)
 
 
 class ReceiverClient(BaseClient):
-    """Counts received timer tick messages."""
+    """Records received timer ticks and their observed interval."""
 
-    def __init__(self, port: int):
+    def __init__(self, port: int, receiver_index: int):
         self.count = 0
+        self.first_tick_at: float | None = None
+        self.last_tick_at: float | None = None
+        self.done = threading.Event()
         super().__init__(
             port,
-            name="tick_receiver",
+            name=f"tick_receiver_{receiver_index:02d}",
             provides=[],
             requires=[TICK_MESSAGE],
         )
+        # Exclude synchronous per-message debug file writes from timing results.
+        self.logger.setLevel(logging.INFO)
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
-        """Increment counter; return True so spin_forever does not stop."""
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
+        """Record one tick and signal when all expected ticks arrived."""
+        received_at = time.perf_counter()
+        if self.first_tick_at is None:
+            self.first_tick_at = received_at
+        self.last_tick_at = received_at
         self.count += 1
+        if self.count >= N_TICKS:
+            self.done.set()
         return True
 
+    @property
+    def average_tick_length(self) -> float:
+        """Return mean interval between first and last received ticks."""
+        if self.count < 2 or self.first_tick_at is None or self.last_tick_at is None:
+            raise RuntimeError(f"{self.name} needs at least two ticks for statistics")
+        return (self.last_tick_at - self.first_tick_at) / (self.count - 1)
 
-if __name__ == "__main__":
-    args = get_args("Timer test: timer-driven client sends tick messages to a subscriber")
 
-    receiver = ReceiverClient(args.port)
-    driver = TimerClient(args.port)
+def _start_receivers(port: int) -> tuple[list[ReceiverClient], list[threading.Thread]]:
+    """Connect receivers and start one queue-draining thread per receiver."""
+    receivers = [ReceiverClient(port, index) for index in range(N_RECEIVERS)]
+    threads = [
+        threading.Thread(target=receiver.spin_forever, daemon=True)
+        for receiver in receivers
+    ]
+    for thread in threads:
+        thread.start()
+    return receivers, threads
 
-    tick_event = threading.Event()
 
-    def _drive_ticks() -> None:
-        """Fire N_TICKS gRPC messages, one per timer event."""
-        timer_thread = threading.Thread(
-            target=timer,
-            args=(N_TICKS, TICK_INTERVAL, tick_event, False),  # compensation disabled
-            daemon=True,
-        )
-        timer_thread.start()
-        for tick_index in range(N_TICKS):
-            fired = tick_event.wait(timeout=5.0)
-            assert fired, f"Timer tick {tick_index} did not fire within 5 s"
-            tick_event.clear()
+def _send_ticks(driver: TimerClient) -> None:
+    """Send one message for every periodic timer event."""
+    # macOS reports inherited gRPC poller descriptors when multiprocessing
+    # starts after gRPC threads. Its thread backend avoids child creation;
+    # other platforms retain process-isolated timing.
+    backend = "thread" if sys.platform == "darwin" else "process"
+    driver.logger.info("Using %s timer backend on %s", backend, sys.platform)
+    with timer(
+        s=TICK_INTERVAL,
+        n=N_TICKS,
+        logger=driver.logger,
+        backend=backend,
+    ) as ticks:
+        for tick_index in ticks:
             driver.send_data(
                 generate_message(TICK_MESSAGE, byte_payload=str(tick_index).encode())
             )
-        timer_thread.join(timeout=5.0)
-
-    drive_thread = threading.Thread(target=_drive_ticks, daemon=True)
-    drive_thread.start()
-
-    # receive all ticks on the main thread --- spin(timeout=5) blocks until
-    # one message arrives or 5 s elapses
-    for i in range(N_TICKS):
-        got = receiver.spin(timeout=5.0)
-        assert got is not False, f"Receiver timed out waiting for tick {i}"
-
-    drive_thread.join(timeout=10.0)
     driver.wait_done()
 
-    assert receiver.count >= N_TICKS, (
-        f"Receiver got {receiver.count} ticks, expected {N_TICKS}"
-    )
-    receiver.logger.info("OK: receiver collected all %d timer ticks", receiver.count)
 
+def _wait_for_receivers(receivers: list[ReceiverClient]) -> None:
+    """Wait for all receivers against one shared deadline."""
+    deadline = time.monotonic() + RECEIVE_TIMEOUT
+    incomplete = []
+    for receiver in receivers:
+        remaining = max(0.0, deadline - time.monotonic())
+        if not receiver.done.wait(timeout=remaining):
+            incomplete.append(f"{receiver.name}={receiver.count}/{N_TICKS}")
+    assert not incomplete, "Receivers timed out: " + ", ".join(incomplete)
+
+
+def _log_statistics(driver: TimerClient, receivers: list[ReceiverClient]) -> None:
+    """Log average observed tick interval for every receiver."""
+    for receiver in receivers:
+        driver.logger.info(
+            "%s: %d ticks, average tick %.6f s (%.3f ms)",
+            receiver.name,
+            receiver.count,
+            receiver.average_tick_length,
+            receiver.average_tick_length * 1_000,
+        )
+
+
+def _disconnect_all(
+    driver: TimerClient,
+    receivers: list[ReceiverClient],
+    receiver_threads: list[threading.Thread],
+) -> None:
+    """Request server shutdown, then close every client and spin thread."""
     driver.send_data(generate_message("server-exit"))
     driver.wait_done()
     driver.disconnect()
-    receiver.disconnect()
+    for receiver in receivers:
+        receiver.disconnect()
+    for thread in receiver_threads:
+        thread.join(timeout=5.0)
+
+
+def main() -> None:
+    """Run timer broadcast integration scenario."""
+    args = get_args("Timer test: 200 timed messages broadcast to 50 subscribers")
+
+    receivers, spin_threads = _start_receivers(args.port)
+    driver = TimerClient(args.port)
+    try:
+        _send_ticks(driver)
+        _wait_for_receivers(receivers)
+        _log_statistics(driver, receivers)
+    finally:
+        _disconnect_all(driver, receivers, spin_threads)
+
+
+if __name__ == "__main__":
+    main()

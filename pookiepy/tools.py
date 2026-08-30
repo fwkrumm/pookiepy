@@ -7,10 +7,11 @@ from datetime import datetime, timezone
 
 from google.protobuf import struct_pb2
 from google.protobuf import json_format
-from pookiepy import message_pb2
+from google.protobuf.message import Message as PookieMessage
+from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.exceptions import GrpcCustomInterfaceError
 
-def set_metadata(message: message_pb2.Message):
+def set_metadata(message: PookieMessage):
     """
     Set metadata for a message before sending
 
@@ -21,7 +22,7 @@ def set_metadata(message: message_pb2.Message):
 
     Parameters
     ----------
-    message : message_pb2.Message
+    message : message_pb2.PookieMessage
         The message to set metadata for
     """
     if not message.metaInfo.messageId:
@@ -84,11 +85,11 @@ def _log_transit_times(history, log_callback: callable) -> None:
             )
 
 
-def evaluate_history(data: message_pb2.Message, log_callback: callable = None):
+def evaluate_history(data: PookieMessage, log_callback: callable = None):
     """
     AI GENERATED
 
-    Evaluate and print the DataPoint history of a Message.
+    Evaluate and print the DataPoint history of a PookieMessage.
 
     For each hop the following is logged:
     - Node name (client identifier or "server")
@@ -105,7 +106,7 @@ def evaluate_history(data: message_pb2.Message, log_callback: callable = None):
 
     Parameters
     ----------
-    data : message_pb2.Message
+    data : message_pb2.PookieMessage
         The message whose ``history`` field is to be evaluated.
     log_callback : callable, optional
         Function used for output.  Defaults to ``print``.
@@ -168,11 +169,13 @@ def evaluate_history(data: message_pb2.Message, log_callback: callable = None):
 def generate_message(message_name: str = "default_message",
                      struct_payload: dict = None,
                      byte_payload: bytes = None,
-                     add_metadata: bool = False) -> message_pb2.Message:
+                     add_metadata: bool = False,
+                     *,
+                     proto_interface: ProtoInterface = None) -> PookieMessage:
     """
     AI GENERATED
 
-    Generate a Message with the given payload and message name.
+    Generate a PookieMessage with the given payload and message name.
 
     The payload can be either a dictionary (which will be converted to a Struct)
     or raw bytes. The message will have a unique messageId and the current
@@ -192,16 +195,19 @@ def generate_message(message_name: str = "default_message",
     byte_payload : bytes, optional
         The content to include in the message as raw bytes.  If provided, it will
         be set as the bytePayload.
-    set_metadata : bool, optional
+    add_metadata : bool, optional
         Whether to set the metadata automatically. NOTE that this is automatically also set
         if the data are sent by the client, however in certain situations or test scenarios
         it might be desired to set the metadata manually. In that case set this to True
         (default: False).
+    proto_interface : ProtoInterface, optional
+        Precompiled custom interface used to construct the message. Omit it to
+        use the bundled interface.
 
     Returns
     -------
-    message_pb2.Message
-        The generated Message object ready to be sent.
+    google.protobuf.message.PookieMessage
+        The generated PookieMessage object ready to be sent.
 
     Raises
     ------
@@ -210,7 +216,8 @@ def generate_message(message_name: str = "default_message",
         (``structPayload`` / ``bytePayload``), which commonly happens when a
         custom payload schema differs from the bundled one.
     """
-    msg = message_pb2.Message()
+    interface = proto_interface or _bundled_interface()
+    msg = interface.message_pb2.PookieMessage()
     msg.metaInfo.messageName = message_name
 
     if struct_payload is not None:

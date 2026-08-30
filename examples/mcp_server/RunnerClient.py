@@ -188,12 +188,12 @@ class RunnerClient(BaseClient):
 
     # ── Hook ──────────────────────────────────────────────────────────────────
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Execute the run pipeline and reply with the result."""
         self.logger.info("Run request received")
         result = self._execute()
 
-        response = message_pb2.Message(
+        response = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName=RUN_RESPONSE),
             payload=message_pb2.Payload(structPayload=json_to_struct(result)),
         )

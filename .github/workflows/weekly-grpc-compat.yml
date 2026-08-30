@@ -14,6 +14,10 @@ concurrency:
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   test:
     name: gRPC compat test (py${{ matrix.python-version }} / ${{ matrix.os }})
@@ -24,24 +28,28 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.12", "3.x"]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
-          cache-suffix: ${{ matrix.os }}-${{ matrix.python-version }}
+          cache-suffix: py${{ matrix.python-version }}
 
       - name: Install dependencies (wider grpc range)
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements-weekly.txt coverage
+        run: |
+          uv pip install --system --only-binary grpcio,grpcio-tools \
+            -r requirements-weekly.txt coverage
 
-      - name: Generate proto
-        run: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+      - name: Generate protobuf interfaces
+        uses: ./.github/actions/generate-protobuf
 
       - name: Run unit tests with coverage
         run: |
@@ -56,24 +64,30 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.x"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
           cache-suffix: ${{ github.job }}
 
       - name: Install dependencies (wider grpc range)
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements-weekly.txt
+        run: |
+          uv pip install --system --only-binary grpcio,grpcio-tools \
+            -r requirements-weekly.txt
 
-      - name: Generate proto
-        run: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+      - name: Generate protobuf interfaces
+        uses: ./.github/actions/generate-protobuf
+        with:
+          include-custom: "true"
 
       - name: Run integration tests
         run: python tests/integration/run_integration_tests.py

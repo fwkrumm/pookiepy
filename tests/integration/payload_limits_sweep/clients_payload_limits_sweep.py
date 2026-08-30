@@ -110,7 +110,7 @@ def _build_client_options(
     return options
 
 
-def _history_e2e_ms(msg: message_pb2.Message) -> float | None:
+def _history_e2e_ms(msg: message_pb2.PookieMessage) -> float | None:
     """Compute end-to-end wall-clock latency from history timestamps."""
     if not msg.history:
         return None
@@ -139,8 +139,8 @@ def _iqr(values: list[float]) -> float:
     """Compute interquartile range (Q3-Q1) for at least two values."""
     if len(values) < 2:
         return 0.0
-    q1, _, q3 = statistics.quantiles(values, n=4, method="inclusive")
-    return q3 - q1
+    quartiles = statistics.quantiles(values, n=4, method="inclusive")
+    return quartiles[2] - quartiles[0]
 
 
 def _pick_unused_port() -> int:
@@ -271,7 +271,7 @@ class ReceiverClient(BaseClient):  # pylint: disable=too-many-instance-attribute
             config=cfg,
         )
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         if data.payload.bytePayload != self.expected_payload:
             raise AssertionError("Payload mismatch at receiver")
 

@@ -1,0 +1,27 @@
+name: Generate protobuf interfaces
+description: Generate bundled bindings and optional custom integration-test bindings.
+
+inputs:
+  include-custom:
+    description: Generate the custom integration-test interface.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Generate bundled interface
+      shell: bash
+      run: >-
+        python -m grpc_tools.protoc -I. --python_out=.
+        --grpc_python_out=. --pyi_out=. pookiepy/message.proto
+
+    - name: Generate custom integration interface
+      if: inputs.include-custom == 'true'
+      shell: bash
+      run: >-
+        python -m grpc_tools.protoc -Itests/integration/custom_interface
+        --python_out=tests/integration/custom_interface
+        --grpc_python_out=tests/integration/custom_interface
+        --pyi_out=tests/integration/custom_interface
+        tests/integration/custom_interface/custom_if/message.proto

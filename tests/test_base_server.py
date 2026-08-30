@@ -20,7 +20,7 @@ import grpc
 
 from pookiepy import message_pb2
 from pookiepy.baseserver import BaseServer, Peer, ServerConfig
-from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import DEFAULT_SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
 
 
 def _make_server(**kwargs) -> BaseServer:
@@ -36,20 +36,34 @@ class TestDefaultHooks(unittest.TestCase):
 
     def test_on_receive_returns_true(self):
         """Default on_receive returns True, meaning forward the message."""
-        self.assertTrue(self.server.on_receive(self.peer, message_pb2.Message()))
+        self.assertTrue(self.server.on_receive(self.peer, message_pb2.PookieMessage()))
 
     def test_on_client_connect_returns_true(self):
         """Default on_client_connect returns True, meaning accept the connection."""
         # context=None is fine for the default implementation
-        self.assertTrue(self.server.on_client_connect(message_pb2.Message(), None))
+        self.assertTrue(self.server.on_client_connect(message_pb2.PookieMessage(), None))
 
     def test_on_client_accepted_returns_none(self):
         """Default on_client_accepted is a no-op and returns None."""
-        self.assertIsNone(self.server.on_client_accepted(self.peer, message_pb2.Message()))
+        self.assertIsNone(self.server.on_client_accepted(self.peer, message_pb2.PookieMessage()))
 
     def test_on_client_disconnect_returns_none(self):
         """Default on_client_disconnect is a no-op and returns None."""
         self.assertIsNone(self.server.on_client_disconnect(self.peer))
+
+
+class TestGenerateMessage(unittest.TestCase):
+    """Tests for BaseServer.generate_message()."""
+
+    def test_generates_message_with_byte_payload(self):
+        """The server helper uses the server's configured protobuf interface."""
+        server = _make_server()
+
+        message = server.generate_message("foo", None, b"payload")
+
+        self.assertIsInstance(message, message_pb2.PookieMessage)
+        self.assertEqual(message.metaInfo.messageName, "foo")
+        self.assertEqual(message.payload.bytePayload, b"payload")
 
 
 class TestShutdown(unittest.TestCase):
@@ -104,11 +118,11 @@ class TestLifecycleHooks(unittest.TestCase):
                 return False  # always drop
 
         srv = _Server(port=50096)
-        self.assertFalse(srv.on_receive(Peer("ip", "s"), message_pb2.Message()))
+        self.assertFalse(srv.on_receive(Peer("ip", "s"), message_pb2.PookieMessage()))
 
     def test_on_client_connect_override_receives_args(self):
         """on_client_connect override is called with (data, context) and can reject."""
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
 
         class _Server(BaseServer):
             received_data = None
@@ -128,7 +142,7 @@ class TestLifecycleHooks(unittest.TestCase):
     def test_on_client_accepted_override_receives_args(self):
         """on_client_accepted override is called with (peer, request)."""
         peer = Peer(peer="1.2.3.4:1111", session_id="s1", client_id="c1", name="worker")
-        msg = message_pb2.Message()
+        msg = message_pb2.PookieMessage()
 
         class _Server(BaseServer):
             received_peer = None
@@ -160,13 +174,15 @@ class TestLifecycleHooks(unittest.TestCase):
     def test_on_data_yield_hook_called_when_message_yielded(self):
         """on_data_yield is invoked when DataChannel yields a queued message."""
         recorded = []
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
 
         class _Server(BaseServer):
             def on_data_yield(self, peer, data):
                 recorded.append((peer, data))
 
-        server = _Server(port=50092)
+        # explicitly set schema_version to empty string to
+        #  avoid defaulting to DEFAULT_SCHEMA_VERSION
+        server = _Server(port=50092, config=ServerConfig(schema_version=""))
         context = MagicMock()
         context.peer.return_value = "fake-peer"
         context.invocation_metadata.return_value = []
@@ -232,9 +248,9 @@ class TestServerConfig(unittest.TestCase):
         cfg = ServerConfig(max_workers=None)
         self.assertGreaterEqual(cfg.effective_max_workers, 1)
 
-    def test_schema_version_default_is_empty(self):
-        """ServerConfig.schema_version defaults to an empty string."""
-        self.assertEqual(ServerConfig().schema_version, "")
+    def test_schema_version_default_is_none(self):
+        """ServerConfig.schema_version defaults to None."""
+        self.assertIsNone(ServerConfig().schema_version)
 
     def test_compression_default_is_none(self):
         """ServerConfig.compression defaults to None (no compression)."""
@@ -267,30 +283,42 @@ class TestServerConfig(unittest.TestCase):
 class TestServeForever(unittest.TestCase):
     """Tests for serve_forever startup wiring."""
 
-    @patch("pookiepy.baseserver.message_pb2_grpc.add_StreamServicer_to_server")
     @patch("pookiepy.baseserver.grpc.server")
     @patch("pookiepy.baseserver.futures.ThreadPoolExecutor")
     def test_serve_forever_uses_effective_max_workers(
         self,
         mock_executor,
         mock_grpc_server,
-        mock_add_servicer,
     ):
         """serve_forever passes the resolved worker count into ThreadPoolExecutor."""
         cfg = ServerConfig(max_workers=None)
         server = BaseServer(port=50081, config=cfg)
         server.global_exit_event.set()
+        server.logger.info = MagicMock()
 
         mock_server_instance = MagicMock()
         mock_stop_event = MagicMock()
         mock_stop_event.wait.return_value = True
         mock_server_instance.stop.return_value = mock_stop_event
+        mock_server_instance.add_insecure_port.return_value = 54321
         mock_grpc_server.return_value = mock_server_instance
 
-        server.serve_forever()
+        with patch.object(
+            server._message_pb2_grpc,  # pylint: disable=protected-access
+            "add_StreamServicer_to_server",
+        ) as mock_add_servicer:
+            server.serve_forever()
 
         mock_executor.assert_called_once_with(max_workers=cfg.effective_max_workers)
         mock_add_servicer.assert_called_once()
+        mock_server_instance.add_insecure_port.assert_called_once_with("[::]:50081")
+        self.assertIn("port=50081", repr(server))
+        server.logger.info.assert_called_once_with(
+            "server %s started (bound_port=%d, schema=%s)",
+            server,
+            54321,
+            DEFAULT_SCHEMA_VERSION,
+        )
 
 
 class TestSchemaValidation(unittest.TestCase):
@@ -298,7 +326,7 @@ class TestSchemaValidation(unittest.TestCase):
 
     def test_empty_server_and_client_schema_logs_warning(self):
         """Server warns when neither side provides a schema version string."""
-        msg = message_pb2.Message(metaInfo=message_pb2.MetaInformation(messageName="foo"))
+        msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
         server = BaseServer(port=50087, config=ServerConfig(schema_version=""))
         server.logger.warning = MagicMock()
         context = MagicMock()

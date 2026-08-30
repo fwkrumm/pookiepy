@@ -3,7 +3,7 @@ LlmBridgeClient --- autonomous LLM agent that drives file operations via gRPC.
 
 The LLM (OpenAI-compatible endpoint, e.g. LM Studio) receives a task and a
 system prompt describing available tools.  It emits <tool>JSON</tool> blocks;
-this client parses them, translates each into a gRPC Message, sends it through
+this client parses them, translates each into a gRPC PookieMessage, sends it through
 the server to FileOperationClient / RunnerClient, and feeds the result back to
 the LLM.  The loop continues until the LLM outputs <done/> or MAX_ITERATIONS
 is reached.
@@ -176,7 +176,7 @@ class LlmBridgeClient(BaseClient):
 
     def _execute_tool(self, tool: dict) -> str:
         """
-        Translate one tool call dict into a gRPC Message, send it through the
+        Translate one tool call dict into a gRPC PookieMessage, send it through the
         server, wait for the response, and return a human-readable result string
         for the LLM's next turn.
         """
@@ -197,7 +197,7 @@ class LlmBridgeClient(BaseClient):
 
         # Assign messageId now so we can log it (set_metadata won't overwrite)
         msg_id = str(uuid.uuid4())
-        msg = message_pb2.Message(
+        msg = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(
                 messageName=msg_name,
                 messageId=msg_id,

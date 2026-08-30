@@ -20,33 +20,30 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.x"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          enable-cache: true
+          enable-cache: false
           cache-suffix: ${{ github.job }}
 
-      - name: Install grpcio-tools for proto generation
-        run: uv pip install --system --only-binary grpcio-tools grpcio-tools
-
-      - name: Generate proto
-        run: python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto
-
       - name: Build distribution packages (sdist + wheel)
+        # The PDM build hook generates bundled protobuf bindings in isolation.
         run: uv build
 
       - name: Publish to PyPI via Trusted Publishing
         # Uses OIDC --- no PYPI_API_TOKEN secret required.
         # Configure the trusted publisher once at:
         # https://pypi.org/manage/project/<your-package>/settings/publishing/
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011 # v1.12.4
         with:
           # repository-url: https://test.pypi.org/legacy/ # for testing
           skip-existing: true

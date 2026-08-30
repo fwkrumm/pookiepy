@@ -1,200 +1,129 @@
+"""Validated protobuf interface dependencies for clients and servers."""
 
-# AI GENERATED
-
-"""Runtime .proto compilation and dynamic module loading utilities."""
-
-# Postpone evaluation of type annotations (PEP 563).
-# This avoids evaluating annotations at import time which can trigger
-# import-time side effects or import cycles when we dynamically load
-# generated modules (useful for runtime proto compilation/loading).
 from __future__ import annotations
 
-import importlib
-import importlib.util
-import subprocess
-import sys
-import tempfile
-import types
-from pathlib import Path
+from dataclasses import dataclass
+from functools import lru_cache
 from types import ModuleType
-from typing import Optional, Tuple, Union
+
+from pookiepy.exceptions import GrpcCustomInterfaceError
 
 
-def compile_proto(proto_path: Union[str, Path], out_dir: Optional[Union[str, Path]] = None) -> Path:
-    """
-    Compile a .proto file using grpc_tools.protoc into `out_dir`.
-
-    Returns the output directory Path containing generated files.
-    """
-    proto_path = Path(proto_path)
-    if out_dir is None:
-        out_dir = Path(tempfile.mkdtemp(prefix="user_proto_"))
-    else:
-        out_dir = Path(out_dir)
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-    cmd = [
-        sys.executable,
-        "-m",
-        "grpc_tools.protoc",
-        f"-I{proto_path.parent}",
-        f"--python_out={out_dir}",
-        f"--grpc_python_out={out_dir}",
-        f"--pyi_out={out_dir}",
-        str(proto_path),
-    ]
-
-    try:
-        subprocess.check_call(cmd)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"protoc failed: {e}") from e
-    except FileNotFoundError as e:
-        raise RuntimeError("grpc_tools.protoc not available. Install grpcio-tools.") from e
-
-    return out_dir
+_REQUIRED_MESSAGES = (
+    "PookieMessage",
+    "MetaInformation",
+    "DataPoint",
+    "ClientProvides",
+    "ServerProvides",
+    "Payload",
+)
+_REQUIRED_MESSAGE_FIELDS = ("metaInfo", "history", "payload")
+_REQUIRED_META_FIELDS = (
+    "timestamp",
+    "messageId",
+    "responseToId",
+    "clientInfo",
+    "serverInfo",
+    "messageName",
+)
+_REQUIRED_GRPC_SYMBOLS = (
+    "StreamStub",
+    "StreamServicer",
+    "add_StreamServicer_to_server",
+)
 
 
-def _load_module_from_file(module_name: str, file_path: Union[str, Path]) -> ModuleType:
-    """Load a Python module from a file path without mutating sys.path."""
-    file_path = Path(file_path)
-    spec = importlib.util.spec_from_file_location(module_name, str(file_path))
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Cannot load module from {file_path}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
-    return mod
+def _missing_module_symbols(module: ModuleType, names: tuple[str, ...], label: str) -> list[str]:
+    """Return required symbols absent from a generated module."""
+    return [f"{label}.{name}" for name in names if not hasattr(module, name)]
 
 
-def register_modules(pb2: ModuleType, pb2_grpc: ModuleType, package: str = "interface") -> None:
-    """
-    Register generated modules into sys.modules under `package.message_pb2` and
-    `package.message_pb2_grpc`, and expose them as attributes on the package module.
-
-    This allows existing code that does `import pookiepy.message_pb2` to keep
-    working without changing import sites.
-    """
-    pkg = sys.modules.get(package)
-    if pkg is None:
-        pkg = types.ModuleType(package)
-        sys.modules[package] = pkg
-
-    # set canonical names / packages
-    pb2.__name__ = f"{package}.message_pb2"
-    pb2.__package__ = package
-    pb2_grpc.__name__ = f"{package}.message_pb2_grpc"
-    pb2_grpc.__package__ = package
-
-    setattr(pkg, "message_pb2", pb2)
-    setattr(pkg, "message_pb2_grpc", pb2_grpc)
-
-    sys.modules[f"{package}.message_pb2"] = pb2
-    sys.modules[f"{package}.message_pb2_grpc"] = pb2_grpc
+def _missing_message_fields(message_type, names: tuple[str, ...], label: str) -> list[str]:
+    """Return required protobuf fields absent from a generated message type."""
+    descriptor = getattr(message_type, "DESCRIPTOR", None)
+    if descriptor is None:
+        return [f"{label}.DESCRIPTOR"]
+    fields = getattr(descriptor, "fields_by_name", {})
+    return [f"{label}.{name}" for name in names if name not in fields]
 
 
-def load_pb_modules_from_dir(
-    dir_path: Union[str, Path],
-    package: str = "interface",
-    register: bool = True,
-) -> Tuple[ModuleType, ModuleType]:
-    """
-    Load `message_pb2.py` and `message_pb2_grpc.py` from a directory and optionally register them.
-    Returns (pb2_module, pb2_grpc_module).
-    """
-    dir_path = Path(dir_path)
-    pb2_file = dir_path / "message_pb2.py"
-    pb2_grpc_file = dir_path / "message_pb2_grpc.py"
-    if not pb2_file.exists() or not pb2_grpc_file.exists():
-        raise FileNotFoundError(f"Generated files not found in {dir_path}")
+def _service_errors(message_pb2: ModuleType) -> list[str]:
+    """Validate the required bidirectional Stream.DataChannel RPC descriptor."""
+    descriptor = getattr(message_pb2, "DESCRIPTOR", None)
+    if descriptor is None:
+        return ["message_pb2.DESCRIPTOR"]
 
-    # use a temporary unique module name prefix to avoid collisions
-    prefix = f"user_generated_{abs(hash(str(dir_path))) }"
-    pb2 = _load_module_from_file(f"{prefix}.message_pb2", pb2_file)
+    service = descriptor.services_by_name.get("Stream")
+    if service is None:
+        return ["service Stream"]
 
-    # Some generated *_pb2_grpc.py files import `message_pb2` as a top-level module
-    # (no package). To make that import succeed when loading the generated grpc
-    # module from a custom directory, temporarily register the loaded pb2 module
-    # under the bare name 'message_pb2' in sys.modules, then remove it afterwards
-    # so we don't pollute the global module namespace.
-    sys.modules["message_pb2"] = pb2
-    try:
-        pb2_grpc = _load_module_from_file(f"{prefix}.message_pb2_grpc", pb2_grpc_file)
-    finally:
-        sys.modules.pop("message_pb2", None)
+    method = service.methods_by_name.get("DataChannel")
+    if method is None:
+        return ["rpc Stream.DataChannel"]
 
-    validate_interface(pb2, pb2_grpc)
-
-    if register:
-        register_modules(pb2, pb2_grpc, package=package)
-
-    return pb2, pb2_grpc
+    errors = []
+    if not method.client_streaming:
+        errors.append("Stream.DataChannel client streaming")
+    if not method.server_streaming:
+        errors.append("Stream.DataChannel server streaming")
+    if method.input_type.full_name != message_pb2.PookieMessage.DESCRIPTOR.full_name:
+        errors.append("Stream.DataChannel input PookieMessage")
+    if method.output_type.full_name != message_pb2.PookieMessage.DESCRIPTOR.full_name:
+        errors.append("Stream.DataChannel output PookieMessage")
+    return errors
 
 
-def compile_and_register(
-    proto_path: Union[str, Path],
-    package: str = "interface",
-    out_dir: Optional[Union[str, Path]] = None,
-) -> Tuple[ModuleType, ModuleType]:
-    """
-    Compile a .proto file and register the generated modules under the provided package name.
+def _validate_interface(message_pb2: ModuleType, message_pb2_grpc: ModuleType) -> None:
+    """Raise one error containing every incompatibility in a module pair."""
+    if not isinstance(message_pb2, ModuleType) or not isinstance(message_pb2_grpc, ModuleType):
+        raise GrpcCustomInterfaceError(
+            "ProtoInterface requires imported message_pb2 and message_pb2_grpc modules"
+        )
 
-    Returns (pb2_module, pb2_grpc_module).
-    """
-    out = compile_proto(proto_path, out_dir=out_dir)
-    pb2, pb2_grpc = load_pb_modules_from_dir(out, package=package, register=True)
-    return pb2, pb2_grpc
+    errors = _missing_module_symbols(message_pb2, _REQUIRED_MESSAGES, "message_pb2")
+    errors.extend(
+        _missing_module_symbols(message_pb2_grpc, _REQUIRED_GRPC_SYMBOLS, "message_pb2_grpc")
+    )
 
+    if hasattr(message_pb2, "PookieMessage"):
+        errors.extend(
+            _missing_message_fields(
+                message_pb2.PookieMessage,
+                _REQUIRED_MESSAGE_FIELDS,
+                "message_pb2.PookieMessage",
+            )
+        )
+        errors.extend(_service_errors(message_pb2))
+    if hasattr(message_pb2, "MetaInformation"):
+        errors.extend(
+            _missing_message_fields(
+                message_pb2.MetaInformation,
+                _REQUIRED_META_FIELDS,
+                "message_pb2.MetaInformation",
+            )
+        )
 
-def validate_interface(pb2: ModuleType, pb2_grpc: ModuleType) -> None:
-    """
-    Validate that the loaded modules contain the minimal expected symbols.
-    Raises RuntimeError on missing symbols.
-    """
-    missing = []
-    for name in ("Message", "ClientProvides", "ServerProvides"):
-        if not hasattr(pb2, name):
-            missing.append(f"pb2.{name}")
-
-    if not hasattr(pb2_grpc, "StreamStub"):
-        missing.append("pb2_grpc.StreamStub")
-    if not hasattr(pb2_grpc, "StreamServicer"):
-        missing.append("pb2_grpc.StreamServicer")
-
-    if missing:
-        raise RuntimeError(
-            "Loaded proto modules are missing required symbols: " + ", ".join(missing)
+    if errors:
+        raise GrpcCustomInterfaceError(
+            "Incompatible protobuf interface; missing or invalid: " + ", ".join(errors)
         )
 
 
-def resolve_modules(message_module: Optional[Union[str, ModuleType]] = None,
-                    grpc_module: Optional[Union[str, ModuleType]] = None,
-                    module_path: Optional[Union[str, Path]] = None,
-                    package: str = "interface") -> Tuple[ModuleType, ModuleType]:
-    """
-    Resolve and return (message_pb2_module, message_pb2_grpc_module) from one of:
-      - module objects passed directly
-      - import strings (e.g. 'myproto.message_pb2')
-      - a directory path containing generated files
-      - fall back to packaged `interface` modules
-    """
-    # already module objects
-    if isinstance(message_module, types.ModuleType) and isinstance(grpc_module, types.ModuleType):
-        return message_module, grpc_module
+@dataclass(frozen=True, slots=True)
+class ProtoInterface:
+    """Immutable pair of compatible, precompiled protobuf modules."""
 
-    # import strings
-    if isinstance(message_module, str) and isinstance(grpc_module, str):
-        return importlib.import_module(message_module), importlib.import_module(grpc_module)
+    message_pb2: ModuleType
+    message_pb2_grpc: ModuleType
 
-    # directory path containing generated files
-    if module_path is not None:
-        pb2, pb2_grpc = load_pb_modules_from_dir(module_path, package=package, register=False)
-        validate_interface(pb2, pb2_grpc)
-        return pb2, pb2_grpc
+    def __post_init__(self) -> None:
+        _validate_interface(self.message_pb2, self.message_pb2_grpc)
 
-    # fall back to bundled interface
-    try:
-        import pookiepy.message_pb2 as default_pb2  # type: ignore  # pylint: disable=import-outside-toplevel
-        import pookiepy.message_pb2_grpc as default_pb2_grpc  # type: ignore  # pylint: disable=import-outside-toplevel
-        validate_interface(default_pb2, default_pb2_grpc)
-        return default_pb2, default_pb2_grpc
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        raise RuntimeError("Unable to resolve proto modules") from e
+
+@lru_cache(maxsize=1)
+def _bundled_interface() -> ProtoInterface:
+    """Return the bundled interface used when no custom interface is supplied."""
+    from pookiepy import message_pb2  # pylint: disable=import-outside-toplevel
+    from pookiepy import message_pb2_grpc  # pylint: disable=import-outside-toplevel
+
+    return ProtoInterface(message_pb2, message_pb2_grpc)
