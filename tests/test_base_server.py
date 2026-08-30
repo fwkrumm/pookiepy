@@ -20,7 +20,7 @@ import grpc
 
 from pookiepy import message_pb2
 from pookiepy.baseserver import BaseServer, Peer, ServerConfig
-from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import DEFAULT_SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
 
 
 def _make_server(**kwargs) -> BaseServer:
@@ -294,11 +294,13 @@ class TestServeForever(unittest.TestCase):
         cfg = ServerConfig(max_workers=None)
         server = BaseServer(port=50081, config=cfg)
         server.global_exit_event.set()
+        server.logger.info = MagicMock()
 
         mock_server_instance = MagicMock()
         mock_stop_event = MagicMock()
         mock_stop_event.wait.return_value = True
         mock_server_instance.stop.return_value = mock_stop_event
+        mock_server_instance.add_insecure_port.return_value = 54321
         mock_grpc_server.return_value = mock_server_instance
 
         with patch.object(
@@ -309,6 +311,14 @@ class TestServeForever(unittest.TestCase):
 
         mock_executor.assert_called_once_with(max_workers=cfg.effective_max_workers)
         mock_add_servicer.assert_called_once()
+        mock_server_instance.add_insecure_port.assert_called_once_with("[::]:50081")
+        self.assertIn("port=50081", repr(server))
+        server.logger.info.assert_called_once_with(
+            "server %s started (bound_port=%d, schema=%s)",
+            server,
+            54321,
+            DEFAULT_SCHEMA_VERSION,
+        )
 
 
 class TestSchemaValidation(unittest.TestCase):

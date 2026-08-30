@@ -10,14 +10,13 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import Iterable, TextIO
-
-import psutil
 
 
 COMMAND_TIMEOUT_SECONDS = 60
@@ -214,39 +213,28 @@ def read_process_log(log_file: TextIO) -> str:
     return output
 
 
-def get_listening_port(process: subprocess.Popen[str]) -> int | None:
-    """Return child server's OS-assigned listening port, if available."""
-    try:
-        connections = psutil.Process(process.pid).net_connections(kind="inet")
-    except psutil.NoSuchProcess:
-        return None
-    listening_ports = {
-        int(connection.laddr.port)
-        for connection in connections
-        if connection.status == psutil.CONN_LISTEN
-    }
-    if len(listening_ports) > 1:
-        raise RuntimeError(
-            f"Generated server opened unexpected listening ports: "
-            f"{sorted(listening_ports)}"
-        )
-    return next(iter(listening_ports), None)
-
-
 def wait_for_server(
     process: subprocess.Popen[str],
     log_file: TextIO,
 ) -> int:
-    """Wait until generated server listens and return its assigned port."""
+    """Wait until generated server reports readiness and return its port."""
     deadline = time.monotonic() + SERVER_STARTUP_TIMEOUT_SECONDS
+    startup_pattern = re.compile(r"bound_port=(\d+)")
     while time.monotonic() < deadline:
         if process.poll() is not None:
             raise RuntimeError(
                 f"Generated server exited during startup with code {process.returncode}\n"
                 f"--- output ---\n{read_process_log(log_file)}"
             )
-        port = get_listening_port(process)
-        if port is not None:
+        output = read_process_log(log_file)
+        match = startup_pattern.search(output)
+        if match is not None:
+            port = int(match.group(1))
+            if port == 0:
+                raise RuntimeError(
+                    "Generated server reported invalid assigned port 0\n"
+                    f"--- output ---\n{output}"
+                )
             print(
                 f"[ok] Generated server listening on localhost:{port}",
                 flush=True,

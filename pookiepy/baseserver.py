@@ -415,14 +415,17 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         )
         self._message_pb2_grpc.add_StreamServicer_to_server(self, server)
         if self.__ssl_credentials is None:
-            server.add_insecure_port(f"{self._ip}:{self._port}")
+            bound_port = server.add_insecure_port(f"{self._ip}:{self._port}")
         else:
             self.logger.iinfo("Using SSL credentials for server")
-            server.add_secure_port(f"{self._ip}:{self._port}", self.__ssl_credentials)
+            bound_port = server.add_secure_port(
+                f"{self._ip}:{self._port}", self.__ssl_credentials
+            )
         server.start()
         self.logger.info(
-            "server %s started (schema=%s)",
+            "server %s started (bound_port=%d, schema=%s)",
             self,
+            bound_port,
             self.__config.schema_version,
         )
         try:
