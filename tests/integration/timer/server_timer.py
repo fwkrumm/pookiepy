@@ -16,6 +16,7 @@ if __name__ == "__main__":
         args.port,
         config=ServerConfig(max_workers=MAX_TIMER_CLIENTS),
     )
-    # Per-message debug file I/O dominates a 10 ms benchmark on Windows CI.
+    # Exclude synchronous per-message debug file writes from timing results;
+    # slow CI storage otherwise measures logging throughput instead of delivery.
     s.logger.setLevel(logging.INFO)
     s.serve_forever()

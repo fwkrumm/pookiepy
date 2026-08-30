@@ -14,6 +14,7 @@ Run
     python tests/integration/timer/clients_timer.py
 """
 import logging
+import sys
 import threading
 import time
 
@@ -25,7 +26,9 @@ from tests.integration._interface import get_args
 
 N_TICKS = 200
 N_RECEIVERS = 50
-TICK_INTERVAL = 0.01  # 200 × 0.01 s = 2 s total drive time
+# Short interval keeps example runtime near two seconds. Achievable precision
+# depends on OS timer resolution, scheduler load, hardware, and CI environment.
+TICK_INTERVAL = 0.01
 RECEIVE_TIMEOUT = 15.0
 TICK_MESSAGE = "timer_tick"
 
@@ -40,6 +43,7 @@ class TimerClient(BaseClient):
             provides=[TICK_MESSAGE, "server-exit"],
             requires=[],
         )
+        # Exclude synchronous per-message debug file writes from timing results.
         self.logger.setLevel(logging.INFO)
 
 
@@ -57,6 +61,7 @@ class ReceiverClient(BaseClient):
             provides=[],
             requires=[TICK_MESSAGE],
         )
+        # Exclude synchronous per-message debug file writes from timing results.
         self.logger.setLevel(logging.INFO)
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
@@ -92,13 +97,16 @@ def _start_receivers(port: int) -> tuple[list[ReceiverClient], list[threading.Th
 
 def _send_ticks(driver: TimerClient) -> None:
     """Send one message for every periodic timer event."""
-    # gRPC already owns worker threads here. Avoid creating any child process,
-    # because gRPC C-core reports inherited poller descriptors on macOS.
+    # macOS reports inherited gRPC poller descriptors when multiprocessing
+    # starts after gRPC threads. Its thread backend avoids child creation;
+    # other platforms retain process-isolated timing.
+    backend = "thread" if sys.platform == "darwin" else "process"
+    driver.logger.info("Using %s timer backend on %s", backend, sys.platform)
     with timer(
         s=TICK_INTERVAL,
         n=N_TICKS,
         logger=driver.logger,
-        backend="thread",
+        backend=backend,
     ) as ticks:
         for tick_index in ticks:
             driver.send_data(
