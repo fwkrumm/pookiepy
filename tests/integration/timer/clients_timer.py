@@ -13,6 +13,7 @@ Run
 ---
     python tests/integration/timer/clients_timer.py
 """
+import logging
 import threading
 import time
 
@@ -39,6 +40,7 @@ class TimerClient(BaseClient):
             provides=[TICK_MESSAGE, "server-exit"],
             requires=[],
         )
+        self.logger.setLevel(logging.INFO)
 
 
 class ReceiverClient(BaseClient):
@@ -55,6 +57,7 @@ class ReceiverClient(BaseClient):
             provides=[],
             requires=[TICK_MESSAGE],
         )
+        self.logger.setLevel(logging.INFO)
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Record one tick and signal when all expected ticks arrived."""

@@ -2,6 +2,8 @@
 ====================
 Plain relay server; all timer-driving logic lives in the client.
 """
+import logging
+
 from pookiepy.baseserver import ServerConfig
 from tests.integration._interface import get_args
 from tests.integration._server_base import IntegrationServer
@@ -14,4 +16,6 @@ if __name__ == "__main__":
         args.port,
         config=ServerConfig(max_workers=MAX_TIMER_CLIENTS),
     )
+    # Per-message debug file I/O dominates a 10 ms benchmark on Windows CI.
+    s.logger.setLevel(logging.INFO)
     s.serve_forever()

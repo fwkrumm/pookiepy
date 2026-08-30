@@ -28,6 +28,9 @@ TIME_NS_OFFSET = len(str(int(time.time())))
 # empirically this is the lowest value we allow, however we only test for
 # relevant digit 2, the period time is 0.01 at lowest.
 MAX_RELEVANT_DIGIT_VALUE = 3
+# Never fork a process after libraries such as gRPC have started threads or
+# opened poller file descriptors; spawn creates an isolated, cross-platform child.
+_SPAWN_CONTEXT = multiprocessing.get_context("spawn")
 
 
 # the following dict determines the ''strength'' of the clock drift compensation.
@@ -194,7 +197,7 @@ class TimedEvent:
 
     Notes
     -----
-    The timer runs in a daemon thread.  The context manager blocks in
+    The timer runs in a spawn-isolated daemon process.  The context manager blocks in
     ``__exit__`` until all ``n`` ticks have been issued or the ``for``
     loop inside the ``with`` block has been exhausted.
     """
@@ -203,18 +206,22 @@ class TimedEvent:
         self.s = s
         self.n = n
         self.compensation = compensation
-        self._event = multiprocessing.Event()
+        # Forking after gRPC starts worker threads inherits its poller file
+        # descriptors and triggers unsafe-fork warnings on POSIX. Spawn gives
+        # the timer an isolated interpreter on every platform.
+        self._event = _SPAWN_CONTEXT.Event()
         self._process: multiprocessing.Process = None
         self.overrun_count: int = 0  # number of cycles where task exceeded the tick period
         self.logger = logger
 
     def __enter__(self) -> "TimedEvent":
-        self._process = multiprocessing.Process(
+        self._process = _SPAWN_CONTEXT.Process(
             target=timer,
             args=(self.n, self.s, self._event, self.compensation,
                   self.logger.level if self.logger else None),
             daemon=True,
         )
+        self._process.start()
 
         # set timer process to high priority to minimize the risk of timer
         # overruns due to scheduling delays (not yet optimal but this is not
@@ -227,7 +234,6 @@ class TimedEvent:
         else:  # MAC OS X or other (potentially)
             psutil_process.nice(20)
 
-        self._process.start()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> bool:
@@ -255,7 +261,7 @@ class TimedEvent:
         ``__iter__`` would then wait forever on a tick that the (now-finished)
         timer thread will never fire.  To guard against this, every wait uses a
         finite timeout (10 × period); if the timeout expires *and* the timer
-        thread is no longer alive, iteration stops early and the missed cycles
+        process is no longer alive, iteration stops early and the missed cycles
         are reported.
         """
         try:
