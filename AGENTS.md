@@ -16,6 +16,10 @@ pookiepy/schema_version.py        # schema-version metadata key for compat check
 pookiepy/custom_interface.py      # runtime .proto compile+load
 pookiepy/message.proto         # proto source (one service, one bidirectional RPC)
 pookiepy/message_pb2*.py       # generated --- DO NOT EDIT
+.rust/                        # Rust async BaseServer port (tonic/tokio)
+.rust/src/server.rs           # Rust BaseServer + hook trait + stream service
+.rust/src/data_register.rs    # Rust msg routing: messageName→clientId→queue
+.rust/src/schema_version.rs   # Rust proto fingerprint + metadata key
 ```
 
 Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto`
@@ -53,6 +57,8 @@ Schema check: compares `ClientConfig.schema_version` vs `ServerConfig.schema_ver
 | `on_receive` | `(peer, request)` | `bool` True=fan-out |
 
 **Other:** `serve_forever()`, `shutdown()`, `_add_static_data(name, msg)`, `_get_static_data(name)`
+
+Rust sync rule: any behavior change, hook change, handshake change, routing change, schema handling change, or shutdown change in `pookiepy/baseserver.py` must be reviewed against `.rust/src/server.rs` and synced when applicable. Such changes must also add or update tests for affected Python and Rust behavior.
 
 ## BaseClient --- [pookiepy/BaseClient.py](pookiepy/BaseClient.py)
 

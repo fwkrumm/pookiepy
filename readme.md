@@ -26,6 +26,7 @@
 - [Parameters](#parameters)
 - [Minimal Examples](#minimal-examples)
 - [Examples](#examples)
+- [Rust](#rust)
 - [Testing](#testing)
 - [Extend default Configuration](#extend-default-configuration)
 - [Regenerating the gRPC Interface](#regenerating-the-grpc-interface)
@@ -315,6 +316,21 @@ Runnable examples are available in two locations:
 - `tests/integration/` --- integration test scenarios covering a broad range of use cases
 
 Run them on a machine with adequate resources; some scenarios are resource-intensive.
+
+---
+<a name="rust"></a>
+<a id="rust"></a>
+
+## Rust
+
+An experimental Rust server port is available in `.rust/`.
+
+See `.rust/README.md` for setup, build, and usage details.
+
+Current status:
+- Work in progress (WIP).
+- AI-generated port that is (more or less) actively refined.
+- Feedback and insights from experienced Rust developers are very welcome.
 
 ---
 <a name="testing"></a>

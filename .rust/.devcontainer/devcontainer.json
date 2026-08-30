@@ -1,0 +1,23 @@
+{
+  "name": "pookiepy-rust",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspaces/pookiepy-rust",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/pookiepy-rust,type=bind,consistency=cached",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "rust-analyzer.check.command": "clippy"
+      }
+    }
+  },
+  "postCreateCommand": "rustup component add rustfmt clippy; if [ -f Cargo.toml ]; then cargo build; elif [ -f .rust/Cargo.toml ]; then cd .rust && cargo build; else echo 'Cargo.toml not found in mounted workspace'; fi"
+}

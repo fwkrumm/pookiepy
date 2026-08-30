@@ -9,3 +9,10 @@ uv.lock
 pookiepy/message_pb2.py
 pookiepy/message_pb2.pyi
 pookiepy/message_pb2_grpc.py
+
+
+# rust specific
+.rust/target/*
+Cargo.lock
+devcontainer-lock.json
+
