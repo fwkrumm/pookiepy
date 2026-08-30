@@ -468,4 +468,5 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
 | 0.0.15                     | Add exception for custom interface mismatch, add `__version__` to `__all__`. |
 | 0.0.16                     | Change client spin control flow and server delivery-result APIs; add queue-growth configuration. |
+| 0.0.17                     | Rename non-ambiguous message name. Simplify custom interface usage. Minor improvements to logs and comments. added voice client to interactive streaming example. added workflow for skeletons. added threading backend for timer. |
 
