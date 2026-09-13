@@ -43,7 +43,7 @@ jobs:
         run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
 
       - name: Generate protobuf interfaces
-        uses: $/.github/actions/generate-protobuf
+        run: python .github/scripts/generate_protobuf.py
 
       - name: Run unit tests with coverage
         run: |
@@ -73,9 +73,7 @@ jobs:
         run: uv pip install --system -r requirements.txt pylint
 
       - name: Generate protobuf interfaces
-        uses: $/.github/actions/generate-protobuf
-        with:
-          include-custom: "true"
+        run: python .github/scripts/generate_protobuf.py --include-custom
 
       - name: Run Pylint
         run: pylint pookiepy tests examples
