@@ -595,7 +595,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
 
 
-    def spin(self, timeout: float = None) -> Any:
+    def spin(self, timeout: float = None) -> PookieMessage:
         """
         Process a single message from the receive queue.
 
@@ -606,8 +606,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        Any
-            Whatever on_receive returns.
+        PookieMessage
+            The received message.
 
         Raises
         ------
@@ -647,7 +647,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """
         while self.run_event.is_set():
             try:
-                self.spin(timeout=timeout)
+                # will not return message
+                _ = self.spin(timeout=timeout)
             except ClientExit:
                 self.logger.iinfo("ClientExit received, stopping spin_forever")
                 break
