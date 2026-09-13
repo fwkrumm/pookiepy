@@ -188,10 +188,10 @@ class TestDisconnect(unittest.TestCase):
 class TestHooks(unittest.TestCase):
     """Tests for BaseClient hook methods (on_receive, on_shutdown)."""
 
-    def test_on_receive_default_returns_none(self):
-        """Default on_receive is a warning-only hook and returns None."""
+    def test_on_receive_default_returns_True(self):
+        """Default on_receive returns True."""
         client = _client()
-        self.assertIsNone(client.on_receive(message_pb2.PookieMessage()))
+        self.assertTrue(client.on_receive(message_pb2.PookieMessage()))
 
     def test_on_receive_override_called_by_spin(self):
         """spin() calls the overridden on_receive with the dequeued PookieMessage."""
@@ -207,14 +207,15 @@ class TestHooks(unittest.TestCase):
         client.channel = MagicMock()
 
         msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
-        client.receive_queue.put(msg)
+        client.stream = [msg]
+        client._receive_loop()  # pylint: disable=protected-access
         client.spin()
 
         self.assertEqual(len(received), 1)
         self.assertIs(received[0], msg)
 
-    def test_spin_returns_on_receive_value(self):
-        """spin() returns the exact value produced by on_receive()."""
+    def test_spin_returns_received_message(self):
+        """spin() returns message enqueued by receive loop after on_receive()."""
         class _Client(BaseClient):
             def on_receive(self, data):
                 _ = data
@@ -225,9 +226,10 @@ class TestHooks(unittest.TestCase):
         client.channel = MagicMock()
 
         msg = message_pb2.PookieMessage(metaInfo=message_pb2.MetaInformation(messageName="foo"))
-        client.receive_queue.put(msg)
+        client.stream = [msg]
+        client._receive_loop()  # pylint: disable=protected-access
 
-        self.assertEqual(client.spin(), {"ok": True})
+        self.assertIs(client.spin(), msg)
 
     def test_spin_propagates_nonblocking_empty_queue(self):
         """spin() raises queue.Empty when called nonblocking on an empty queue."""
