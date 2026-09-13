@@ -46,7 +46,7 @@ jobs:
         run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
 
       - name: Generate protobuf interfaces
-        uses: ./.github/actions/generate-protobuf
+        uses: $/.github/actions/generate-protobuf
 
       - name: Run unit tests with coverage
         run: |
@@ -80,7 +80,7 @@ jobs:
         run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt
 
       - name: Generate protobuf interfaces
-        uses: ./.github/actions/generate-protobuf
+        uses: $/.github/actions/generate-protobuf
         with:
           include-custom: "true"
 
@@ -111,7 +111,7 @@ jobs:
         run: uv pip install --system -r requirements.txt -r requirements_dev.txt
 
       - name: Generate protobuf interfaces
-        uses: ./.github/actions/generate-protobuf
+        uses: $/.github/actions/generate-protobuf
         with:
           include-custom: "true"
 

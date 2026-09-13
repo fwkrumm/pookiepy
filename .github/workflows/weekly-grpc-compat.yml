@@ -49,7 +49,7 @@ jobs:
             -r requirements-weekly.txt coverage
 
       - name: Generate protobuf interfaces
-        uses: ./.github/actions/generate-protobuf
+        uses: $/.github/actions/generate-protobuf
 
       - name: Run unit tests with coverage
         run: |
@@ -85,7 +85,7 @@ jobs:
             -r requirements-weekly.txt
 
       - name: Generate protobuf interfaces
-        uses: ./.github/actions/generate-protobuf
+        uses: $/.github/actions/generate-protobuf
         with:
           include-custom: "true"
 
