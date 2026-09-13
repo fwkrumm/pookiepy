@@ -33,4 +33,4 @@ fi
 git config user.name "github-actions[bot]"
 git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git tag -a "$TAG" -m "Release $TAG"
-git push origin "$TAG"
+git -c "http.extraheader=AUTHORIZATION: bearer ${GH_TOKEN:?GH_TOKEN is required}" push origin "$TAG"
