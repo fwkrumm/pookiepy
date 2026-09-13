@@ -43,13 +43,21 @@ jobs:
         # Uses OIDC --- no PYPI_API_TOKEN secret required.
         # Configure the trusted publisher once at:
         # https://pypi.org/manage/project/<your-package>/settings/publishing/
-        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011 # v1.12.4
+        # Pin underlying published image digest; action commit SHA has no GHCR image.
+        # v1.14.2; immutable GHCR manifest digest.
+        uses: docker://ghcr.io/pypa/gh-action-pypi-publish@sha256:5c2f7030fbef8308068eb4cc9080fd3c9e157ccf6d511924d69f8f4b23dc95c1
         with:
           # repository-url: https://test.pypi.org/legacy/ # for testing
+          packages-dir: dist
+          verify-metadata: true
           skip-existing: true
+          print-hash: false
+          attestations: true
 
       - name: Create and push release tag
         if: success() && github.ref_name == 'master'
         # if publish was successful -> create git tag on current
         # commit and push it to the remote repository
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/tag_release.sh
