@@ -14,7 +14,6 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
 
 import grpc
 from google.protobuf.message import Message as PookieMessage

@@ -188,7 +188,7 @@ class TestDisconnect(unittest.TestCase):
 class TestHooks(unittest.TestCase):
     """Tests for BaseClient hook methods (on_receive, on_shutdown)."""
 
-    def test_on_receive_default_returns_True(self):
+    def test_on_receive_default_returns_true(self):
         """Default on_receive returns True."""
         client = _client()
         self.assertTrue(client.on_receive(message_pb2.PookieMessage()))
@@ -251,7 +251,7 @@ class TestHooks(unittest.TestCase):
         class _Client(BaseClient):
             def on_receive(self, data):
                 _ = data
-                raise StopSpin()
+                raise StopSpin("stop requested by test")
 
         with patch.object(BaseClient, "run", lambda self: None):
             client = _Client(name="stop-spin", port=50099, provides=["foo"])
