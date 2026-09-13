@@ -27,9 +27,7 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcValueError, \
                               ClientExit, \
                               StopSpin, \
-                              GrpcEmpty, \
-                              PookiepyOnDataYieldError, \
-                              PookiepyOnReceiveError
+                              GrpcEmpty
 
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
@@ -317,9 +315,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     self.logger.error("Exception in on_data_yield(): %s", exc)
                     self.send_queue.task_done()  # mark the message as done in the queue
                     # this will in outside try-except block yield break of the iterator
-                    raise PookiepyOnDataYieldError(
-                        f"{exc}"
-                    ) from exc
+                    raise exc
                 if on_data_yield_result is not False:
 
                     # so far the only line where the message id is logged
@@ -424,7 +420,9 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     self.logger.error("Exception in on_receive(): %s", exc)
                     # raising this will be caught by outside try-except block and put into the
                     # receive queue so that the main thread can raise it
-                    raise PookiepyOnReceiveError(f"{exc}") from exc
+                    # NOTE that e.g. raising StopSpin here is important to
+                    # make spin_forever() to stop.
+                    raise exc
                 if on_receive_result is False:
                     self.logger.idebug("on_receive() returned False, "\
                                        "not putting message into receive queue")

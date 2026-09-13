@@ -30,7 +30,6 @@ import time
 
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient
-from pookiepy.exceptions import PookiepyOnReceiveError
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
@@ -79,12 +78,11 @@ if __name__ == "__main__":
         # on_receive raised --- should not reach here
         sender.logger.error("ERROR: expected ValueError from spin(), got no exception")
         sys.exit(1)
-    except PookiepyOnReceiveError as exc:
+    except ValueError as exc:
         assert str(exc) == INTENTIONAL_ERROR, (
             f"Unexpected error message: '{exc}'"
         )
-        sender.logger.info("OK: spin() propagated PookiepyOnReceiveError (from ValueError) "\
-                           "as expected: '%s'", exc)
+        sender.logger.info("OK: spin() propagated ValueError as expected: '%s'", exc)
 
     # --- assert clean state before disconnect ---
     # receive_thread is the gRPC receive loop --- should not be alive (it runs independently)
