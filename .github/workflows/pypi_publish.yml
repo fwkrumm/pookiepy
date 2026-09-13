@@ -43,9 +43,8 @@ jobs:
         # Uses OIDC --- no PYPI_API_TOKEN secret required.
         # Configure the trusted publisher once at:
         # https://pypi.org/manage/project/<your-package>/settings/publishing/
-        # Pin underlying published image digest; action commit SHA has no GHCR image.
-        # v1.14.2; immutable GHCR manifest digest.
-        uses: docker://ghcr.io/pypa/gh-action-pypi-publish@sha256:5c2f7030fbef8308068eb4cc9080fd3c9e157ccf6d511924d69f8f4b23dc95c1
+        # Exact release tag pins v1.14.2; its published GHCR image is tag-based.
+        uses: pypa/gh-action-pypi-publish@v1.14.2 # zizmor: ignore[unpinned-uses] exact release tag intentionally used
         with:
           # repository-url: https://test.pypi.org/legacy/ # for testing
           packages-dir: dist
