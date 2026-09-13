@@ -45,8 +45,8 @@ if __name__ == "__main__":
     client1.send_data(data1)
     client2.send_data(data2)
     try:
-        client1.spin(timeout=TIMEOUT)
-        client2.spin(timeout=TIMEOUT)
+        _ = client1.get_data(timeout=TIMEOUT)
+        _ = client2.get_data(timeout=TIMEOUT)
     finally:
         client1.disconnect()
         client2.disconnect()
@@ -56,14 +56,14 @@ if __name__ == "__main__":
     with client1, client2:
         client1.send_data(data1)
         client2.send_data(data2)
-        client1.spin(timeout=TIMEOUT)
-        client2.spin(timeout=TIMEOUT)
+        _ = client1.get_data(timeout=TIMEOUT)
+        _ = client2.get_data(timeout=TIMEOUT)
 
     with client1, client2:
         client1.send_data(data1)
         client2.send_data(data2)
-        client1.spin(timeout=TIMEOUT)
-        client2.spin(timeout=TIMEOUT)
+        _ = client1.get_data(timeout=TIMEOUT)
+        _ = client2.get_data(timeout=TIMEOUT)
 
         # we are done, let server exit (patched via hook! this is no general feature)
         client1.send_data(generate_message(message_name="server-exit"))

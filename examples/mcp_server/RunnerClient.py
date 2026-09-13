@@ -46,12 +46,17 @@ class RunnerClient(BaseClient):
             provides=[RUN_RESPONSE],
         )
 
+    def run_forever(self):
+        """Loop get_data() until disconnect."""
+        while self.run_event.is_set():
+            _ = self.get_data()
+
     def on_init(self):
         self.logger.info(
             "RunnerClient ready --- cwd: %s  setup_timeout: %ds  run_timeout: %ds",
             BASE_DIR.resolve(), SETUP_TIMEOUT, RUN_TIMEOUT,
         )
-        threading.Thread(target=self.spin_forever, daemon=True).start()
+        threading.Thread(target=self.run_forever, daemon=True).start()
 
     # ── Runner detection ──────────────────────────────────────────────────────
 
@@ -186,6 +191,11 @@ class RunnerClient(BaseClient):
             return {"ok": False, "stdout": "", "timed_out": False,
                     "stderr": str(exc), "exit_code": None}
 
+    def run_forver(self):
+        """Loop get_data() until disconnect."""
+        while self.run_event.is_set():
+            _ = self.get_data()
+
     # ── Hook ──────────────────────────────────────────────────────────────────
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
@@ -211,7 +221,7 @@ class RunnerClient(BaseClient):
 if __name__ == "__main__":
     client = RunnerClient(49998)
     try:
-        client.spin_forever()
+        client.run_forver()
     except KeyboardInterrupt:
         pass
     finally:

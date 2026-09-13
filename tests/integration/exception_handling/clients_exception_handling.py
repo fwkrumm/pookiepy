@@ -72,9 +72,9 @@ if __name__ == "__main__":
 
     sender.send_data(generate_message("test_message", byte_payload=b"hello"))
 
-    # spin() must propagate the ValueError raised inside on_receive
+    # get_data must propagate the ValueError raised inside on_receive
     try:
-        receiver.spin(timeout=TIMEOUT)
+        _ = receiver.get_data(timeout=TIMEOUT)
         # on_receive raised --- should not reach here
         sender.logger.error("ERROR: expected ValueError from spin(), got no exception")
         sys.exit(1)

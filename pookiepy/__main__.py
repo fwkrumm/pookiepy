@@ -233,8 +233,6 @@ class MyClient(BaseClient):
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """
-        Called by spin() / spin_forever() for each message received from the server.
-
         Return value is currently unused by the framework but kept for consistency.
         """
         name = data.metaInfo.messageName
@@ -251,8 +249,15 @@ if __name__ == "__main__":
     # Pattern A: hook-based receive loop (recommended for long-running clients)
     client = MyClient(port=50051)
     client.send_data(generate_message("my_request", struct_payload={"key": "value"}))
-    client.spin_forever(timeout=5.0)  # calls on_receive() per message; exits on timeout
-    client.disconnect()
+
+    def run_forever():
+        """Loop get_data() until disconnect."""
+        while client.run_event.is_set():
+            _ = client.get_data()  # calls on_receive() per message
+    try:
+        run_forever()
+    finally:
+        client.disconnect()
 
     # Pattern B: manual polling
     # client = MyClient(port=50051)
@@ -406,8 +411,6 @@ class MyClient(BaseClient):
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """
-        Called by spin() / spin_forever() for each received message.
-
         Access your custom payload fields directly:
             value = data.payload.myCustomField
         """
@@ -419,8 +422,14 @@ class MyClient(BaseClient):
 if __name__ == "__main__":
     client = MyClient(port=50051)
     client.send_data(client.generate_message("my_request"))
-    client.spin_forever(timeout=5.0)
-    client.disconnect()
+    def run_forever():
+        """Loop get_data() until disconnect."""
+        while client.run_event.is_set():
+            _ = client.get_data()  # calls on_receive() per message
+    try:
+        run_forever()
+    finally:
+        client.disconnect()
 '''
 
 

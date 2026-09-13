@@ -55,8 +55,8 @@ if __name__ == "__main__":
     client1.send_data(msg1)
     client2.send_data(msg2)
     try:
-        client1.spin(timeout=TIMEOUT)
-        client2.spin(timeout=TIMEOUT)
+        _ = client1.get_data(timeout=TIMEOUT)
+        _ = client2.get_data(timeout=TIMEOUT)
     finally:
         client1.disconnect()
         client2.disconnect()
@@ -67,8 +67,8 @@ if __name__ == "__main__":
                                            byte_payload=b"from-client1"))
         client2.send_data(generate_message(message_name="compressed_message",
                                            byte_payload=b"from-client2"))
-        client1.spin(timeout=TIMEOUT)
-        client2.spin(timeout=TIMEOUT)
+        _ = client1.get_data(timeout=TIMEOUT)
+        _ = client2.get_data(timeout=TIMEOUT)
 
         client1.send_data(generate_message(message_name="server-exit"))
         client1.wait_done()

@@ -27,8 +27,7 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcResourceExhaustedError, \
                               GrpcValueError, \
                               ClientExit, \
-                              StopSpin, \
-                              GrpcEmpty
+                              GrpcEmpty, PookiepyOnDataYieldError, PookiepyOnReceiveError
 
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
@@ -310,8 +309,16 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 if not data.metaInfo.timestamp:
                     raise GrpcValueError("PookieMessage timestamp is not set "\
                                          "even after set_metadata()")
-
-                if self.on_data_yield(data) is not False:
+                try:
+                    on_data_yield_result = self.on_data_yield(data)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self.logger.error("Exception in on_data_yield(): %s", exc)
+                    self.send_queue.task_done()  # mark the message as done in the queue
+                    # this will in outside try-except block yield break of the iterator
+                    raise PookiepyOnDataYieldError(
+                        f"Exception in on_data_yield(): {exc}"
+                    ) from exc
+                if on_data_yield_result is not False:
 
                     # so far the only line where the message id is logged
                     self.logger.idebug("Sending message with timestamp %s and messageId %s",
@@ -396,7 +403,14 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     ))
                 # NOTE do not log entire message since this might affect performance negatively.
                 self.logger.idebug("received data from server: %s", response.metaInfo)
-                if self.on_receive(response) is False:
+                try:
+                    on_receive_result = self.on_receive(response)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self.logger.error("Exception in on_receive(): %s", exc)
+                    self.receive_queue.put(_StreamError(PookiepyOnReceiveError(
+                        f"Exception in on_receive(): {exc}")))
+                    return
+                if on_receive_result is False:
                     self.logger.idebug("on_receive() returned False, "\
                                        "not putting message into receive queue")
                     continue
@@ -592,72 +606,6 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         # run_event was cleared before a message arrived
         raise ClientExit("Run event cleared")
-
-
-
-    def spin(self, timeout: float = None) -> PookieMessage:
-        """
-        Process a single message from the receive queue.
-
-        Parameters
-        ----------
-        timeout : float, optional
-            Passed to get_data(). None = wait forever. 0 = non-blocking.
-
-        Returns
-        -------
-        PookieMessage
-            The received message.
-
-        Raises
-        ------
-        ClientExit
-            If the client disconnects while waiting for a message.
-        GrpcEmpty
-            If timeout expires before a message arrives.
-        queue.Empty
-            If timeout=0 and the queue is empty.
-        """
-        try:
-            return self.get_data(timeout=timeout)
-        except ClientExit:
-            self.logger.iinfo("ClientExit received in spin()")
-            raise
-        except GrpcEmpty:
-            self.logger.iinfo("No message received within timeout in spin()")
-            raise
-        except queue.Empty:
-            self.logger.iinfo("No message available for nonblocking spin() call")
-            raise
-
-    def spin_forever(self, timeout: float = None):
-        """
-        Continuously process messages from the receive queue until the client is disconnected.
-
-        Raise StopSpin from on_receive() to stop processing while keeping the client connected.
-        The return value of on_receive(), including False, is otherwise ignored.
-
-        NOTE that if you use spin_forever() the data are not returned to the caller. In that
-        case you should not return the actual data via on_receive.
-
-        Parameters
-        ----------
-        timeout : float, optional
-            Per-message timeout passed to spin(). None = wait forever per message.
-        """
-        while self.run_event.is_set():
-            try:
-                # will not return message
-                _ = self.spin(timeout=timeout)
-            except ClientExit:
-                self.logger.iinfo("ClientExit received, stopping spin_forever")
-                break
-            except (GrpcEmpty, queue.Empty):
-                self.logger.iinfo("No message received within timeout, stopping spin_forever")
-                break
-            except StopSpin:
-                self.logger.iinfo("StopSpin received, stopping spin_forever")
-                break
 
     def generate_message(self, *args) -> PookieMessage:
         """

@@ -128,13 +128,13 @@ if __name__ == "__main__":
 
     # send request; ClientB processes it and replies
     client_a.send_data(request)
-    client_b.spin(timeout=args.timeout)   # receives request → on_receive sends replies
+    _ = client_b.get_data(timeout=args.timeout)   # receives request → on_receive sends replies
     client_b.wait_done()                  # ensure replies are in gRPC pipeline
 
     # collect all replies on ClientA
     total_expected = N_EXTRA_RESPONSES + 1
     for _ in range(total_expected):
-        client_a.spin(timeout=args.timeout)
+        _ = client_a.get_data(timeout=args.timeout)
 
     # --- assertions ---
     assert client_b.requests_received == 1, (

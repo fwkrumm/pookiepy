@@ -34,7 +34,12 @@ class LMProxyClient(BaseClient):
         else:
             self.logger.warning("requests not installed --- HTTP calls will fail")
 
-        threading.Thread(target=self.spin_forever, daemon=True).start()
+        def run_forever():
+            """Loop get_data() until disconnect."""
+            while self.run_event.is_set():
+                _ = self.get_data()
+
+        threading.Thread(target=run_forever, daemon=True).start()
 
     def _send_chunk(self, request: message_pb2.PookieMessage, text: str,
                     done: bool = False):

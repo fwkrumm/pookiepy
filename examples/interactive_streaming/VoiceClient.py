@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 
 from pookiepy.baseclient import BaseClient
 from pookiepy.tools import struct_to_json
@@ -123,7 +124,9 @@ class VoiceClient(BaseClient):
 
     def listen_forever(self):
         """Process incoming response chunks until disconnected."""
-        self.spin_forever()
+        while self.run_event.is_set():
+            # one receive hook handles everything; nothing to do instead keeping main thread alive
+            time.sleep(1)
 
 
 if __name__ == "__main__":

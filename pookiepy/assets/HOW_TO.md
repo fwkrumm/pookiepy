@@ -137,7 +137,7 @@ class MyClient(BaseClient):
         pass
 
     def on_receive(self, data: message_pb2.PookieMessage) -> Any:
-        # called by spin()/spin_forever() per message
+        # call on data receive in background thread
         name = data.metaInfo.messageName
         payload = struct_to_json(data.payload.structPayload)  # dict
         return {"name": name, "payload": payload}

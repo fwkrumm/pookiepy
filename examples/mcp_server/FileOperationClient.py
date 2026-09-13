@@ -51,9 +51,18 @@ class FileOperationClient(BaseClient):
             "FileOperationClient ready.  ALL file operations are restricted to: %s",
             BASE_DIR.resolve(),
         )
+        def run_forever():
+            """Loop get_data() until disconnect."""
+            while self.run_event.is_set():
+                _ = self.get_data()
         # Drive on_receive() from a background thread so the client processes
-        # incoming messages without the caller needing to call spin_forever().
-        threading.Thread(target=self.spin_forever, daemon=True).start()
+        # incoming messages without the caller needing to call run_forever().
+        threading.Thread(target=run_forever, daemon=True).start()
+
+    def run_forever(self):
+        """Loop get_data() until disconnect."""
+        while self.run_event.is_set():
+            _ = self.get_data()
 
     # ── Path safety ───────────────────────────────────────────────────────────
 
@@ -193,7 +202,7 @@ class FileOperationClient(BaseClient):
 if __name__ == "__main__":
     client = FileOperationClient(49998)
     try:
-        client.spin_forever()
+        client.run_forver()
     except KeyboardInterrupt:
         pass
     finally:

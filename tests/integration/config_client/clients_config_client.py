@@ -85,7 +85,7 @@ if __name__ == "__main__":
     # worker's spin() must complete promptly after the server cancels the stream
     t0 = time.monotonic()
     try:
-        worker.spin(timeout=SPIN_TIMEOUT)
+        _ = worker.get_data(timeout=SPIN_TIMEOUT)
     except GrpcEmpty:
         pass  # expected --- no data arriving after disconnect
     except (GrpcConnectionError, ClientExit, GrpcTimeoutError, RuntimeError) as exc:
@@ -93,9 +93,9 @@ if __name__ == "__main__":
 
     elapsed = time.monotonic() - t0
     assert elapsed < MAX_WAIT, (
-        f"worker.spin() took {elapsed:.1f}s --- possible freeze (limit={MAX_WAIT}s)"
+        f"worker.get_data() took {elapsed:.1f}s --- possible freeze (limit={MAX_WAIT}s)"
     )
-    config.logger.info("OK: worker.spin() completed in %.2fs after server-side disconnect", elapsed)
+    config.logger.info("OK: worker.get_data() completed in %.2fs after server-side disconnect", elapsed)
 
     # disconnect the worker client locally
     t1 = time.monotonic()

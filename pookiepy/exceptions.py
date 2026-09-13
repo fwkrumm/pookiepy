@@ -21,11 +21,14 @@ class GrpcValueError(ValueError):
 class ClientExit(Exception):
     """custom SystemExit for server exit."""
 
-class StopSpin(Exception):
-    """Signal that BaseClient.spin_forever should stop processing messages."""
-
 class GrpcEmpty(queue.Empty):
     """custom Empty exception for gRPC client queues."""
 
 class GrpcCustomInterfaceError(GrpcValueError):
     """Raised when runtime custom proto schema is incompatible with helper utilities."""
+
+class PookiepyOnReceiveError(Exception):
+    """Raised when on_receive() callback raises an exception."""
+
+class PookiepyOnDataYieldError(Exception):
+    """Raised when on_data_yield() callback raises an exception."""

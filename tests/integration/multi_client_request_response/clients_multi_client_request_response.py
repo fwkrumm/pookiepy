@@ -89,12 +89,12 @@ if __name__ == "__main__":
 
         # Responder processes each shared-topic request and emits one correlated reply.
         for _ in requesters:
-            responder.spin(timeout=args.timeout)
+            _ = responder.get_data(timeout=args.timeout)
         responder.wait_done()
 
         # Each requester should receive only its own correlated response.
         for requester in requesters:
-            requester.spin(timeout=args.timeout)
+            _ = requester.get_data(timeout=args.timeout)
 
         assert len(responder.handled_request_ids) == 3, (
             "Responder expected 3 requests, got "

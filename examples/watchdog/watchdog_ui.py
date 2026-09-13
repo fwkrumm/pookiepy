@@ -104,6 +104,11 @@ class WatchdogPoller(BaseClient):
             requires=[WATCHDOG_STATS],
         )
 
+    def run_forever(self):
+        """Loop get_data() until disconnect."""
+        while self.run_event.is_set():
+            _ = self.get_data()
+
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Parse incoming stats snapshot and store for the API to serve."""
         raw = struct_to_json(data.payload.structPayload)
@@ -966,7 +971,7 @@ if __name__ == "__main__":
         print("         python examples/watchdog/server_watchdog.py")
         sys.exit(1)
 
-    spin_thread = threading.Thread(target=poller.spin_forever, daemon=True)
+    spin_thread = threading.Thread(target=poller.run_forever, daemon=True)
     spin_thread.start()
 
     poll_thread = threading.Thread(target=_poll_loop, args=(poller,), daemon=True)

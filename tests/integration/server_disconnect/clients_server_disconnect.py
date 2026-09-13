@@ -25,7 +25,7 @@ from pookiepy.exceptions import GrpcEmpty, GrpcConnectionError, ClientExit
 from tests.integration._interface import get_args
 
 # Must be longer than SHUTDOWN_AFTER (1.0 s) on the server
-SPIN_TIMEOUT = 3.0
+TIMEOUT = 3.0
 # Hard upper bound --- if the whole flow takes longer we consider it a freeze
 MAX_WAIT = 8.0
 
@@ -50,21 +50,21 @@ if __name__ == "__main__":
     t0 = time.monotonic()
 
     try:
-        # spin() will raise GrpcEmpty once the timeout elapses with no data.
+        # get_data() will raise GrpcEmpty once the timeout elapses with no data.
         # The server shuts down ~1 s after connect, so receive_loop terminates
         # shortly after that and no further messages will arrive.
-        client.spin(timeout=SPIN_TIMEOUT)
+        _ = client.get_data(timeout=TIMEOUT)
     except GrpcEmpty:
         pass  # expected --- server went away before timeout elapsed or at timeout
     except (GrpcConnectionError, ClientExit, RuntimeError) as exc:
         # Any stream-level error is acceptable --- the server went away
-        client.logger.info("spin() raised %s: %s", type(exc).__name__, exc)
+        client.logger.info("get_data() raised %s: %s", type(exc).__name__, exc)
 
     elapsed_spin = time.monotonic() - t0
     assert elapsed_spin < MAX_WAIT, (
-        f"spin() took {elapsed_spin:.1f}s --- possible freeze (limit={MAX_WAIT}s)"
+        f"get_data() took {elapsed_spin:.1f}s --- possible freeze (limit={MAX_WAIT}s)"
     )
-    client.logger.info("OK: spin() returned in %.2fs", elapsed_spin)
+    client.logger.info("OK: get_data() returned in %.2fs", elapsed_spin)
 
     # disconnect() must complete promptly
     t1 = time.monotonic()
