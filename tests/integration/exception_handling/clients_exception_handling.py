@@ -30,6 +30,7 @@ import time
 
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import PookiepyOnReceiveError
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
@@ -78,17 +79,22 @@ if __name__ == "__main__":
         # on_receive raised --- should not reach here
         sender.logger.error("ERROR: expected ValueError from spin(), got no exception")
         sys.exit(1)
-    except ValueError as exc:
+    except PookiepyOnReceiveError as exc:
         assert str(exc) == INTENTIONAL_ERROR, (
             f"Unexpected error message: '{exc}'"
         )
-        sender.logger.info("OK: spin() propagated ValueError as expected: '%s'", exc)
+        sender.logger.info("OK: spin() propagated PookiepyOnReceiveError (from ValueError) "\
+                           "as expected: '%s'", exc)
 
     # --- assert clean state before disconnect ---
-    # receive_thread is the gRPC receive loop --- still alive (it runs independently)
-    assert receiver.receive_thread.is_alive(), (
-        "receive_thread should still be alive before disconnect"
+    # receive_thread is the gRPC receive loop --- should not be alive (it runs independently)
+    # due to exception in receive loop
+    assert not receiver.receive_thread.is_alive(), (
+        "receive_thread should not be alive before disconnect"
     )
+
+    # run event however which is related to general client state should still be set
+    # since client is still be able to send data
     assert receiver.run_event.is_set(), "run_event should still be set before disconnect"
 
     # --- disconnect must complete without hanging ---

@@ -27,7 +27,9 @@ from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcValueError, \
                               ClientExit, \
                               StopSpin, \
-                              GrpcEmpty
+                              GrpcEmpty, \
+                              PookiepyOnDataYieldError, \
+                              PookiepyOnReceiveError
 
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
@@ -309,8 +311,16 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 if not data.metaInfo.timestamp:
                     raise GrpcValueError("PookieMessage timestamp is not set "\
                                          "even after set_metadata()")
-
-                if self.on_data_yield(data) is not False:
+                try:
+                    on_data_yield_result = self.on_data_yield(data)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self.logger.error("Exception in on_data_yield(): %s", exc)
+                    self.send_queue.task_done()  # mark the message as done in the queue
+                    # this will in outside try-except block yield break of the iterator
+                    raise PookiepyOnDataYieldError(
+                        f"{exc}"
+                    ) from exc
+                if on_data_yield_result is not False:
 
                     # so far the only line where the message id is logged
                     self.logger.idebug("Sending message with timestamp %s and messageId %s",
@@ -383,6 +393,10 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     def _receive_loop(self):
         """
         continuously receive messages from the server
+
+        NOTE that if this loop terminates, the event is not cleared i.e. the client
+        is still able to send data (but not receiving). The dev must decide itself if
+        the client should be disconnected or not.
         """
         self.logger.iinfo("Waiting for server welcome message")
         for response in self.stream:
@@ -390,10 +404,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             # does properly handle the checks if server responds.
             # the alternative (and potentially more elegant) solution would be to call
             # do the checks here and propagate the status back to main thread
-            try:
-                self.receive_queue.put(response)
-            finally:
-                break
+            self.receive_queue.put(response)
+            break
 
         self.logger.iinfo("Receive loop started")
         try:
@@ -406,7 +418,14 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     ))
                 # NOTE do not log entire message since this might affect performance negatively.
                 self.logger.idebug("received data from server: %s", response.metaInfo)
-                if self.on_receive(response) is False:
+                try:
+                    on_receive_result = self.on_receive(response)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self.logger.error("Exception in on_receive(): %s", exc)
+                    # raising this will be caught by outside try-except block and put into the
+                    # receive queue so that the main thread can raise it
+                    raise PookiepyOnReceiveError(f"{exc}") from exc
+                if on_receive_result is False:
                     self.logger.idebug("on_receive() returned False, "\
                                        "not putting message into receive queue")
                     continue

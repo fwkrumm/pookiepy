@@ -29,3 +29,9 @@ class GrpcEmpty(queue.Empty):
 
 class GrpcCustomInterfaceError(GrpcValueError):
     """Raised when runtime custom proto schema is incompatible with helper utilities."""
+
+class PookiepyOnReceiveError(Exception):
+    """Raised when on_receive() callback raises an exception."""
+
+class PookiepyOnDataYieldError(Exception):
+    """Raised when on_data_yield() callback raises an exception."""
