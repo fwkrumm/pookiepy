@@ -22,7 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          persist-credentials: false
+          persist-credentials: true # zizmor: ignore[artipacked] required for release tag push
 
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -57,6 +57,4 @@ jobs:
         if: success() && github.ref_name == 'master'
         # if publish was successful -> create git tag on current
         # commit and push it to the remote repository
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/tag_release.sh
