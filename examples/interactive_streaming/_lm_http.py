@@ -17,7 +17,7 @@ from pookiepy.logger import get_logger
 
 SYSTEM_PROMPT = os.environ.get(
     "LMSTUDIO_SYSTEM_PROMPT",
-    "Use only printable UTF-8 characters. Reply in plain text without special symbols or emojis.",
+    "Antworte auf Deutsch. Verwende nur druckbare UTF-8-Zeichen und Klartext ohne Emojis.",
 )
 
 # Set by LMProxyClient.__init__() to a persistent requests.Session.
@@ -121,9 +121,9 @@ def _fetch_sync(prompt: str, base_url: str, model: str) -> str:
 def _offline_stream(_prompt: str):
     """Multi-chunk offline fallback when LM Studio is unreachable."""
     chunks = [
-        "LM Studio is not available. This is a static offline response.",
-        " It simulates streaming by sending multiple chunks.",
-        " Use it to test client rendering and chunk reassembly.",
+        "LM Studio ist nicht erreichbar. Dies ist eine statische Offline-Antwort.",
+        " Sie simuliert Streaming mit mehreren Textabschnitten.",
+        " Damit lassen sich Ausgabe und Zusammensetzen der Abschnitte testen.",
     ]
     for chunk in chunks:
         yield _sanitize_text(chunk)

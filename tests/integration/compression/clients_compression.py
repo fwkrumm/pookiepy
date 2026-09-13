@@ -32,7 +32,7 @@ class CompressionClient(BaseClient):
         )
         self.logger.info("initialized CompressionClient with Gzip compression")
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
         if self.name == "client1":
             assert data.payload.bytePayload == b"from-client2", (
                 f"client1 expected b'from-client2', got {data.payload.bytePayload!r}"

@@ -19,7 +19,7 @@ class TextClient(BaseClient):
                          requires=["lm_response_stream"])
         self.logger.setLevel("WARNING")
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         try:
             payload = (
                 struct_to_json(data.payload.structPayload)
@@ -51,7 +51,7 @@ class TextClient(BaseClient):
                     break
 
                 msg_id = str(uuid.uuid4())
-                msg = message_pb2.Message(
+                msg = message_pb2.PookieMessage(
                     metaInfo=message_pb2.MetaInformation(
                         messageId=msg_id,
                         messageName="lm_request",

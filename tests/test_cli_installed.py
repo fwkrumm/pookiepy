@@ -21,7 +21,7 @@ Test coverage
 - ``--generate-interface``  produces message.proto and prints
   "Next steps" instructions.
 - ``--generate-interface-with-skeletons`` produces message.proto + skeletons using
-  compile_and_register.
+    explicit ProtoInterface injection.
 - Re-running a generate flag does NOT overwrite an existing file ([skip] path).
 
 Notes
@@ -417,7 +417,7 @@ class TestInstalledCLI(unittest.TestCase):
         """
         --generate-interface-with-skeletons creates message.proto, server_skeleton.py,
         and client_skeleton.py.  The Python files must be syntactically valid and
-        must reference compile_and_register so we know they use the custom interface
+        must reference ProtoInterface so we know they use the custom interface
         path rather than the plain skeleton path.
         """
         result = self._run("--generate-interface-with-skeletons")
@@ -434,13 +434,54 @@ class TestInstalledCLI(unittest.TestCase):
         self._assert_valid_python(server, label="server_skeleton.py")
         self._assert_valid_python(client, label="client_skeleton.py")
 
-        # Both skeletons must use the custom-interface bootstrap, not the plain import.
+        # Both skeletons must inject precompiled modules without runtime compilation.
         server_src = server.read_text(encoding="utf-8")
         client_src = client.read_text(encoding="utf-8")
-        self.assertIn("compile_and_register", server_src,
-                      "server_skeleton.py does not call compile_and_register")
-        self.assertIn("compile_and_register", client_src,
-                      "client_skeleton.py does not call compile_and_register")
+        self.assertIn("ProtoInterface", server_src)
+        self.assertIn("proto_interface: ProtoInterface = PROTO_INTERFACE", server_src)
+        self.assertIn("proto_interface=proto_interface", server_src)
+        self.assertIn("ProtoInterface", client_src)
+        self.assertIn("proto_interface: ProtoInterface = PROTO_INTERFACE", client_src)
+        self.assertIn("proto_interface=proto_interface", client_src)
+        self.assertNotIn("compile_and_register", server_src)
+        self.assertNotIn("compile_and_register", client_src)
+
+        compile_result = subprocess.run(
+            [
+                str(self._python),
+                "-m",
+                "grpc_tools.protoc",
+                "-I.",
+                "--python_out=.",
+                "--grpc_python_out=.",
+                "--pyi_out=.",
+                "message.proto",
+            ],
+            cwd=str(self._work_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(compile_result.returncode, 0, msg=compile_result.stderr)
+
+        import_result = subprocess.run(
+            [
+                str(self._python),
+                "-c",
+                (
+                    "import inspect, server_skeleton, client_skeleton; "
+                    "assert inspect.signature(server_skeleton.MyServer).parameters"
+                    "['proto_interface'].default is server_skeleton.PROTO_INTERFACE; "
+                    "assert inspect.signature(client_skeleton.MyClient).parameters"
+                    "['proto_interface'].default is client_skeleton.PROTO_INTERFACE"
+                ),
+            ],
+            cwd=str(self._work_dir),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(import_result.returncode, 0, msg=import_result.stderr)
 
         # Instructions must also be printed.
         self.assertIn("Next steps", result.stdout)

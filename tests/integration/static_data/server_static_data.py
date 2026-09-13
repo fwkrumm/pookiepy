@@ -19,15 +19,15 @@ class StaticDataServer(IntegrationServer):
     gRPC server implementation
     """
 
-    def _add_static_data(self, message_name: str, data: message_pb2.Message):
+    def _add_static_data(self, message_name: str, data: message_pb2.PookieMessage):
         if not isinstance(message_name, str):
             raise GrpcValueError(f"{self}: message_name must be a string")
-        if not isinstance(data, message_pb2.Message):
-            raise GrpcValueError(f"{self}: data must be of type message_pb2.Message")
+        if not isinstance(data, message_pb2.PookieMessage):
+            raise GrpcValueError(f"{self}: data must be of type message_pb2.PookieMessage")
         with self._static_data_lock:
             self._static_data[message_name] = data
 
-    def _get_static_data(self, message_name: str) -> message_pb2.Message | None:
+    def _get_static_data(self, message_name: str) -> message_pb2.PookieMessage | None:
         with self._static_data_lock:
             return self._static_data.get(message_name, None)
 
@@ -45,7 +45,7 @@ class StaticDataServer(IntegrationServer):
 
     def on_receive(self,
                    peer: Peer,
-                   request: message_pb2.Message
+                   request: message_pb2.PookieMessage
                    ) -> bool:
         """
         Override to handle incoming messages. By default, all messages are added to the
@@ -55,7 +55,7 @@ class StaticDataServer(IntegrationServer):
         ----------
         peer : Peer
             The peer that sent the message
-        request : message_pb2.Message
+        request : message_pb2.PookieMessage
             The message sent by the client
 
         Returns

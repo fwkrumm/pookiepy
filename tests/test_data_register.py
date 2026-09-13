@@ -19,9 +19,9 @@ from pookiepy.data_register import DataRegister, DeliveryResult
 from pookiepy.exceptions import GrpcValueError
 
 
-def _msg(name: str = "topic") -> message_pb2.Message:
-    """Helper: create a minimal Message with messageName set."""
-    return message_pb2.Message(
+def _msg(name: str = "topic") -> message_pb2.PookieMessage:
+    """Helper: create a minimal PookieMessage with messageName set."""
+    return message_pb2.PookieMessage(
         metaInfo=message_pb2.MetaInformation(messageName=name)
     )
 
@@ -93,7 +93,7 @@ class TestAddDataFanOut(unittest.TestCase):
         self.assertEqual(result.dropped, ())
 
     def test_wrong_data_type_raises_grpc_value_error(self):
-        """Passing a non-Message value raises GrpcValueError."""
+        """Passing a non-PookieMessage value raises GrpcValueError."""
         self.dr.add_notification_queue_for_message_name("c1", "topic", queue.Queue())
         with self.assertRaises(GrpcValueError):
             self.dr.add_data_for_message_name("other", "topic", "not-a-message")
@@ -146,7 +146,7 @@ class TestAddDataFanOut(unittest.TestCase):
         self.assertEqual(result.delivered, ())
 
     def test_returned_message_is_exact_object_put(self):
-        """The exact Message object put by the sender arrives in the
+        """The exact PookieMessage object put by the sender arrives in the
         subscriber's queue (no copy)."""
         q = queue.Queue()
         self.dr.add_notification_queue_for_message_name("c1", "topic", q)

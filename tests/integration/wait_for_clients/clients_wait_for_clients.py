@@ -74,7 +74,7 @@ if __name__ == "__main__":
     coordinator.logger.info("INFO: check_ready sent --- server is now waiting for workers")
 
     # track result from background receiver thread
-    received_signal: list[message_pb2.Message] = []
+    received_signal: list[message_pb2.PookieMessage] = []
     receive_error: list[Exception] = []
 
     def _receive():
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
     # graceful shutdown
     coordinator.send_data(
-        message_pb2.Message(
+        message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="server-exit")
         )
     )

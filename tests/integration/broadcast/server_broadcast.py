@@ -29,7 +29,7 @@ class BroadcastServer(IntegrationServer):
         self._connected_lock = threading.Lock()
         super().__init__(port)
 
-    def on_client_connect(self, data: message_pb2.Message, context) -> bool:
+    def on_client_connect(self, data: message_pb2.PookieMessage, context) -> bool:
         """Start broadcasting only after all expected clients are connected."""
         self.logger.debug("Client '%s' connecting", data.metaInfo.clientInfo.name)
         with self._connected_lock:

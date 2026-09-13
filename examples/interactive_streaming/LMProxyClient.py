@@ -36,9 +36,9 @@ class LMProxyClient(BaseClient):
 
         threading.Thread(target=self.spin_forever, daemon=True).start()
 
-    def _send_chunk(self, request: message_pb2.Message, text: str,
+    def _send_chunk(self, request: message_pb2.PookieMessage, text: str,
                     done: bool = False):
-        msg = message_pb2.Message(
+        msg = message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="lm_response_stream"),
             payload=message_pb2.Payload(
                 structPayload=json_to_struct({"chunk": text, "done": done})
@@ -47,7 +47,7 @@ class LMProxyClient(BaseClient):
         msg.metaInfo.responseToId = request.metaInfo.messageId
         self.send_data(msg)
 
-    def _handle_request(self, request: message_pb2.Message):
+    def _handle_request(self, request: message_pb2.PookieMessage):
         """Forward an lm_request to LM Studio and stream back the response."""
         try:
             prompt = struct_to_json(request.payload.structPayload).get("text", "")
@@ -86,7 +86,7 @@ class LMProxyClient(BaseClient):
 
         self._send_chunk(request, "", done=True)
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         threading.Thread(target=self._handle_request, args=(data,), daemon=True).start()
         return True
 

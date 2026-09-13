@@ -19,7 +19,7 @@ PASSWORD_METADATA_KEY = "x-password"
 class PasswordServer(IntegrationServer):
     """Rejects clients that omit or present the wrong ``x-password`` metadata key."""
 
-    def on_client_connect(self, data: message_pb2.Message, context) -> bool:
+    def on_client_connect(self, data: message_pb2.PookieMessage, context) -> bool:
         """Check the ``x-password`` gRPC call metadata before accepting the client.
 
         Args:

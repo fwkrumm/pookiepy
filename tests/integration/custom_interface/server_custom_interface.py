@@ -1,20 +1,19 @@
-"""Custom-interface integration test --- server using a runtime-compiled proto."""
-import sys
-from pathlib import Path
+"""Custom-interface integration test using precompiled protobuf modules."""
+import importlib
 
-sys.path.insert(0, str(Path(__file__).parent))  # enable: import _proto_setup
-# pylint: disable=wrong-import-position
-import _proto_setup  # side-effect: compiles + registers custom proto
+from pookiepy.custom_interface import ProtoInterface
 from tests.integration._server_base import IntegrationServer
 from tests.integration._interface import get_args
-# pylint: enable=wrong-import-position
 
-_proto_setup.ensure_loaded()
+
+message_pb2 = importlib.import_module("custom_if.message_pb2")
+message_pb2_grpc = importlib.import_module("custom_if.message_pb2_grpc")
+PROTO_INTERFACE = ProtoInterface(message_pb2, message_pb2_grpc)
 
 
 class GrpcServerCustom(IntegrationServer):
     def __init__(self, port: int):
-        super().__init__(port)
+        super().__init__(port, proto_interface=PROTO_INTERFACE)
         self.logger.info("initialized GrpcServerCustom")
 
     def on_receive(self, peer, request):

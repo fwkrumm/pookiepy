@@ -25,7 +25,7 @@ class ServerDisconnectServer(IntegrationServer):
         super().__init__(port)
         self._shutdown_scheduled = False
 
-    def on_client_connect(self, data: message_pb2.Message, context) -> bool:
+    def on_client_connect(self, data: message_pb2.PookieMessage, context) -> bool:
         """Schedule server shutdown on first client connection."""
         if not self._shutdown_scheduled:
             self._shutdown_scheduled = True

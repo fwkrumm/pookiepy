@@ -53,10 +53,10 @@ class ClientA(BaseClient):
             provides=[REQUEST_MSG, "server-exit"],
             requires=[RESPONSE_MSG],
         )
-        self.received: list[message_pb2.Message] = []
+        self.received: list[message_pb2.PookieMessage] = []
         self.request_id: str | None = None
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
         """Classify incoming responses: log non-matching ones, retain all.
 
         Args:
@@ -93,7 +93,7 @@ class ClientB(BaseClient):
         )
         self.requests_received: int = 0
 
-    def on_receive(self, data: message_pb2.Message):
+    def on_receive(self, data: message_pb2.PookieMessage):
         """On each request send N_EXTRA_RESPONSES unrelated replies then one matched reply.
 
         Args:
