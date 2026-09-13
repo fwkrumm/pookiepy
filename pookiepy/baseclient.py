@@ -674,7 +674,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """Client configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, data: PookieMessage) -> bool:
+    def on_data_yield(self, data: PookieMessage) -> bool: # pylint: disable=unused-argument
         """
         Hook called right before a message is yielded from the client request generator.
 
@@ -698,7 +698,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: PookieMessage) -> bool:
+    def on_receive(self, data: PookieMessage) -> bool: # pylint: disable=unused-argument
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
@@ -719,8 +719,6 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         bool
             Return False to prevent the message from being put into the receive queue.
         """
-        self.logger.warning("Received data but on_receive() is not implemented. Data metaInfo: %s",
-                            data.metaInfo)
         return True # default behavior is to put the message into the receive queue
 
     def on_shutdown(self):
