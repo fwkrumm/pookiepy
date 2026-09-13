@@ -148,6 +148,9 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     def _setup_connection(self):
         """Create channel, stub, and queues, then connect. Safe to call on reconnect."""
 
+        # call on init before connection is set up
+        self.on_init()
+
         if self.__config.ssl_credentials is None:
             self.channel = grpc.insecure_channel(f"{self.ip}:{self.port}",
                                                  options=self.__config.grpc_options)
@@ -170,9 +173,6 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         # start connection and receive thread
         self.run()
-
-        # call on_init hook
-        self.on_init()
 
     def run(self):
         """
@@ -384,6 +384,17 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """
         continuously receive messages from the server
         """
+        self.logger.iinfo("Waiting for server welcome message")
+        for response in self.stream:
+            # explicitly prevent calling on_receive() here so that _check_connection()
+            # does properly handle the checks if server responds.
+            # the alternative (and potentially more elegant) solution would be to call
+            # do the checks here and propagate the status back to main thread
+            try:
+                self.receive_queue.put(response)
+            finally:
+                break
+
         self.logger.iinfo("Receive loop started")
         try:
             for response in self.stream:

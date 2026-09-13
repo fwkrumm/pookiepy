@@ -4,6 +4,8 @@ from pookiepy.tools import generate_message
 from pookiepy import message_pb2
 from tests.integration._interface import get_args
 
+from pookiepy.logger import INTERNAL_DEBUG
+
 TIMEOUT = 2 # seconds
 
 class BasicClient(BaseClient):
@@ -17,6 +19,9 @@ class BasicClient(BaseClient):
                          provides=["test_message", "server-exit"],
                          requires=["test_message"])
         self.logger.info("initialized BasicClient")
+
+    def on_init(self):
+        self.logger.setLevel(INTERNAL_DEBUG)
 
     def on_receive(self, data: message_pb2.PookieMessage):
 
