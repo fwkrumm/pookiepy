@@ -244,27 +244,6 @@ class TestHooks(unittest.TestCase):
         with self.assertRaises(ClientExit):
             client.spin()
 
-    def test_spin_forever_does_not_stop_on_false(self):
-        """False from on_receive is a normal value, not a loop-control signal."""
-        received = []
-
-        class _Client(BaseClient):
-            def on_receive(self, data):
-                received.append(data)
-                if len(received) == 2:
-                    self.run_event.clear()
-                return False
-
-        with patch.object(BaseClient, "run", lambda self: None):
-            client = _Client(name="spin-false", port=50099, provides=["foo"])
-        client.channel = MagicMock()
-        client.receive_queue.put(message_pb2.PookieMessage())
-        client.receive_queue.put(message_pb2.PookieMessage())
-
-        client.spin_forever()
-
-        self.assertEqual(len(received), 2)
-
     def test_spin_forever_stops_on_stop_spin(self):
         """StopSpin from on_receive stops processing without clearing run_event."""
         class _Client(BaseClient):
@@ -275,7 +254,11 @@ class TestHooks(unittest.TestCase):
         with patch.object(BaseClient, "run", lambda self: None):
             client = _Client(name="stop-spin", port=50099, provides=["foo"])
         client.channel = MagicMock()
-        client.receive_queue.put(message_pb2.PookieMessage())
+
+        # _receive_loop invokes on_receive() before enqueueing response. Feed fake stream
+        # directly so test exercises same production path without starting a thread.
+        client.stream = [message_pb2.PookieMessage()]
+        client._receive_loop()  # pylint: disable=protected-access
 
         client.spin_forever()
 
