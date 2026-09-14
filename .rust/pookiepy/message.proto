@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+package message.proto.v3;
+
+// Communication service
+service Stream {
+    // bi-directional sending and receiving of communication messages
+    rpc DataChannel(stream Message) returns (stream Message);
+}
+
+message Message {
+    MetaInformation metaInfo = 1; // slim meta information which are used internally and for logging
+    repeated DataPoint history = 2;    // the client can extend this; not part of meta to not disturb logs
+    Payload payload = 3;
+}
+
+message MetaInformation {
+    google.protobuf.Timestamp timestamp = 1;
+    string messageId = 2; // unique message id (uuid4)
+    string responseToId = 3; // in case the message is an answer to a previous message, this field can be written to contain the original message id
+    ClientProvides clientInfo = 4; // only filled by clients
+    ServerProvides serverInfo = 5; // only filled by server
+    string messageName = 6; // name of the data
+}
+
+message DataPoint {
+    string name = 1; // the worker (client or server) which set the data
+    google.protobuf.Timestamp receiveTimestamp = 2; // timestamp data data receive/sent; required synced time
+    google.protobuf.Timestamp sendTimestamp = 3; // timestamp data data receive/sent; required synced time
+    double perfCounter = 4;  // time diff between receive and sent i.e. process time
+}
+
+message ClientProvides {
+    string uuid = 1;
+    string name = 2;
+    repeated string requires = 3;
+    repeated string provides = 4;
+}
+
+message ServerProvides {
+    string serverId = 1; // server id, equal for all sessions
+    string uuid = 2;  // server-generated session ID
+    string name = 3; // user-defined server id
+}
+
+
+//
+// The Message below can be exchanged by user-defined interfaces.
+// If you are working within the sources, note that some of the examples
+// require the interface to not be adjusted.
+//
+
+message Payload {
+    // struct payload (dict)
+    google.protobuf.Struct structPayload = 1;
+
+	// byte serialized payload
+    bytes bytePayload = 2;
+}
