@@ -83,36 +83,13 @@ def _wait_for_next_tick(duration: float, stop_event: threading.Event = None) -> 
     return stop_event.wait(timeout=duration)
 
 
-def _normalize_timer_options(
-    legacy_options: tuple,
-    enable_compensation: bool,
-    logger_level: int,
-    stop_event: threading.Event,
-) -> tuple[bool, int | None, threading.Event | None]:
-    """Map legacy positional options to explicit keyword options."""
-    if len(legacy_options) > 3:
-        raise TypeError(
-            "timer() accepts at most 3 legacy positional options: "
-            "enable_compensation, logger_level, stop_event"
-        )
-
-    if len(legacy_options) >= 1:
-        enable_compensation = legacy_options[0]
-    if len(legacy_options) >= 2:
-        logger_level = legacy_options[1]
-    if len(legacy_options) >= 3:
-        stop_event = legacy_options[2]
-
-    return enable_compensation, logger_level, stop_event
-
-
 def timer(
     n: int,
     s: float,
     event: Union[synchronize.Event, threading.Event],
-    *legacy_options,
     enable_compensation: bool = True,
     logger_level: int = None,
+    *,
     stop_event: threading.Event = None,
 ):
     """
@@ -140,13 +117,6 @@ def timer(
 
     Prints warning if event is still set from previous cycle (timer overrun).
     """
-    enable_compensation, logger_level, stop_event = _normalize_timer_options(
-        legacy_options=legacy_options,
-        enable_compensation=enable_compensation,
-        logger_level=logger_level,
-        stop_event=stop_event,
-    )
-
     # only required if compensation is enabled
     s_orig = None
     relevant_digit = None
