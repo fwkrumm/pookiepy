@@ -85,10 +85,14 @@ if __name__ == "__main__":
         sender.logger.info("OK: spin() propagated ValueError as expected: '%s'", exc)
 
     # --- assert clean state before disconnect ---
-    # receive_thread is the gRPC receive loop --- still alive (it runs independently)
-    assert receiver.receive_thread.is_alive(), (
-        "receive_thread should still be alive before disconnect"
+    # receive_thread is the gRPC receive loop --- should not be alive (it runs independently)
+    # due to exception in receive loop
+    assert not receiver.receive_thread.is_alive(), (
+        "receive_thread should not be alive before disconnect"
     )
+
+    # run event however which is related to general client state should still be set
+    # since client is still be able to send data
     assert receiver.run_event.is_set(), "run_event should still be set before disconnect"
 
     # --- disconnect must complete without hanging ---

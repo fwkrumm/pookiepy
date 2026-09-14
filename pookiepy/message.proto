@@ -30,8 +30,8 @@ message MetaInformation {
 
 message DataPoint {
     string name = 1;                                    // the worker (client or server) which set the data
-    google.protobuf.Timestamp receiveTimestamp = 2;     // timestamp data data receive/sent; required synced time
-    google.protobuf.Timestamp sendTimestamp = 3;        // timestamp data data receive/sent; required synced time
+    google.protobuf.Timestamp receiveTimestamp = 2;     // timestamp data data received; required synced time
+    google.protobuf.Timestamp sendTimestamp = 3;        // timestamp data data sent; required synced time
     reserved 4,5,6,7,8,9;
     double perfCounter = 10;                            // time diff between receive and sent i.e. process time
 }

@@ -14,7 +14,6 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
 
 import grpc
 from google.protobuf.message import Message as PookieMessage
@@ -149,6 +148,9 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     def _setup_connection(self):
         """Create channel, stub, and queues, then connect. Safe to call on reconnect."""
 
+        # call on init before connection is set up
+        self.on_init()
+
         if self.__config.ssl_credentials is None:
             self.channel = grpc.insecure_channel(f"{self.ip}:{self.port}",
                                                  options=self.__config.grpc_options)
@@ -171,9 +173,6 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         # start connection and receive thread
         self.run()
-
-        # call on_init hook
-        self.on_init()
 
     def run(self):
         """
@@ -310,18 +309,25 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 if not data.metaInfo.timestamp:
                     raise GrpcValueError("PookieMessage timestamp is not set "\
                                          "even after set_metadata()")
-
-                # so far the only line where the message id is logged
-                self.logger.idebug("Sending message with timestamp %s and messageId %s",
-                                  data.metaInfo.timestamp,
-                                  data.metaInfo.messageId)
-
                 try:
-                    self.on_data_yield(data)
+                    on_data_yield_result = self.on_data_yield(data)
                 except Exception as exc:  # pylint: disable=broad-exception-caught
-                    self.logger.error("Error in on_data_yield hook: %s", exc)
+                    self.logger.error("Exception in on_data_yield(): %s", exc)
+                    self.send_queue.task_done()  # mark the message as done in the queue
+                    # this will in outside try-except block yield break of the iterator
+                    raise exc
+                if on_data_yield_result is not False:
 
-                yield data
+                    # so far the only line where the message id is logged
+                    self.logger.idebug("Sending message with timestamp %s and messageId %s",
+                                        data.metaInfo.timestamp,
+                                        data.metaInfo.messageId)
+
+                    yield data
+
+                else:
+                    self.logger.idebug("on_data_yield() returned False, "
+                                       "not yielding message to server")
 
                 # mark the message as done in the queue after it was sent to the server via yield
                 self.send_queue.task_done()
@@ -383,7 +389,20 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
     def _receive_loop(self):
         """
         continuously receive messages from the server
+
+        NOTE that if this loop terminates, the event is not cleared i.e. the client
+        is still able to send data (but not receiving). The dev must decide itself if
+        the client should be disconnected or not.
         """
+        self.logger.iinfo("Waiting for server welcome message")
+        for response in self.stream:
+            # explicitly prevent calling on_receive() here so that _check_connection()
+            # does properly handle the checks if server responds.
+            # the alternative (and potentially more elegant) solution would be to call
+            # do the checks here and propagate the status back to main thread
+            self.receive_queue.put(response)
+            break
+
         self.logger.iinfo("Receive loop started")
         try:
             for response in self.stream:
@@ -395,6 +414,19 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     ))
                 # NOTE do not log entire message since this might affect performance negatively.
                 self.logger.idebug("received data from server: %s", response.metaInfo)
+                try:
+                    on_receive_result = self.on_receive(response)
+                except Exception as exc:  # pylint: disable=broad-exception-caught
+                    self.logger.error("Exception in on_receive(): %s", exc)
+                    # raising this will be caught by outside try-except block and put into the
+                    # receive queue so that the main thread can raise it
+                    # NOTE that e.g. raising StopSpin here is important to
+                    # make spin_forever() to stop.
+                    raise exc
+                if on_receive_result is False:
+                    self.logger.idebug("on_receive() returned False, "\
+                                       "not putting message into receive queue")
+                    continue
                 self.receive_queue.put(response)
         except grpc.RpcError as err:
             if err.code() == grpc.StatusCode.CANCELLED:
@@ -590,7 +622,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
 
 
-    def spin(self, timeout: float = None) -> Any:
+    def spin(self, timeout: float = None) -> PookieMessage:
         """
         Process a single message from the receive queue.
 
@@ -601,8 +633,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        Any
-            Whatever on_receive returns.
+        PookieMessage
+            The received message.
 
         Raises
         ------
@@ -614,8 +646,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             If timeout=0 and the queue is empty.
         """
         try:
-            data = self.get_data(timeout=timeout)
-            return self.on_receive(data)
+            return self.get_data(timeout=timeout)
         except ClientExit:
             self.logger.iinfo("ClientExit received in spin()")
             raise
@@ -643,7 +674,8 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """
         while self.run_event.is_set():
             try:
-                self.spin(timeout=timeout)
+                # will not return message
+                _ = self.spin(timeout=timeout)
             except ClientExit:
                 self.logger.iinfo("ClientExit received, stopping spin_forever")
                 break
@@ -670,7 +702,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """Client configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, data: PookieMessage):
+    def on_data_yield(self, data: PookieMessage) -> bool: # pylint: disable=unused-argument
         """
         Hook called right before a message is yielded from the client request generator.
 
@@ -681,7 +713,12 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         ----------
         data : google.protobuf.message.PookieMessage
             The message that is about to be yielded to the gRPC stream.
+        Returns
+        -------
+        bool
+            Return False to prevent the message from being yielded to the server.
         """
+        return True # default behavior is to yield the message to the server
 
     def on_init(self):
         """
@@ -689,13 +726,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: PookieMessage) -> Any:
+    def on_receive(self, data: PookieMessage) -> bool: # pylint: disable=unused-argument
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
 
-        Return values are passed through by spin() and ignored by spin_forever().
-        Raise StopSpin to stop spin_forever() without disconnecting.
+        If this function returns False, the message will not be put into the receive queue and
+        will be discarded.
 
         Parameters
         ----------
@@ -707,11 +744,10 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        Any
-            Optional value returned by spin().
+        bool
+            Return False to prevent the message from being put into the receive queue.
         """
-        self.logger.warning("Received data but on_receive() is not implemented. Data metaInfo: %s",
-                            data.metaInfo)
+        return True # default behavior is to put the message into the receive queue
 
     def on_shutdown(self):
         """
