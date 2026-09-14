@@ -83,10 +83,38 @@ def _wait_for_next_tick(duration: float, stop_event: threading.Event = None) -> 
     return stop_event.wait(timeout=duration)
 
 
+def _normalize_timer_options(
+    legacy_options: tuple,
+    enable_compensation: bool,
+    logger_level: int,
+    stop_event: threading.Event,
+) -> tuple[bool, int | None, threading.Event | None]:
+    """Map legacy positional options to explicit keyword options."""
+    if len(legacy_options) > 3:
+        raise TypeError(
+            "timer() accepts at most 3 legacy positional options: "
+            "enable_compensation, logger_level, stop_event"
+        )
 
-def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
-          enable_compensation: bool = True, logger_level: int = None,
-          stop_event: threading.Event = None):
+    if len(legacy_options) >= 1:
+        enable_compensation = legacy_options[0]
+    if len(legacy_options) >= 2:
+        logger_level = legacy_options[1]
+    if len(legacy_options) >= 3:
+        stop_event = legacy_options[2]
+
+    return enable_compensation, logger_level, stop_event
+
+
+def timer(
+    n: int,
+    s: float,
+    event: Union[synchronize.Event, threading.Event],
+    *legacy_options,
+    enable_compensation: bool = True,
+    logger_level: int = None,
+    stop_event: threading.Event = None,
+):
     """
     Timer function that sets an event periodically.
 
@@ -112,6 +140,12 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
 
     Prints warning if event is still set from previous cycle (timer overrun).
     """
+    enable_compensation, logger_level, stop_event = _normalize_timer_options(
+        legacy_options=legacy_options,
+        enable_compensation=enable_compensation,
+        logger_level=logger_level,
+        stop_event=stop_event,
+    )
 
     # only required if compensation is enabled
     s_orig = None
@@ -124,7 +158,6 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
         process_logger = None
 
     if enable_compensation:
-
         # store original period time
         s_orig = s
 
@@ -148,16 +181,16 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
 
         compensation_strength = round(1e-1 ** (relevant_digit + 1), relevant_digit + 1)
 
-    def _tick(s: float):
+    def _tick(period: float):
         """
         provides timing; ''inspired'' from stackoverflow
         https://stackoverflow.com/questions/8600161/executing-periodic-actions
         comment from watsonic
         """
-        t = time.time()
+        next_tick = time.time()
         while True:
-            t += s
-            yield max(t - time.time(), 0)
+            next_tick += period
+            yield max(next_tick - time.time(), 0)
 
     for i in _cycles(n):
         if stop_event is not None and stop_event.is_set():
@@ -189,8 +222,10 @@ def timer(n: int, s: float, event: Union[synchronize.Event, threading.Event],
                 relevant_number = "0"
 
             # round to sleep time for next iteration
-            s = round(s_orig + map_digit_to_compensation(relevant_number) * compensation_strength,
-                    relevant_digit + 1)
+            s = round(
+                s_orig + map_digit_to_compensation(relevant_number) * compensation_strength,
+                relevant_digit + 1,
+            )
             # process exits naturally here when _cycles(n) is exhausted
 
 class TimedEvent:  # pylint: disable=too-many-instance-attributes
@@ -248,16 +283,24 @@ class TimedEvent:  # pylint: disable=too-many-instance-attributes
             self.n,
             self.s,
             self._event,
-            self.compensation,
-            self.logger.level if self.logger else None,
-            self._stop_event if self._backend == "thread" else None,
         )
+        timer_kwargs = {
+            "enable_compensation": self.compensation,
+            "logger_level": self.logger.level if self.logger else None,
+            "stop_event": self._stop_event if self._backend == "thread" else None,
+        }
         if self._backend == "thread":
-            self._worker = threading.Thread(target=timer, args=timer_args, daemon=True)
+            self._worker = threading.Thread(
+                target=timer,
+                args=timer_args,
+                kwargs=timer_kwargs,
+                daemon=True,
+            )
         else:
             self._worker = _SPAWN_CONTEXT.Process(
                 target=timer,
                 args=timer_args,
+                kwargs=timer_kwargs,
                 daemon=True,
             )
         self._worker.start()
