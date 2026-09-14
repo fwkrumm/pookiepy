@@ -54,7 +54,7 @@ class StressReceiver(BaseClient):
             requires=[STRESS_MESSAGE],
         )
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Increment counter and set the done event once all messages arrive.
 
         Returns True so spin_forever does not stop between messages.

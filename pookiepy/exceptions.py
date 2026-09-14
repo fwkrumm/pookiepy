@@ -21,6 +21,9 @@ class GrpcValueError(ValueError):
 class ClientExit(Exception):
     """custom SystemExit for server exit."""
 
+class StopSpin(Exception):
+    """Signal that BaseClient.spin_forever should stop processing messages."""
+
 class GrpcEmpty(queue.Empty):
     """custom Empty exception for gRPC client queues."""
 

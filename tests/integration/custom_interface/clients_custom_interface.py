@@ -1,19 +1,16 @@
-"""Custom-interface integration test --- clients using a runtime-compiled proto."""
-import sys
-from pathlib import Path
+"""Custom-interface integration test using precompiled protobuf modules."""
+import importlib
 
-sys.path.insert(0, str(Path(__file__).parent))  # enable: import _proto_setup
-# pylint: disable=wrong-import-position
-import _proto_setup  # side-effect: compiles + registers custom proto
 from pookiepy.tools import generate_message
 from pookiepy.baseclient import BaseClient
+from pookiepy.custom_interface import ProtoInterface
 from tests.integration._interface import get_args
-# pylint: enable=wrong-import-position
-
-_proto_setup.ensure_loaded()
 
 
 TIMEOUT = 1.0 # seconds
+message_pb2 = importlib.import_module("custom_if.message_pb2")
+message_pb2_grpc = importlib.import_module("custom_if.message_pb2_grpc")
+PROTO_INTERFACE = ProtoInterface(message_pb2, message_pb2_grpc)
 
 
 
@@ -22,7 +19,8 @@ class GrpcTestClientCustom(BaseClient):
         super().__init__(port,
                          name=name,
                          provides=["test_message", "server-exit"],
-                         requires=["test_message"])
+                         requires=["test_message"],
+                         proto_interface=PROTO_INTERFACE)
         self.logger.info("initialized GrpcTestClientCustom")
 
 
@@ -32,12 +30,10 @@ if __name__ == "__main__":
     client1 = GrpcTestClientCustom("client1", args.port)
     client2 = GrpcTestClientCustom("client2", args.port)
 
-    message1 = generate_message(message_name="test_message")
-    message2 = generate_message(message_name="test_message")
+    message1 = generate_message(message_name="test_message", proto_interface=PROTO_INTERFACE)
+    message2 = generate_message(message_name="test_message", proto_interface=PROTO_INTERFACE)
 
-    # the generate message currently would only set the message name; for custom interfaces
-    # that function needs to be implemented by the dev. here we simpply set the values manually.
-    # NOTE that intellisense might not work properly (yet).
+    # Custom payload fields remain application-specific and are set directly.
     message1.payload.onlyAFloatPayload=1.1
     message2.payload.onlyAFloatPayload=2.2
 
@@ -60,7 +56,7 @@ if __name__ == "__main__":
 
     finally:
 
-        client1.send_data(generate_message("server-exit"))
+        client1.send_data(generate_message("server-exit", proto_interface=PROTO_INTERFACE))
         client1.wait_done()  # wait until data yielded
 
         client1.disconnect()

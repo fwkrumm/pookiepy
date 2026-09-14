@@ -35,7 +35,7 @@ class ConfigServer(IntegrationServer):
         self._contexts_lock = threading.Lock()
 
     def on_client_connect(
-        self, data: message_pb2.Message, context: grpc.ServicerContext
+        self, data: message_pb2.PookieMessage, context: grpc.ServicerContext
     ) -> bool:
         """Register the peer's gRPC context so it can be cancelled later."""
         name = data.metaInfo.clientInfo.name
@@ -44,7 +44,7 @@ class ConfigServer(IntegrationServer):
         self.logger.info("registered context for '%s'", name)
         return True
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         """Handle config messages; forward everything else."""
         if request.metaInfo.messageName == CONFIG_MESSAGE:
             payload = struct_to_json(request.payload.structPayload)

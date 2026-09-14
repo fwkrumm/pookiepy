@@ -13,7 +13,7 @@ pookiepy/logger.py                # GrpcLogger + rotating file logger
 pookiepy/tools.py                 # set_metadata, generate_message, evaluate_history
 pookiepy/timer.py                 # high-precision periodic timer (multiprocessing)
 pookiepy/schema_version.py        # schema-version metadata key for compat check
-pookiepy/custom_interface.py      # runtime .proto compile+load
+pookiepy/custom_interface.py      # validated precompiled protobuf module injection
 pookiepy/message.proto         # proto source (one service, one bidirectional RPC)
 pookiepy/message_pb2*.py       # generated --- DO NOT EDIT
 .rust/                        # Rust async BaseServer port (tonic/tokio)
@@ -24,7 +24,10 @@ pookiepy/message_pb2*.py       # generated --- DO NOT EDIT
 
 Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. --pyi_out=. pookiepy/message.proto`
 
-## Proto --- Message fields
+Regen custom integration fixture with runtime-compatible pins:
+`uv run --isolated --with grpcio-tools==1.81.0 --with protobuf==6.33.5 python -m grpc_tools.protoc -I tests/integration/custom_interface --python_out=tests/integration/custom_interface --grpc_python_out=tests/integration/custom_interface --pyi_out=tests/integration/custom_interface tests/integration/custom_interface/custom_if/message.proto`
+
+## Proto --- PookieMessage fields
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -38,7 +41,8 @@ Regen proto: `python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=.
 ## BaseServer --- [pookiepy/BaseServer.py](pookiepy/BaseServer.py)
 
 ```python
-BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None)
+BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None,
+           proto_interface=None)
 # config = ServerConfig(max_workers, max_queue_elements, shutdown_poll_interval, schema_version, server_options)
 ```
 
@@ -64,7 +68,7 @@ Rust sync rule: any behavior change, hook change, handshake change, routing chan
 
 ```python
 BaseClient(identifier, port, provides=None, requires=None, ip="localhost",
-           config=None)
+           config=None, proto_interface=None)
 # config = ClientConfig(receive_queue_maxsize, connection_check_timeout, schema_version, ssl_credentials, grpc_options)
 ```
 
@@ -81,8 +85,8 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `get_data(timeout)` | poll `receive_queue`; raises `GrpcEmpty`/`ClientExit` |
 | `wait_done(additional_sleep=0.5)` | block until `send_queue.join()` + grace sleep (yielded to gRPC, not ACKed) |
 | `disconnect()` | clear `run_event`, cancel stream, close channel, join thread |
-| `spin(timeout=None)` | `get_data()` → `on_receive()`; False on timeout/disconnect |
-| `spin_forever(timeout=None)` | loop `spin()` until False |
+| `spin(timeout=None)` | `get_data()` → `on_receive()`; raises on timeout/disconnect |
+| `spin_forever(timeout=None)` | loop `spin()`; stop on timeout/disconnect or `StopSpin` |
 
 **Hooks:** `on_init` (after each `_setup_connection()`), `on_receive(data)`, `on_shutdown`
 
@@ -110,12 +114,13 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `GrpcCustomInterfaceError` | helper expects bundled payload field names but active custom proto differs |
 | `ClientExit` | `run_event` cleared during `get_data()` |
 | `GrpcEmpty` | `get_data()` timeout |
+| `StopSpin` | explicit signal to stop `spin_forever()` without disconnect |
 
 ## pookiepy Utils
 
 **Logger** (`pookiepy/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console `coloredlogs` default `INFO`. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d at `INTERNAL_DEBUG`.
 
-**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `Message`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
+**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `PookieMessage`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
 **Timer** (`pookiepy/timer.py`): `TimedEvent` context manager (canonical) + `timedevent(s, n)` alias (compat) --- drift-compensated, RT priority.
 ```python
@@ -125,7 +130,7 @@ with TimedEvent(s=0.01, n=100) as te:
 
 **Schema version** (`pookiepy/schema_version.py`): metadata-key constant only. Actual schema/version string comes from `ClientConfig.schema_version` / `ServerConfig.schema_version`.
 
-**Custom interface** (`pookiepy/custom_interface.py`): `compile_proto(proto_path, out_dir)` + `load_module(...)` --- runtime proto compile/load without touching `pookiepy/`.
+**Custom interface** (`pookiepy/custom_interface.py`): compile protobuf modules externally, construct `ProtoInterface(message_pb2, message_pb2_grpc)`, then pass `proto_interface=` to each client/server. No runtime compilation or global module replacement.
 
 ## Design Patterns
 
@@ -144,3 +149,10 @@ grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psuti
 ## TODOs
 
 - `wait_done()` = yielded to gRPC, not server ACK.
+
+## Compatibility documentation workflow
+
+- When changing a breaking public API, signature, return value, exception, or user-visible behavior, create or update `docs/required_adjustments/<version>.md`.
+- Base adjustment notes on the branch diff against `master` and state exact migration actions for users upgrading from the previous version.
+- Keep adjustment notes concise. Distinguish required migrations from optional configuration changes.
+- Do not edit generated protobuf files directly; document schema compatibility changes separately when proto regeneration is required.

@@ -74,11 +74,11 @@ class FileOperationClient(BaseClient):
     # ── Response helper ───────────────────────────────────────────────────────
 
     def _make_response(self, ok: bool, operation: str, path: str,
-                       error: str = "") -> message_pb2.Message:
+                       error: str = "") -> message_pb2.PookieMessage:
         payload: dict = {"ok": ok, "operation": operation, "path": path}
         if error:
             payload["error"] = error
-        return message_pb2.Message(
+        return message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName=MCP_RESPONSE),
             payload=message_pb2.Payload(structPayload=json_to_struct(payload)),
         )
@@ -156,7 +156,7 @@ class FileOperationClient(BaseClient):
 
     # ── Hook ────────────────────────────────────────────────────────────────────────────
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Dispatch incoming file operation requests to the appropriate handler."""
         operation = data.metaInfo.messageName
         payload   = struct_to_json(data.payload.structPayload)

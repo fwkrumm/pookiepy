@@ -14,23 +14,23 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Union
+from typing import Any
 
 import grpc
+from google.protobuf.message import Message as PookieMessage
 
-from pookiepy import message_pb2
-from pookiepy import message_pb2_grpc
-
+from pookiepy import tools
+from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
 from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcTimeoutError, \
                               GrpcResourceExhaustedError, \
                               GrpcValueError, \
                               ClientExit, \
+                              StopSpin, \
                               GrpcEmpty
 
-from pookiepy.tools import set_metadata
-from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
 
 class _StreamError:  # pylint: disable=too-few-public-methods
@@ -57,7 +57,9 @@ class ClientConfig:
     # timeout in seconds to wait for server welcome message after connecting
     connection_check_timeout: float = 5.0
     # application-managed schema version string sent as gRPC metadata on connect
-    schema_version: str = ""
+    # will be set to a default value if at runtime no custom interface is provided and
+    # schema version is not explicitly set by the user
+    schema_version: str = None
     # gRPC channel options
     ssl_credentials: grpc.ChannelCredentials = None
     # extra/extend (key, value) metadata tuples appended to every gRPC stream call;
@@ -91,11 +93,25 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                  provides: list[str] = None,
                  requires: list[str] = None,
                  ip: str = "localhost",
-                 config: ClientConfig = None):
+                 config: ClientConfig = None,
+                 proto_interface: ProtoInterface = None):
 
         self.logger = get_logger(name=f"Client-{name}")
 
         self.__config = config or ClientConfig()
+
+        if proto_interface is None:
+            self._proto_interface = _bundled_interface()
+            if self.__config.schema_version is None:
+                self.__config.schema_version = DEFAULT_SCHEMA_VERSION
+        else:
+            self._proto_interface = proto_interface
+
+        if self.__config.schema_version is None:
+            self.__config.schema_version = ""
+
+        self._message_pb2 = self._proto_interface.message_pb2
+        self._message_pb2_grpc = self._proto_interface.message_pb2_grpc
         self.ip = ip
 
         # the following methods have to be overwritten by user in subclass
@@ -146,7 +162,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         # but this is necessary to ensure a clean state on reconnect.
         # The old ones will be garbage collected after disconnect and should
         # not cause any issues.
-        self.stub = message_pb2_grpc.StreamStub(self.channel)
+        self.stub = self._message_pb2_grpc.StreamStub(self.channel)
         self.send_queue = queue.Queue()
         self.receive_queue = queue.Queue(maxsize=self.__config.receive_queue_maxsize)
         self.server_session_id = ""
@@ -208,9 +224,9 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger.iinfo(
             "Connected to server at port %d sending connect message", self.port
         )
-        first_message = message_pb2.Message(
-            metaInfo=message_pb2.MetaInformation(
-                clientInfo=message_pb2.ClientProvides(
+        first_message = self._message_pb2.PookieMessage(
+            metaInfo=self._message_pb2.MetaInformation(
+                clientInfo=self._message_pb2.ClientProvides(
                     uuid=self.uuid,
                     name=self.name,
                     requires=self.requires,
@@ -275,12 +291,12 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Yields
         ------
-        message_pb2.Message
+        google.protobuf.message.PookieMessage
             message to send
         """
         while self.run_event.is_set():
             try:
-                data: message_pb2.Message = self.send_queue.get(timeout=1)
+                data: PookieMessage = self.send_queue.get(timeout=1)
                 self.logger.idebug("Sending message to server: %s", data.metaInfo)
                 if data.history:
                     # if there is a history extend it
@@ -289,10 +305,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                     )
                     data.history[-1].sendTimestamp = datetime.now(timezone.utc)
                 # if meta data have not been set, set them automatically
-                set_metadata(data)
+                tools.set_metadata(data)
 
                 if not data.metaInfo.timestamp:
-                    raise GrpcValueError("Message timestamp is not set even after set_metadata()")
+                    raise GrpcValueError("PookieMessage timestamp is not set "\
+                                         "even after set_metadata()")
 
                 # so far the only line where the message id is logged
                 self.logger.idebug("Sending message with timestamp %s and messageId %s",
@@ -334,6 +351,13 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         self.logger.iinfo("Disconnecting client %s", self)
 
+        if not self.send_queue.empty():
+            self.logger.warning(
+                "Disconnecting client %s with non-empty send queue (%d messages)",
+                self,
+                self.send_queue.qsize()
+            )
+
         if not self.run_event.is_set():
             # already disconnected or never connected, do nothing
             self.logger.iinfo("Client %s is already disconnected or never connected", self)
@@ -364,7 +388,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         try:
             for response in self.stream:
                 if response.history:
-                    response.history.append(message_pb2.DataPoint(
+                    response.history.append(self._message_pb2.DataPoint(
                         name=self.name,
                         receiveTimestamp=datetime.now(timezone.utc),
                         perfCounter=time.perf_counter()
@@ -399,33 +423,37 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         finally:
             self.logger.iinfo("Receive loop terminated")
 
-    def send_data(self, data: message_pb2.Message, add_history: bool = False):
+    def send_data(self, data: PookieMessage, add_history: bool = False):
         """
         put data to queue from where they will be sent to grpc server
 
         Parameters
         ----------
-        data : message_pb2.Message
+        data : google.protobuf.message.PookieMessage
             The message to be sent to the gRPC server.
+        add_history : bool, optional
+            If True, automatically append a DataPoint to the message's history
+            documenting the send and process times of the message. This however can only
+            be compared among different clients if the run on the same machine or
+            the machines are properly synchronized. Default is False.
 
         Raises
         ------
         GrpcValueError
-            If the data is not of type message_pb2.Message or if the message name
+            If data does not use the configured PookieMessage type or if the message name
             is not in the provides list.
-        GrpcValueError
-            _description_
         """
-        if not isinstance(data, message_pb2.Message):
+        if not isinstance(data, self._message_pb2.PookieMessage):
             raise GrpcValueError(
-                f"Data must be of type message_pb2.Message, but got {type(data)}"
+                f"Data must use the client's configured PookieMessage type, but got {type(data)}"
             )
 
         if data.metaInfo.messageName not in self.provides:
             # actually we could work without this check and just let the user send whatever
             # they want, but this case we could not track "which data might be provided later on"
             raise GrpcValueError(
-                f"Message name {data.metaInfo.messageName} not in provides list {self.provides}"
+                f"PookieMessage name {data.metaInfo.messageName} not in "\
+                f"provides list {self.provides}"
             )
 
         if add_history:
@@ -433,7 +461,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
                 raise GrpcValueError("Data already has history, this will automatically extend "\
                                      "the history throughtout the data flow, so add_history "\
                                      "should not be used in this case.")
-            data.history.append(message_pb2.DataPoint(
+            data.history.append(self._message_pb2.DataPoint(
                 name=self.name,
                 receiveTimestamp=datetime.now(timezone.utc),
                 perfCounter=time.perf_counter())
@@ -443,12 +471,16 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         self.logger.idebug("Enqueued data %s", data.metaInfo)
 
     def wait_done(self, additional_sleep: float = WAIT_DONE_ADDITIONAL_SLEEP_DEFAULT):
-        """Block until all queued messages were handed to the gRPC stream.
+        """Block until all queued messages were handed to the gRPC stream. NOTE text below!
 
-        Important: this confirms only local hand-off to gRPC (``yield`` from the
+        Important NOTE: this confirms only local hand-off to gRPC (``yield`` from the
         request generator), not that the server application has already processed
         the message. If callers disconnect immediately afterwards, the stream may
         still be cancelled while the message is in-flight.
+
+        If you need a reliable guarantee that the server has processed all messages, you must
+        implement an application-level acknowledgment mechanism via hooks, i.e. the receiving
+        clients send confirmation messages the sender client can react on.
 
         The optional ``additional_sleep`` adds a best-effort grace window after
         ``send_queue.join()`` to reduce this race, especially on loaded CI runners
@@ -494,7 +526,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             # also catch AttributeError and RuntimeError just to be safe
             pass
 
-    def get_data(self, timeout: float = None) -> message_pb2.Message:
+    def get_data(self, timeout: float = None) -> PookieMessage:
         """
         Get a response from the receive queue.
 
@@ -511,7 +543,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        message_pb2.Message
+        google.protobuf.message.PookieMessage
             The received message
 
         Raises
@@ -558,7 +590,7 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
 
 
-    def spin(self, timeout: float = None) -> Union[bool, any]:
+    def spin(self, timeout: float = None) -> Any:
         """
         Process a single message from the receive queue.
 
@@ -569,23 +601,37 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        Union[bool, any]
-            return value can be anything the user adds via on_receive hook
+        Any
+            Whatever on_receive returns.
+
+        Raises
+        ------
+        ClientExit
+            If the client disconnects while waiting for a message.
+        GrpcEmpty
+            If timeout expires before a message arrives.
+        queue.Empty
+            If timeout=0 and the queue is empty.
         """
         try:
             data = self.get_data(timeout=timeout)
             return self.on_receive(data)
         except ClientExit:
-            self.logger.iinfo("ClientExit received, stopping spin")
-            return False
+            self.logger.iinfo("ClientExit received in spin()")
+            raise
         except GrpcEmpty:
-            self.logger.iinfo("No message received within timeout, stopping spin")
-            return False
+            self.logger.iinfo("No message received within timeout in spin()")
+            raise
+        except queue.Empty:
+            self.logger.iinfo("No message available for nonblocking spin() call")
+            raise
 
     def spin_forever(self, timeout: float = None):
         """
         Continuously process messages from the receive queue until the client is disconnected.
-        spin() has to return explicitly false to stop the loop.
+
+        Raise StopSpin from on_receive() to stop processing while keeping the client connected.
+        The return value of on_receive(), including False, is otherwise ignored.
 
         NOTE that if you use spin_forever() the data are not returned to the caller. In that
         case you should not return the actual data via on_receive.
@@ -596,9 +642,25 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
             Per-message timeout passed to spin(). None = wait forever per message.
         """
         while self.run_event.is_set():
-            if self.spin(timeout=timeout) is False:
+            try:
+                self.spin(timeout=timeout)
+            except ClientExit:
+                self.logger.iinfo("ClientExit received, stopping spin_forever")
+                break
+            except (GrpcEmpty, queue.Empty):
+                self.logger.iinfo("No message received within timeout, stopping spin_forever")
+                break
+            except StopSpin:
+                self.logger.iinfo("StopSpin received, stopping spin_forever")
                 break
 
+    def generate_message(self, *args) -> PookieMessage:
+        """
+        Generate a new PookieMessage using the client's proto interface.
+
+        For doc string see ``pookiepy.tools.generate_message``.
+        """
+        return tools.generate_message(*args, proto_interface=self._proto_interface)
 #
 # Hooks
 #
@@ -608,12 +670,17 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         """Client configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, data: message_pb2.Message):
+    def on_data_yield(self, data: PookieMessage):
         """
         Hook called right before a message is yielded from the client request generator.
 
         This is a best-effort notification point that occurs when the message is
         handed off to the gRPC stream iterator, not when the server has processed it.
+
+        Parameters
+        ----------
+        data : google.protobuf.message.PookieMessage
+            The message that is about to be yielded to the gRPC stream.
         """
 
     def on_init(self):
@@ -622,17 +689,17 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         Override this in your subclass to implement custom behavior after the client is initialized.
         """
 
-    def on_receive(self, data: message_pb2.Message) -> bool:
+    def on_receive(self, data: PookieMessage) -> Any:
         """
         Hook method to handle received messages. Override this in your subclass to
         implement custom behavior.
 
-        NOTE that if you return False, and only then, spin_forever()
-            will stop processing further messages.
+        Return values are passed through by spin() and ignored by spin_forever().
+        Raise StopSpin to stop spin_forever() without disconnecting.
 
         Parameters
         ----------
-        data : message_pb2.Message
+        data : google.protobuf.message.PookieMessage
             The message received from the server. This is passed directly from the receive loop, so
             it is not removed from the receive queue yet. If you want to remove it from the queue,
             you can call get_data() in this function, but be aware that this will block until a new
@@ -640,12 +707,11 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
 
         Returns
         -------
-        bool
-            Whether the message was handled successfully.
+        Any
+            Optional value returned by spin().
         """
         self.logger.warning("Received data but on_receive() is not implemented. Data metaInfo: %s",
                             data.metaInfo)
-        return True
 
     def on_shutdown(self):
         """

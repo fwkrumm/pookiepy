@@ -16,6 +16,11 @@ class TestTimedEvent(unittest.TestCase):
         timer_ctx = TimedEvent(s=0.01, n=1, compensation=False)
         self.assertIsInstance(timer_ctx, TimedEvent)
 
+    def test_thread_backend_emits_all_ticks(self):
+        """Thread backend emits requested ticks without creating a process."""
+        with TimedEvent(s=0.01, n=3, compensation=False, backend="thread") as timer_ctx:
+            self.assertEqual(list(timer_ctx), [0, 1, 2])
+
 
 if __name__ == "__main__":
     unittest.main()

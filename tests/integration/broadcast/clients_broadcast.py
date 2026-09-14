@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
     # graceful shutdown
     clients[0].send_data(
-        message_pb2.Message(
+        message_pb2.PookieMessage(
             metaInfo=message_pb2.MetaInformation(messageName="server-exit")
         )
     )

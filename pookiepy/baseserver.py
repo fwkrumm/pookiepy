@@ -19,13 +19,13 @@ from datetime import datetime, timezone
 from typing import Iterator
 
 import grpc
-from pookiepy import message_pb2
-from pookiepy import message_pb2_grpc
+from google.protobuf.message import Message as PookieMessage
 
+from pookiepy import tools
+from pookiepy.custom_interface import ProtoInterface, _bundled_interface
 from pookiepy.logger import get_logger
 from pookiepy.data_register import DataRegister
-from pookiepy.tools import set_metadata
-from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY
+from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 
 @dataclass
 class ServerConfig():
@@ -37,10 +37,15 @@ class ServerConfig():
     # Each connected client occupies one thread for the full connection lifetime.
     # Set to at least the expected number of concurrent clients.
     max_workers: int | None = None
+    # queue size at which a warning is logged for a subscriber queue.
+    # None disables warnings. This is also used for unbounded queues where queue.Full never fires.
+    queue_warning_threshold: int | None = 100_000
     # interval in seconds for the serve_forever shutdown-detection watchdog
     shutdown_poll_interval: float = 0.1
     # application-managed schema version string expected from connecting clients
-    schema_version: str = ""
+    # will be set to a default value if at runtime no custom interface is provided and
+    # schema version is not explicitly set by the user
+    schema_version: str = None
     # gRPC compression algorithm applied to server-sent messages.
     # Must be enabled on BOTH server and client to compress both directions.
     # If only the server sets this, only server->client messages are compressed;
@@ -85,7 +90,7 @@ class Peer:
     def __str__(self):
         return self.__repr__()
 
-class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-instance-attributes
+class BaseServer:  # pylint: disable=too-many-instance-attributes
     """
     Base class for gRPC server implementations
 
@@ -100,19 +105,36 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                  ip: str = "[::]",
                  global_exit_event: threading.Event = None,
                  ssl_credentials: grpc.ServerCredentials = None,
-                 config: ServerConfig = None):
-
-        super().__init__()
+                 config: ServerConfig = None,
+                 proto_interface: ProtoInterface = None):
 
         self._name = name
         self.logger = get_logger(name=self._name)
 
-        # routes incoming messages to per-client notification queues
-        self._data_register = DataRegister(self.logger)
-        self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
-
         self.__ssl_credentials = ssl_credentials
         self.__config = config or ServerConfig()
+
+        if proto_interface is None:
+            self._proto_interface = _bundled_interface()
+            if self.__config.schema_version is None:
+                self.__config.schema_version = DEFAULT_SCHEMA_VERSION
+        else:
+            self._proto_interface = proto_interface
+
+        if self.__config.schema_version is None:
+            self.__config.schema_version = ""
+
+        self._message_pb2 = self._proto_interface.message_pb2
+        self._message_pb2_grpc = self._proto_interface.message_pb2_grpc
+
+        # routes incoming messages to per-client notification queues
+        self._data_register = DataRegister(
+            self.logger,
+            queue_warning_threshold=self.__config.queue_warning_threshold,
+            message_type=self._message_pb2.PookieMessage,
+        )
+        self._global_exit_event = global_exit_event or threading.Event()  # exit event for shutdown
+
         self._port = port
         self._ip = ip
         self._uid = str(uuid.uuid4())
@@ -122,7 +144,9 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
         self.on_init()
 
-        self.logger.iinfo("initialized %s", self._name)
+        self.logger.iinfo("initialized %s, using schema version %s",
+                          self._name,
+                          self.__config.schema_version)
 
 
     def __repr__(self):
@@ -138,9 +162,9 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
     def _handle_client_receive(  # pylint: disable=too-many-arguments,R0917
         self,
-        request_iterator: Iterator[message_pb2.Message],
+        request_iterator: Iterator[PookieMessage],
         context,
-        peer: "Peer",
+        peer: Peer,
         notification_queue: queue.Queue,
         exit_event: threading.Event,
     ) -> None:
@@ -151,7 +175,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
         Parameters
         ----------
-        request_iterator : Iterator[message_pb2.Message]
+        request_iterator : Iterator[google.protobuf.message.PookieMessage]
             Iterator over incoming messages from the client.
         context : _type_
             gRPC context for the current RPC.
@@ -164,11 +188,11 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         """
         try:
             for request in request_iterator:
-                request: message_pb2.Message
+                request: PookieMessage
 
                 if request.history:
                     request.history.append(
-                        message_pb2.DataPoint(
+                        self._message_pb2.DataPoint(
                             name="server",
                             receiveTimestamp=datetime.now(timezone.utc),
                             perfCounter=time.perf_counter(),
@@ -218,16 +242,16 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                     # registration there would be a race where a data message arrives first,
                     # causing _check_connection() on the client to consume the wrong message
                     # and subsequent get_data() calls to return the welcome (empty payload).
-                    welcome_message = message_pb2.Message(
-                        metaInfo=message_pb2.MetaInformation(
-                            serverInfo=message_pb2.ServerProvides(
+                    welcome_message = self._message_pb2.PookieMessage(
+                        metaInfo=self._message_pb2.MetaInformation(
+                            serverInfo=self._message_pb2.ServerProvides(
                                 serverId=self._uid,
                                 uuid=peer.session_id,
                                 name=self._name,
                             )
                         )
                     )
-                    set_metadata(welcome_message)
+                    tools.set_metadata(welcome_message)
                     notification_queue.put(welcome_message)
 
                     for require in requires:
@@ -261,14 +285,18 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             exit_event.set()
             self.logger.idebug("%s: exit event set", peer)
 
-    def DataChannel(self, request_iterator: Iterator[message_pb2.Message], context):
+    def DataChannel(  # pylint: disable=invalid-name
+        self,
+        request_iterator: Iterator[PookieMessage],
+        context,
+    ):
         """
         Handle bidirectional streaming. Client metadata is extracted first.
         """
 
         # get ip from context; client id received at first message receive
         # peer contains all important information peer context, client id, session id, etc
-        peer = Peer(peer=context.peer(), session_id=str(uuid.uuid4()))
+        connection_peer = Peer(peer=context.peer(), session_id=str(uuid.uuid4()))
 
         # queue for notifications to client
         notification_queue = queue.Queue(maxsize=self.__config.max_queue_elements)
@@ -280,14 +308,18 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             current_count = self.__connected_clients
 
         if current_count >= self.__config.effective_max_workers:
+            # this is an important warning; make it more prominent in the logs?
             self.logger.warning(
-                "Connected clients (%d) reached max_workers (%d). "
+                "!!! Connected clients (%d) reached max_workers (%d). "
                 "The next client will stall until a slot opens. "
                 "Set ServerConfig.max_workers explicitly to handle more concurrent clients.",
                 current_count, self.__config.effective_max_workers
             )
 
-        self.logger.idebug("%s: connected to DataChannel. Checking permissions", peer)
+        self.logger.idebug(
+            "%s: connected to DataChannel. Checking permissions",
+            connection_peer,
+        )
 
         try:
             # Verify application-managed schema compatibility before processing any messages.
@@ -296,11 +328,11 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             server_schema = self.__config.schema_version
 
             if not server_schema and not client_schema:
-                self.logger.warning("%s: cannot check schema because empty", peer)
+                self.logger.warning("%s: cannot check schema because empty", connection_peer)
             elif client_schema != server_schema:
                 self.logger.error(
                     "%s: schema mismatch - server=%s client=%s. Rejecting connection.",
-                    peer,
+                    connection_peer,
                     server_schema,
                     client_schema,
                 )
@@ -313,13 +345,13 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
             # Process messages
             t = threading.Thread(
                 target=self._handle_client_receive,
-                args=(request_iterator, context, peer, notification_queue, exit_event),
+                args=(request_iterator, context, connection_peer, notification_queue, exit_event),
                 daemon=True,
             )
             t.start()
             try:
                 while not (exit_event.is_set() or self._global_exit_event.is_set()):
-                    self.logger.idebug("%s: main thread running", peer)
+                    self.logger.idebug("%s: main thread running", connection_peer)
                     try:
                         data =  notification_queue.get(timeout=1)  # wait for data to send to client
                         if data.history:
@@ -329,18 +361,24 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
                             data.history[-1].sendTimestamp = datetime.now(timezone.utc)
 
                         try:
-                            self.on_data_yield(peer, data)
+                            self.on_data_yield(connection_peer, data)
                         except Exception as exc:  # pylint: disable=broad-exception-caught
-                            self.logger.error("%s: error in on_data_yield hook: %s", peer, exc)
+                            self.logger.error(
+                                "%s: error in on_data_yield hook: %s",
+                                connection_peer,
+                                exc,
+                            )
 
                         yield data
-                        self.logger.idebug("%s: sent notification", peer)
+                        self.logger.idebug("%s: sent notification", connection_peer)
                     except queue.Empty:
                         continue
             finally:
-                self._data_register.remove_notification_queues_for_client(peer.client_id)
-                self.on_client_disconnect(peer)
-                self.logger.iinfo("%s: disconnected", peer)
+                self._data_register.remove_notification_queues_for_client(
+                    connection_peer.client_id
+                )
+                self.on_client_disconnect(connection_peer)
+                self.logger.iinfo("%s: disconnected", connection_peer)
         finally:
             with self.__connected_clients_lock:
                 self.__connected_clients -= 1
@@ -357,27 +395,37 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         """
         Start the server and wait for termination
         """
-        executor = futures.ThreadPoolExecutor(max_workers=self.__config.max_workers)
+        executor = futures.ThreadPoolExecutor(
+            max_workers=self.__config.effective_max_workers
+        )
         self.logger.iinfo(
             "max_workers set to %d (effective). "
             "Each connected client occupies one thread for its full connection lifetime.",
             self.__config.effective_max_workers
         )
+        if self.__config.max_queue_elements == 0:
+            self.logger.iinfo(
+                "Per-client notification queues are unbounded. queue.Full will never fire; "
+                "set ServerConfig.max_queue_elements > 0 to enable backpressure."
+            )
         server = grpc.server(
             executor,
             options=self.__config.server_options,
             compression=self.__config.compression,
         )
-        message_pb2_grpc.add_StreamServicer_to_server(self, server)
+        self._message_pb2_grpc.add_StreamServicer_to_server(self, server)
         if self.__ssl_credentials is None:
-            server.add_insecure_port(f"{self._ip}:{self._port}")
+            bound_port = server.add_insecure_port(f"{self._ip}:{self._port}")
         else:
             self.logger.iinfo("Using SSL credentials for server")
-            server.add_secure_port(f"{self._ip}:{self._port}", self.__ssl_credentials)
+            bound_port = server.add_secure_port(
+                f"{self._ip}:{self._port}", self.__ssl_credentials
+            )
         server.start()
         self.logger.info(
-            "server %s started (schema=%s)",
+            "server %s started (bound_port=%d, schema=%s)",
             self,
+            bound_port,
             self.__config.schema_version,
         )
         try:
@@ -401,6 +449,17 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         self.logger.iinfo("server stopped")
 
 
+    def generate_message(self, *args) -> PookieMessage:
+        """
+        Generate a new PookieMessage using the server's proto interface.
+
+        NOTE that this will probably not be used by the server since usually
+        the clients provide the data and the server only forwards it to other clients.
+        However, this is provided for completeness.
+
+        For doc string see ``pookiepy.tools.generate_message``.
+        """
+        return tools.generate_message(*args, proto_interface=self._proto_interface)
 
 #
 # Hooks
@@ -416,7 +475,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         """Server configuration (read-only)."""
         return self.__config
 
-    def on_data_yield(self, peer: Peer, data: message_pb2.Message):
+    def on_data_yield(self, peer: Peer, data: PookieMessage):
         """
         Hook called right before a message is yielded to a client stream.
 
@@ -436,7 +495,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
     def on_receive(self,
                    peer: Peer,
-                   request: message_pb2.Message,
+                   request: PookieMessage,
                    ) -> bool:
         """
         Called when a message is received. Override to handle incoming messages.
@@ -445,7 +504,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         ----------
         peer : Peer
             The peer that sent the message
-        request : message_pb2.Message
+        request : google.protobuf.message.PookieMessage
             The message sent by the client
 
         Returns
@@ -456,7 +515,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         return True
 
     def on_client_connect(self,
-                          data: message_pb2.Message,
+                          data: PookieMessage,
                           context: grpc.ServicerContext
                           ) -> bool:
         """
@@ -467,7 +526,7 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
 
         Parameters
         ----------
-        data : message_pb2.Message
+        data : google.protobuf.message.PookieMessage
             The message sent by the client
         context : grpc.ServicerContext
             The RPC context (can be used to abort connection)
@@ -490,14 +549,14 @@ class BaseServer(message_pb2_grpc.StreamServicer):  # pylint: disable=too-many-i
         """
         # pylint: disable=unused-argument
 
-    def on_client_accepted(self, peer: Peer, request: message_pb2.Message):
+    def on_client_accepted(self, peer: Peer, request: PookieMessage):
         """Called after a client has been accepted and registered.
 
         Parameters
         ----------
         peer : Peer
             The accepted peer.
-        request : message_pb2.Message
+        request : google.protobuf.message.PookieMessage
             The first connect message containing ``clientInfo``.
         """
         # pylint: disable=unused-argument

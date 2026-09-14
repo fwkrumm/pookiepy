@@ -33,6 +33,7 @@
 - [ToDos and Roadmap](#todos-and-roadmap)
 - [Known Issues and Troubleshooting](#known-issues-and-troubleshooting)
 - [Contributing](#contributing)
+- [Compatibility Adjustments](#compatibility-adjustments)
 - [License](#license)
 - [Release History](#release-history)
 
@@ -147,6 +148,21 @@ python -m pookiepy --generate-interface-with-skeletons
 
 to generate the skeletons along with a copy of the `message.proto` interface file in the current directory to modify which is then used by the skeletons.
 
+### Custom protobuf interface
+
+Pookiepy accepts precompiled protobuf modules through one explicit interface object. Compile the schema outside pookiepy, import both generated modules, then inject the same object into each matching client and server:
+
+```python
+from my_proto import message_pb2, message_pb2_grpc
+from pookiepy.custom_interface import ProtoInterface
+
+proto_interface = ProtoInterface(message_pb2, message_pb2_grpc)
+server = MyServer(port=50051, proto_interface=proto_interface)
+client = MyClient(port=50051, proto_interface=proto_interface)
+```
+
+Pookiepy performs no runtime compilation or global module registration. Omitting `proto_interface` uses the bundled schema. Custom client and server schemas must be wire-compatible.
+
 ---
 
 <a name="parameters"></a>
@@ -173,7 +189,7 @@ options:
   --generate-how-to     Copy HOW_TO.md into the current directory
   --generate-interface  Copy message.proto into the current directory and print customisation instructions
   --generate-interface-with-skeletons
-                        Copy message.proto and write server_skeleton.py + client_skeleton.py that load the custom interface at startup via compile_and_register()
+                        Copy message.proto and write server_skeleton.py + client_skeleton.py that inject precompiled custom protobuf modules
 
 examples:
   python -m pookiepy --generate                          # skeleton + HOW_TO
@@ -252,7 +268,7 @@ class EchoServer(BaseServer):
     def __init__(self):
         super().__init__(port=50051, name="echo-server")
 
-    def on_receive(self, peer: Peer, request: pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: pb2.PookieMessage) -> bool:
         if request.metaInfo.messageName == "request":
             reply = generate_message("response", byte_payload=request.payload.bytePayload)
             self._data_register.add_data_for_message_name(
@@ -271,6 +287,7 @@ EchoServer().serve_forever()
 ```python
 from pookiepy.baseclient import BaseClient
 from pookiepy.tools import generate_message
+from pookiepy.exceptions import ClientExit, GrpcEmpty
 import pookiepy.message_pb2 as pb2
 
 
@@ -279,13 +296,16 @@ class EchoClient(BaseClient):
         super().__init__(port=50051, name="echo-client",
                          provides=["request"], requires=["response"])
 
-    def on_receive(self, data: pb2.Message):
+    def on_receive(self, data: pb2.PookieMessage):
         print(f"Server replied: {data.payload.bytePayload.decode()}")
 
 
 client = EchoClient()
 client.send_data(generate_message("request", byte_payload=b"hello, pookiepy!"))
-client.spin(timeout=5.0)   # calls on_receive() per message; returns on timeout/disconnect
+try:
+    client.spin(timeout=5.0)   # calls on_receive() per message
+except (ClientExit, GrpcEmpty):
+    pass   # timeout/disconnect
 client.disconnect()
 ```
 
@@ -424,6 +444,14 @@ TBD
 Contributions are welcome. Please open an issue first for major changes so the approach can be discussed. For bug fixes and small improvements, a pull request is sufficient.
 
 ---
+<a name="compatibility-adjustments"></a>
+<a id="compatibility-adjustments"></a>
+
+## Compatibility Adjustments
+
+Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.16 adjustment notes](docs/required_adjustments/0.0.16.md) when upgrading from 0.0.15.
+
+---
 <a name="license"></a>
 <a id="license"></a>
 
@@ -455,4 +483,6 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.13                     | Revert publish via token and add note concerning old project name. |
 | 0.0.14                     | Change schema version to manual setting because of incompatibilities between different languages. |
 | 0.0.15                     | Add exception for custom interface mismatch, add `__version__` to `__all__`. |
+| 0.0.16                     | Change client spin control flow and server delivery-result APIs; add queue-growth configuration. |
+| 0.0.17                     | Rename non-ambiguous message name. Simplify custom interface usage. Minor improvements to logs and comments. added voice client to interactive streaming example. added workflow for skeletons. added threading backend for timer. |
 

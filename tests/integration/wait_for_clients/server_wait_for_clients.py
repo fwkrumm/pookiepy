@@ -39,7 +39,7 @@ class WaitForClientsServer(IntegrationServer):
         self._ready_event = threading.Event()
 
     def on_client_connect(
-        self, data: message_pb2.Message, context
+        self, data: message_pb2.PookieMessage, context
     ) -> bool:
         """Increment worker counter when a provider of worker_data connects."""
         provides = list(data.metaInfo.clientInfo.provides)
@@ -57,7 +57,7 @@ class WaitForClientsServer(IntegrationServer):
                 self.logger.info("all required workers connected --- ready!")
         return True
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         """Handle check_ready by waiting for the ready event in a daemon thread."""
         if request.metaInfo.messageName == CHECK_READY_MSG:
             client_id = peer.client_id

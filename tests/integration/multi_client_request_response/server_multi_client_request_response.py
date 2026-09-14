@@ -24,7 +24,7 @@ class MultiClientRequestResponseServer(IntegrationServer):
         # request messageId -> origin requester client_id
         self._origin_by_request_id: dict[str, str] = {}
 
-    def on_receive(self, peer: Peer, request: message_pb2.Message) -> bool:
+    def on_receive(self, peer: Peer, request: message_pb2.PookieMessage) -> bool:
         name = request.metaInfo.messageName
 
         if name == REQUEST_MSG:

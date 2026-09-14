@@ -33,6 +33,7 @@ dependencies = [
 [tool.pdm.build]
 source-includes = [
     "tests/",
+    "docs/required_adjustments/",
     "requirements.txt",
     "HOW_TO.md",
 ]
