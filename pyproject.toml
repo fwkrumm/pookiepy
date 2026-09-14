@@ -40,7 +40,7 @@ source-includes = [
 package-data = {"pookiepy" = ["HOW_TO.md", "message.proto", "*.pyi"]}
 
 [tool.pdm]
-version = { source = "file", path = "__init__.py" }
+version = { source = "file", path = "pookiepy/__init__.py" }
 distribution = true
 
 [project.urls]
