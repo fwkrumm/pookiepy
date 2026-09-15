@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="$(python - <<'PY'
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_INIT="${SCRIPT_DIR}/../../pookiepy/__init__.py"
+
+VERSION="$(python - "$PACKAGE_INIT" <<'PY'
 import pathlib
 import re
+import sys
 
-text = pathlib.Path('__init__.py').read_text(encoding='utf-8')
+version_file = pathlib.Path(sys.argv[1])
+text = version_file.read_text(encoding='utf-8')
 match = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']\s*$', text, re.MULTILINE)
 if not match:
-    raise SystemExit('Could not find __version__ in __init__.py')
+    raise SystemExit(f'Could not find __version__ in {version_file}')
 print(match.group(1))
 PY
 )"
