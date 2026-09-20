@@ -1,0 +1,27 @@
+[package]
+name = "pookiepy-rust-server"
+version = "0.1.0"
+edition = "2021"
+description = "Rust async server compatible with pookiepy Python clients"
+license = "MIT"
+
+[dependencies]
+async-trait = "0.1"
+futures-core = "0.3"
+thiserror = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-stream = "0.1"
+tonic = { version = "0.12", features = ["transport", "gzip"] }
+prost = "0.13"
+prost-types = "0.13"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid = { version = "1", features = ["v4"] }
+
+[build-dependencies]
+tonic-build = "0.12"
+protoc-bin-vendored = "3"
+
+[lints.clippy]
+unwrap_used = "deny"
+todo = "deny"
