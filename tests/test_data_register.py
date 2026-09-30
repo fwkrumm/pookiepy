@@ -92,7 +92,9 @@ class TestAddDataFanOut(unittest.TestCase):
             result = self.dr.add_data_for_message_name("c1", "nonexistent", _msg("nonexistent"))
         self.assertEqual(result.delivered, ())
         self.assertEqual(result.dropped, ())
-        self.assertIn("Message name nonexistent has never had subscribers registered", logs.output[0])
+        self.assertIn(
+            "Message name nonexistent has never had subscribers registered", logs.output[0]
+        )
 
     def test_topic_with_all_subscribers_removed_logs_reason(self):
         """Previously subscribed topics report that their subscribers left."""

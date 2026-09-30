@@ -22,10 +22,14 @@ class TestLMProxyClient(unittest.TestCase):
 
 
 class TestTextClient(unittest.TestCase):
+    """Check text client receive behavior."""
+
     def test_receive_hook_queues_chunk_without_printing(self):
         client = object.__new__(TextClient)
         message = message_pb2.PookieMessage(
-            payload=message_pb2.Payload(structPayload=json_to_struct({"chunk": "Hallo", "done": False}))
+            payload=message_pb2.Payload(
+                structPayload=json_to_struct({"chunk": "Hallo", "done": False})
+            )
         )
         output = io.StringIO()
 
