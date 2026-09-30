@@ -1,0 +1,58 @@
+name: C++ Conan
+
+on:
+  push:
+    paths:
+      - ".github/workflows/cpp-conan.yml"
+      - "CMakeLists.txt"
+      - "conanfile.py"
+      - "requirements-cpp.txt"
+      - "cpp/**"
+      - "pookiepy/message.proto"
+  pull_request:
+    paths:
+      - ".github/workflows/cpp-conan.yml"
+      - "CMakeLists.txt"
+      - "conanfile.py"
+      - "requirements-cpp.txt"
+      - "cpp/**"
+      - "pookiepy/message.proto"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cpp-conan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  create:
+    name: Create and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-suffix: cpp-${{ matrix.os }}
+
+      - name: Detect Conan profile
+        run: uv run --no-project --with-requirements requirements-cpp.txt conan profile detect --exist-ok
+
+      - name: Create package and run CTest
+        run: >-
+          uv run --no-project --with-requirements requirements-cpp.txt
+          conan create . --build=missing
+          -s build_type=Release -s compiler.cppstd=17
+          -c tools.cmake.cmaketoolchain:generator=Ninja

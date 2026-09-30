@@ -4,6 +4,8 @@ __pycache__
 .coverage
 uv.lock
 .lurus
+build/
+CMakeUserPresets.json
 
 # Generated protobuf files --- regenerated at build/CI time
 pookiepy/message_pb2.py
