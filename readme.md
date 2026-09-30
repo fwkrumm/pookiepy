@@ -406,9 +406,6 @@ message Payload {
 
 ### General
 
-- improve redundant logs in data register regarding no notification queue exists
-- there is no storage of target_ids i.e. if a dev via override whats to forward data to a specific target id a new mechanism to match name to target id must be implemented
-
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
 - Verify behavior when connections are interrupted mid-stream; ensure no ghost threads or queue deadlocks occur.
