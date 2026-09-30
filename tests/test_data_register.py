@@ -88,9 +88,22 @@ class TestAddDataFanOut(unittest.TestCase):
 
     def test_unknown_topic_returns_empty_tuples(self):
         """Publishing to an unregistered topic returns an empty DeliveryResult."""
-        result = self.dr.add_data_for_message_name("c1", "nonexistent", _msg("nonexistent"))
+        with self.assertLogs("test", level="DEBUG") as logs:
+            result = self.dr.add_data_for_message_name("c1", "nonexistent", _msg("nonexistent"))
         self.assertEqual(result.delivered, ())
         self.assertEqual(result.dropped, ())
+        self.assertIn("Message name nonexistent has never had subscribers registered", logs.output[0])
+
+    def test_topic_with_all_subscribers_removed_logs_reason(self):
+        """Previously subscribed topics report that their subscribers left."""
+        self.dr.add_notification_queue_for_message_name("c1", "topic", queue.Queue())
+        self.dr.remove_notification_queues_for_client("c1")
+
+        with self.assertLogs("test", level="WARNING") as logs:
+            result = self.dr.add_data_for_message_name("sender", "topic", _msg())
+
+        self.assertEqual(result, DeliveryResult())
+        self.assertIn("All subscribers have been removed for message_name: topic", logs.output[0])
 
     def test_wrong_data_type_raises_grpc_value_error(self):
         """Passing a non-PookieMessage value raises GrpcValueError."""

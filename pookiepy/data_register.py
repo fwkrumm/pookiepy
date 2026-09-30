@@ -160,15 +160,14 @@ class DataRegister:
             lock = self._locks.get(message_name)
 
         if lock is None:
-            self._logger.debug("No notification queue exists for message_name: %s", message_name)
+            self._logger.debug("Message name %s has never had subscribers registered", message_name)
             return DeliveryResult()
 
         with lock:
             client_dict = self._register.get(message_name, {})
             if not client_dict:
-                # change to debug?
                 self._logger.warning(
-                    "No notification queue exists for message_name: %s", message_name
+                    "All subscribers have been removed for message_name: %s", message_name
                 )
                 return DeliveryResult()
             subscribers = dict(client_dict)  # shallow copy --- puts happen outside the lock
