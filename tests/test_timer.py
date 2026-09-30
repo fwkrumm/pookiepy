@@ -51,6 +51,8 @@ class TestTimer(unittest.TestCase):
 
 
 class TestTimerBroadcast(unittest.TestCase):
+    """Verify timer overruns do not hide missed broadcasts."""
+
     def test_timer_overrun_waits_for_messages_actually_sent(self):
         driver = Mock()
         with patch("tests.integration.timer.clients_timer.timer") as timer_context:
