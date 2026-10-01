@@ -10,7 +10,8 @@ class PookieCppConan(ConanFile):
     exports_sources = "CMakeLists.txt", "cpp/*", "pookiepy/message.proto"
 
     def requirements(self):
-        self.requires("grpc/1.72.0")
+        self.requires("grpc/1.72.0", transitive_headers=True, transitive_libs=True)
+        self.requires("protobuf/5.27.0", transitive_headers=True, transitive_libs=True)
 
     def layout(self):
         cmake_layout(self)
@@ -32,3 +33,4 @@ class PookieCppConan(ConanFile):
 
     def package_info(self):
         self.cpp_info.libs = ["pookiecpp"]
+        self.cpp_info.requires = ["grpc::grpc++", "protobuf::libprotobuf"]

@@ -211,11 +211,13 @@ void BaseServer::serve_forever() {
 }
 
 void BaseServer::shutdown() {
-    std::lock_guard lock(lifecycle_mutex_);
+    std::unique_lock lock(lifecycle_mutex_);
     if (!server_ || stopped_) return;
     stopped_ = true;
-    server_->Shutdown();
-    server_->Wait();
+    auto* server = server_.get();
+    lock.unlock();
+    server->Shutdown(std::chrono::system_clock::now() + config_.shutdown_grace_period);
+    server->Wait();
     on_shutdown();
 }
 
@@ -245,7 +247,7 @@ void BaseServer::unsubscribe(Session* session) {
 }
 
 void BaseServer::broadcast(const Peer& sender, std::shared_ptr<const Message> message) {
-    std::lock_guard lock(routes_mutex_);
+    std::shared_lock lock(routes_mutex_);
     auto route = routes_.find(message->metainfo().messagename());
     if (route == routes_.end()) return;
     for (Session* session : route->second) {

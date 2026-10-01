@@ -3,8 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <mutex>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -27,6 +29,7 @@ struct Peer {
 
 struct ServerConfig {
     std::size_t max_queue_elements = 0;
+    std::chrono::milliseconds shutdown_grace_period{1000};
     std::string schema_version = "pookiepy.schema.v0";
     std::vector<std::pair<std::string, int>> channel_arguments;
     std::shared_ptr<grpc::ServerCredentials> credentials = grpc::InsecureServerCredentials();
@@ -73,7 +76,7 @@ private:
     std::mutex lifecycle_mutex_;
     std::unique_ptr<grpc::Server> server_;
     bool stopped_ = false;
-    std::mutex routes_mutex_;
+    std::shared_mutex routes_mutex_;
     std::unordered_map<std::string, std::unordered_set<Session*>> routes_;
     std::unordered_set<std::string> client_ids_;
 };

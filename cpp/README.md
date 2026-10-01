@@ -7,6 +7,8 @@ gRPC callback reactors. Subclass it and override public virtual hooks; call
 virtual dispatch does not work from base constructors). `on_shutdown()` runs once
 after gRPC has stopped. Hooks run on gRPC callback threads: keep them short; avoid
 blocking on server shutdown or acquiring application locks in reverse order.
+`shutdown()` gives active streams one second to finish by default, then cancels
+them; set `ServerConfig::shutdown_grace_period` to change that deadline.
 
 ```cpp
 class Relay final : public pookiecpp::BaseServer {
@@ -48,6 +50,7 @@ uv run --no-sync conan create . --build=missing -s build_type=Release -s compile
 ```
 
 `conan create` compiles the library, runs CTest (failure blocks packaging), and
-installs the library and generated/public headers into the Conan package.
+installs the library and generated/public headers into the Conan package. It
+then builds and runs an external consumer against the installed package.
 This server uses bundled proto; Python custom `ProtoInterface`, static data,
 compression configuration, and server-originated broadcasts are not supported.

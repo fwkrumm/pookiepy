@@ -20,11 +20,18 @@ public:
 
     bool on_receive(const pookiecpp::Peer&, Message& request) override {
         ++received;
+        if (request.metainfo().messagename() == "ignored") return false;
         request.mutable_metainfo()->set_responsetoid("observed");
         return true;
     }
 
+    void on_shutdown() override {
+        ++shutdown_calls;
+        shutdown();
+    }
+
     std::atomic<int> received{0};
+    std::atomic<int> shutdown_calls{0};
 };
 
 void require(bool condition, const char* message) {
@@ -105,11 +112,14 @@ int main() {
     payload.mutable_metainfo()->set_messagename("topic");
     payload.mutable_payload()->set_bytepayload("test-data");
     payload.add_history()->set_name("sender");
+    Message ignored;
+    ignored.mutable_metainfo()->set_messagename("ignored");
+    require(sender->Write(ignored), "ignored payload write failed");
     require(sender->Write(payload), "payload write failed");
     require(subscriber->Read(&result), "subscriber did not receive payload");
     require(result.payload().bytepayload() == "test-data", "payload corrupted");
     require(result.metainfo().responsetoid() == "observed", "receive hook did not run");
-    require(server.received == 1, "unexpected receive hook call count");
+    require(server.received == 2, "unexpected receive hook call count");
     require(result.history_size() == 2, "server history point missing");
     require(result.history(1).has_receivetimestamp(), "receive timestamp missing");
     require(result.history(1).has_sendtimestamp(), "send timestamp missing");
@@ -121,5 +131,19 @@ int main() {
     subscriber->WritesDone();
     require(!subscriber->Read(&result), "subscriber stream did not close");
     require(subscriber->Finish().ok(), "subscriber stream failed");
+
+        grpc::ClientContext idle_context;
+        idle_context.AddMetadata("x-schema-version", "pookiepy.schema.v0");
+        idle_context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(5));
+        auto idle = stub->DataChannel(&idle_context);
+        auto idle_registration = connect_message("idle", true);
+        require(idle->Write(idle_registration), "idle client registration failed");
+        read_welcome(*idle);
+        const auto shutdown_start = std::chrono::steady_clock::now();
     server.shutdown();
+        require(std::chrono::steady_clock::now() - shutdown_start < std::chrono::seconds(3),
+            "server did not stop within shutdown grace period");
+        require(!idle->Read(&result), "idle stream remained open after shutdown");
+        require(!idle->Finish().ok(), "idle stream was not cancelled");
+    require(server.shutdown_calls == 1, "shutdown hook called more than once");
 }
