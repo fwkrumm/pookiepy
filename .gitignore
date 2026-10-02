@@ -11,3 +11,8 @@ CMakeUserPresets.json
 pookiepy/message_pb2.py
 pookiepy/message_pb2.pyi
 pookiepy/message_pb2_grpc.py
+
+# conan-generated files
+conanbuild*
+conanrun*
+deactivate_conan*
