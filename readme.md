@@ -412,6 +412,7 @@ message Payload {
 
 ### Planned Features
 - Multi-language client example (e.g., C++ or Rust).
+- Create a runnable C++ executable demonstrating the C++ component.
 
 ---
 <a name="known-issues-and-troubleshooting"></a>
