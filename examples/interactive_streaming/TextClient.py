@@ -19,25 +19,6 @@ class TextClient(BaseClient):
                          requires=["lm_response_stream"])
         self.logger.setLevel("WARNING")
 
-    def on_receive(self, data: message_pb2.PookieMessage) -> bool:
-        try:
-            payload = (
-                struct_to_json(data.payload.structPayload)
-                if data.payload and data.payload.structPayload
-                else {}
-            )
-        except (ValueError, TypeError, AttributeError):
-            payload = {}
-
-        chunk = payload.get("chunk", "")
-        done = payload.get("done", False)
-
-        if chunk:
-            print(chunk, end="", flush=True)
-        if done:
-            print()
-        return True
-
     def interactive_loop(self):
         """
         Prompt user, send request, stream responses until `done` True.

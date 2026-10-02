@@ -8,6 +8,7 @@
 
 > **Status: Work in Progress.**
 > The project is open source and will remain open source.
+> Feedback is highly appreciated. Questions? Please create a [GitHub issue](https://github.com/fwkrumm/pookiepy/issues).
 > Treat with caution. If you depend on it, **pin your version**.
 > Semantic versioning will only begin with the first official release, starting at version **1.0.0**.
 > Note that until and including version 0.0.11 the project was named **grpchook**.
@@ -230,11 +231,13 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 client_a = BaseClient(port=50051, name="A", provides=["ping"], requires=["ping"])
 client_b = BaseClient(port=50051, name="B", provides=["ping"], requires=["ping"])
 
-client_a.send_data(generate_message("ping", byte_payload=b"hello"))
+client_a.send_data(generate_message("ping", byte_payload=b"hello client B"))
+client_b.send_data(generate_message("ping", byte_payload=b"hello client A"))
 
-msg = client_b.get_data(timeout=5.0)
-client_a.logger.info(msg.payload.bytePayload)   # b"hello"
-client_b.logger.info(msg.payload.bytePayload)   # b"hello"
+msg_b = client_b.get_data(timeout=5.0)
+msg_a = client_a.get_data(timeout=5.0)
+client_a.logger.info(msg_a.payload.bytePayload)   # b"hello client A"
+client_b.logger.info(msg_b.payload.bytePayload)   # b"hello client B"
 
 client_a.disconnect()
 client_b.disconnect()
@@ -403,6 +406,8 @@ message Payload {
 <a id="todos-and-roadmap"></a>
 
 ## ToDos and Roadmap
+
+### General
 
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
