@@ -408,6 +408,7 @@ message Payload {
 ## ToDos and Roadmap
 
 ### General
+- can we increase performance/speed by using multiplexing?
 
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
