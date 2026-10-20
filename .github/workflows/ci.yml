@@ -20,6 +20,7 @@ jobs:
     # if: false  # disabled --- tests already passing; re-enable when needed
     name: Test (py${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.python-version == '3.x' }}
     strategy:
       # Report all matrix failures, not just the first.
       fail-fast: false
@@ -53,28 +54,39 @@ jobs:
           python -m coverage run -m unittest discover -s tests -p "test_*.py"
           coverage report -m
 
+      - name: Report latest Python probe failure
+        if: failure() && matrix.python-version == '3.x'
+        run: |
+          echo "::warning title=Latest Python probe failed::Python 3.x unit-test job failed. Check this run for a new Python compatibility issue or missing dependency wheel."
+          {
+            echo "### Latest Python probe failed"
+            echo "Python 3.x unit-test job failed on ${{ matrix.os }}. Check the job logs for a new Python compatibility issue or missing dependency wheel. This probe is non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   integration-test:
-    name: Integration test (${{ matrix.os }})
+    name: Integration test (py${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.python-version == '3.x' }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.14", "3.x"]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Set up Python
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: "3.x"
+          python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: true
-          cache-suffix: ${{ matrix.os }}
+          cache-suffix: py${{ matrix.python-version }}-${{ matrix.os }}
 
       - name: Install dependencies
         run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt
@@ -84,6 +96,15 @@ jobs:
 
       - name: Run integration tests
         run: python tests/integration/run_integration_tests.py
+
+      - name: Report latest Python probe failure
+        if: failure() && matrix.python-version == '3.x'
+        run: |
+          echo "::warning title=Latest Python probe failed::Python 3.x integration job failed. Check this run for a new Python compatibility issue or missing dependency wheel."
+          {
+            echo "### Latest Python probe failed"
+            echo "Python 3.x integration job failed on ${{ matrix.os }}. Check the job logs for a new Python compatibility issue or missing dependency wheel. This probe is non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
 
 
   lint:
@@ -97,7 +118,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: "3.x"
+          python-version: "3.14"
 
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -112,4 +133,4 @@ jobs:
         run: python .github/scripts/generate_protobuf.py --include-custom
 
       - name: Run Pylint
-        run: pylint pookiepy tests examples
+        run: pylint --jobs=1 pookiepy tests examples

@@ -22,11 +22,12 @@ jobs:
   test:
     name: gRPC compat test (py${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.python-version == '3.x' }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.12", "3.x"]
+        python-version: ["3.12", "3.14", "3.x"]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -56,9 +57,19 @@ jobs:
           python -m coverage run -m unittest discover -s tests -p "test_*.py"
           coverage report -m
 
+      - name: Report latest Python probe failure
+        if: failure() && matrix.python-version == '3.x'
+        run: |
+          echo "::warning title=Latest Python gRPC probe failed::Python 3.x gRPC compatibility job failed. Check this run for a Python compatibility issue or missing gRPC wheel."
+          {
+            echo "### Latest Python gRPC probe failed"
+            echo "Python 3.x gRPC compatibility job failed on ${{ matrix.os }}. Check the job logs for a Python compatibility issue or missing gRPC wheel. This probe is non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   integration-test:
     name: gRPC compat integration (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -68,7 +79,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
+      - name: Set up latest stable Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.x"
@@ -89,3 +100,12 @@ jobs:
 
       - name: Run integration tests
         run: python tests/integration/run_integration_tests.py
+
+      - name: Report latest Python integration probe failure
+        if: failure()
+        run: |
+          echo "::warning title=Latest Python gRPC integration probe failed::Python 3.x gRPC integration job failed. Check this run for a Python compatibility issue or missing gRPC wheel."
+          {
+            echo "### Latest Python gRPC integration probe failed"
+            echo "Python 3.x gRPC integration job failed on ${{ matrix.os }}. Check the job logs for a Python compatibility issue or missing gRPC wheel. This probe is non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
