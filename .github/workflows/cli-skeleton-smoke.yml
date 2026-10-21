@@ -48,10 +48,22 @@ jobs:
           fi
           echo "POOKIEPY_VENV_PYTHON=$venv_python" >> "$GITHUB_ENV"
 
+      - name: Check gRPC binary wheels
+        id: wheel-check
+        if: matrix.python-version == '3.x'
+        continue-on-error: true
+        run: uv pip install --python "$POOKIEPY_VENV_PYTHON" --dry-run --only-binary grpcio,grpcio-tools "$GITHUB_WORKSPACE"
+
+      - name: Explain skipped latest Python skeleton tests
+        if: matrix.python-version == '3.x' && steps.wheel-check.outcome != 'success'
+        run: echo "::warning title=Latest Python skeleton tests skipped::Python 3.x has no required gRPC wheels on ${{ matrix.os }}; skeleton test skipped. Stable skeleton tests continue."
+
       - name: Install pookiepy from checkout
+        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
         run: uv pip install --python "$POOKIEPY_VENV_PYTHON" --only-binary grpcio,grpcio-tools "$GITHUB_WORKSPACE"
 
       - name: Generate and run every skeleton
+        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
         working-directory: ${{ runner.temp }}
         run: >-
           "$POOKIEPY_VENV_PYTHON"
