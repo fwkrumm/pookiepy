@@ -77,17 +77,32 @@ jobs:
           enable-cache: true
           cache-suffix: examples-py${{ matrix.python-version }}-${{ matrix.os }}
 
+      - name: Check latest Python dependency wheels
+        if: matrix.python-version == '3.x'
+        id: wheel-check
+        continue-on-error: true
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv pip install --dry-run --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
+
+      - name: Explain skipped latest Python example probe
+        if: matrix.python-version == '3.x' && steps.wheel-check.outcome != 'success'
+        run: echo "::warning title=Latest Python example probe skipped::Required dependencies or gRPC wheels unavailable on ${{ matrix.os }}; example probe skipped. Stable checks continue."
+
       - name: Install core and example dependencies
+        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
         env:
           UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
         run: uv pip install --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
 
       - name: Generate protobuf interfaces
+        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
         env:
           UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
         run: uv run --no-project python .github/scripts/generate_protobuf.py
 
       - name: Run example unit tests
+        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
         env:
           UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
         run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
