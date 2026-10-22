@@ -66,6 +66,44 @@ jobs:
             echo "Python 3.x gRPC compatibility job failed on ${{ matrix.os }}. Check the job logs for a Python compatibility issue or missing gRPC wheel. This probe is non-blocking."
           } >> "$GITHUB_STEP_SUMMARY"
 
+  unit-test-examples:
+    name: Unit test examples (py${{ matrix.python-version }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.python-version == '3.x' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.12", "3.14", "3.x"]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-suffix: examples-py${{ matrix.python-version }}-${{ matrix.os }}
+
+      - name: Install core and example dependencies (wider grpc range)
+        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements-weekly.txt -r requirements_examples.txt
+
+      - name: Generate protobuf interfaces
+        run: uv run --no-project python .github/scripts/generate_protobuf.py
+
+      - name: Run example unit tests
+        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
+
+      - name: Report latest Python example probe failure
+        if: failure() && matrix.python-version == '3.x'
+        run: echo "::warning title=Latest Python example probe failed::Example unit-test job failed on ${{ matrix.os }}. Check logs for compatibility issues or missing dependency wheels. This probe is non-blocking."
+
   integration-test:
     name: gRPC compat integration (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

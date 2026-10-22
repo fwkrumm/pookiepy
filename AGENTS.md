@@ -140,6 +140,14 @@ with TimedEvent(s=0.01, n=100) as te:
 grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psutil>=5.0.0
 ```
 
+## Test boundaries
+
+- Core framework unit tests belong directly in `tests/`; do not import or test `examples/` components there.
+- Unit tests for `examples/` belong in `tests/examples/`. Keep this directory without `__init__.py` so core `unittest` discovery does not recurse into it.
+- Core suite: `uv run python -m unittest discover -s tests -p "test_*.py"`.
+- Example suite: `uv run python -m unittest discover -s tests/examples -p "test_*.py"`. Keep external services mocked; install optional dependencies from `requirements_examples.txt` only for example jobs.
+- CI, weekly gRPC compatibility, and weekly latest-Python workflows run examples in separate `Unit test examples` jobs. Keep framework integration scenarios in `tests/integration/`.
+
 ## TODOs
 
 - `wait_done()` = yielded to gRPC, not server ACK.
