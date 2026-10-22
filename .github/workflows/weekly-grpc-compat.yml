@@ -93,13 +93,19 @@ jobs:
           cache-suffix: examples-py${{ matrix.python-version }}-${{ matrix.os }}
 
       - name: Install core and example dependencies (wider grpc range)
-        run: uv pip install --python "${{ steps.example-python.outputs.python-path }}" --only-binary grpcio,grpcio-tools -r requirements-weekly.txt -r requirements_examples.txt
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv pip install --only-binary grpcio,grpcio-tools -r requirements-weekly.txt -r requirements_examples.txt
 
       - name: Generate protobuf interfaces
-        run: uv run --no-project --python "${{ steps.example-python.outputs.python-path }}" python .github/scripts/generate_protobuf.py
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv run --no-project python .github/scripts/generate_protobuf.py
 
       - name: Run example unit tests
-        run: uv run --no-project --python "${{ steps.example-python.outputs.python-path }}" python -m unittest discover -s tests/examples -p "test_*.py"
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
 
       - name: Report latest Python example probe failure
         if: failure() && matrix.python-version == '3.x'
