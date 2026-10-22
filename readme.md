@@ -480,3 +480,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.16                     | Change client spin control flow and server delivery-result APIs; add queue-growth configuration. |
 | 0.0.17                     | Rename non-ambiguous message name. Simplify custom interface usage. Minor improvements to logs and comments. added voice client to interactive streaming example. added workflow for skeletons. added threading backend for timer. |
 | 0.0.18                     | Correct on_init position, hopefully fix publish pipeline, correct on_receive hook position. |
+| 0.0.19                     | Minor bug fixes and improvements to the publish pipeline. |
