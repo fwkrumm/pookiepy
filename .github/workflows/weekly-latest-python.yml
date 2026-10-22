@@ -74,6 +74,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up latest stable Python
+        id: example-python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.x"
@@ -85,13 +86,13 @@ jobs:
           cache-suffix: examples-${{ matrix.os }}
 
       - name: Install core and example dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
+        run: uv pip install --python "${{ steps.example-python.outputs.python-path }}" --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
 
       - name: Generate protobuf interfaces
-        run: uv run --no-project python .github/scripts/generate_protobuf.py
+        run: uv run --no-project --python "${{ steps.example-python.outputs.python-path }}" python .github/scripts/generate_protobuf.py
 
       - name: Run example unit tests
-        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
+        run: uv run --no-project --python "${{ steps.example-python.outputs.python-path }}" python -m unittest discover -s tests/examples -p "test_*.py"
 
       - name: Report latest Python example probe failure
         if: failure()
