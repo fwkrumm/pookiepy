@@ -21,13 +21,13 @@ runs:
   steps:
     - name: Set up Python and uv
       id: setup
-      uses: ./.github/actions/setup-python
+      uses: $/.github/actions/setup-python
       with:
         python-version: ${{ inputs.python-version }}
         cache-suffix: ${{ inputs.suite }}-py${{ inputs.python-version }}-${{ runner.os }}-${{ runner.arch }}
     - name: Prepare dependencies
       id: dependencies
-      uses: ./.github/actions/install-dependencies
+      uses: $/.github/actions/install-dependencies
       with:
         python-path: ${{ steps.setup.outputs.python-path }}
         probe: ${{ inputs.python-version == '3.x' }}

@@ -30,7 +30,7 @@ jobs:
           persist-credentials: false
 
       - name: Run core unit tests
-        uses: ./.github/actions/python-check
+        uses: $/.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
           suite: unit
@@ -50,7 +50,7 @@ jobs:
           persist-credentials: false
 
       - name: Run example unit tests
-        uses: ./.github/actions/python-check
+        uses: $/.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
           suite: examples
@@ -69,7 +69,7 @@ jobs:
           persist-credentials: false
 
       - name: Run latest Python probe
-        uses: ./.github/actions/python-check
+        uses: $/.github/actions/python-check
         with:
           python-version: '3.x'
           suite: ${{ contains(matrix.os, '-arm') && 'unit' || 'unit-integration' }}
@@ -89,7 +89,7 @@ jobs:
           persist-credentials: false
 
       - name: Run integration tests
-        uses: ./.github/actions/python-check
+        uses: $/.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
           suite: integration
@@ -103,7 +103,7 @@ jobs:
           persist-credentials: false
 
       - name: Run Pylint
-        uses: ./.github/actions/python-check
+        uses: $/.github/actions/python-check
         with:
           python-version: "3.14"
           suite: lint

@@ -35,8 +35,13 @@ commands use that same interpreter through `UV_PYTHON`.
 
 ## Local validation
 
-- Workflow syntax: `uvx --from actionlint-py actionlint`
+- Workflow syntax: `uvx --from actionlint-py actionlint -ignore '^specifying action \x22\$/\.github/actions/[a-z-]+\x22 in invalid format because ref is missing\.'`
 - Workflow and composite-action security: `uvx zizmor .github`
+
+Use `$/...` for same-repository action references. The actionlint compatibility
+filter excludes only its unsupported-syntax diagnostic for these action paths;
+remove the filter when actionlint-py supports self-repository references. Zizmor
+still audits all actions without a severity override.
 
 Run full OS/version matrices through GitHub Actions. Local syntax and security
 checks do not execute composite actions or prove runner-specific behavior.

@@ -28,7 +28,7 @@ jobs:
 
       - name: Set up Python ${{ matrix.python-version }}
         id: setup
-        uses: ./.github/actions/setup-python
+        uses: $/.github/actions/setup-python
         with:
           python-version: ${{ matrix.python-version }}
           cache-suffix: skeleton-py${{ matrix.python-version }}-${{ matrix.os }}
@@ -40,7 +40,7 @@ jobs:
 
       - name: Install pookiepy from checkout
         id: dependencies
-        uses: ./.github/actions/install-dependencies
+        uses: $/.github/actions/install-dependencies
         with:
           python-path: ${{ env.POOKIEPY_VENV_PYTHON }}
           probe: ${{ matrix.python-version == '3.x' }}

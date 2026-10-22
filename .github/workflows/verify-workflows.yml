@@ -32,7 +32,10 @@ jobs:
           enable-cache: true
 
       - name: Check workflow syntax and expressions
-        run: uvx --from actionlint-py actionlint
+        # actionlint-py does not yet recognize GitHub's self-repository syntax.
+        run: >-
+          uvx --from actionlint-py actionlint
+          -ignore '^specifying action \x22\$/\.github/actions/[a-z-]+\x22 in invalid format because ref is missing\.'
 
       - name: Audit workflow security
         run: uvx zizmor .github
