@@ -236,8 +236,12 @@ client_b.send_data(generate_message("ping", byte_payload=b"hello client A"))
 
 msg_b = client_b.get_data(timeout=5.0)
 msg_a = client_a.get_data(timeout=5.0)
-client_a.logger.info(msg_a.payload.bytePayload)   # b"hello client A"
-client_b.logger.info(msg_b.payload.bytePayload)   # b"hello client B"
+
+# b"hello client A"
+client_a.logger.info(msg_a.payload.bytePayload)
+
+# b"hello client B"
+client_b.logger.info(msg_b.payload.bytePayload)
 
 client_a.disconnect()
 client_b.disconnect()
