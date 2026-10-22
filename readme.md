@@ -413,6 +413,7 @@ message Payload {
 
 ### General
 - can we increase performance/speed by using multiplexing?
+- more tests for examples
 
 ### Performance & Stability
 - Evaluate replacing the threading model with `asyncio` if the performance gain justifies the API tradeoff.
