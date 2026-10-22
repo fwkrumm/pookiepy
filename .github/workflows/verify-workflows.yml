@@ -5,10 +5,12 @@ on:
     paths:
       - ".github/workflows/**"
       - ".github/actions/**"
+      - ".github/scripts/**"
   pull_request:
     paths:
       - ".github/workflows/**"
       - ".github/actions/**"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 permissions:
@@ -33,4 +35,4 @@ jobs:
         run: uvx --from actionlint-py actionlint
 
       - name: Audit workflow security
-        run: uvx zizmor .github/workflows
+        run: uvx zizmor .github

@@ -29,36 +29,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up latest stable Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run core unit tests
+        uses: ./.github/actions/python-check
         with:
-          python-version: "3.x"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: ${{ matrix.os }}
-
-      - name: Install dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py
-
-      - name: Run unit tests with coverage
-        run: |
-          python -m coverage run -m unittest discover -s tests -p "test_*.py"
-          coverage report -m
-
-      - name: Report latest Python probe failure
-        if: failure()
-        run: |
-          echo "::warning title=Latest Python probe failed::Weekly latest-Python unit-test job failed. Check this run for a new Python compatibility issue or missing dependency wheel."
-          {
-            echo "### Latest Python probe failed"
-            echo "Weekly latest-Python unit-test job failed on ${{ matrix.os }}. Check the job logs for a new Python compatibility issue or missing dependency wheel. This probe is non-blocking."
-          } >> "$GITHUB_STEP_SUMMARY"
+          python-version: '3.x'
+          suite: unit
 
   unit-test-examples:
     name: Unit test examples (latest Python / ${{ matrix.os }})
@@ -73,50 +48,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up latest stable Python
-        id: example-python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.x"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: examples-${{ matrix.os }}
-
-      - name: Check latest Python dependency wheels
-        id: wheel-check
-        continue-on-error: true
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv pip install --dry-run --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
-
-      - name: Explain skipped latest Python example probe
-        if: steps.wheel-check.outcome != 'success'
-        run: echo "::warning title=Latest Python example probe skipped::Required dependencies or gRPC wheels unavailable on ${{ matrix.os }}; example probe skipped. Stable checks continue."
-
-      - name: Install core and example dependencies
-        if: steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv pip install --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
-
-      - name: Generate protobuf interfaces
-        if: steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv run --no-project python .github/scripts/generate_protobuf.py
-
       - name: Run example unit tests
-        if: steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
-
-      - name: Report latest Python example probe failure
-        if: failure()
-        run: echo "::warning title=Latest Python example probe failed::Example unit-test job failed on ${{ matrix.os }}. Check logs for compatibility issues or missing dependency wheels. This probe is non-blocking."
+        uses: ./.github/actions/python-check
+        with:
+          python-version: '3.x'
+          suite: examples
 
   lint:
     name: Pylint (latest Python)
@@ -127,31 +63,8 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up latest stable Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.x"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: ${{ github.job }}
-
-      - name: Install dependencies
-        run: uv pip install --system -r requirements.txt pylint
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
-
       - name: Run Pylint
-        run: pylint --jobs=1 pookiepy tests examples
-
-      - name: Report latest Python lint probe failure
-        if: failure()
-        run: |
-          echo "::warning title=Latest Python lint probe failed::Weekly latest-Python Pylint job failed. Check this run for Python or Pylint compatibility issues."
-          {
-            echo "### Latest Python lint probe failed"
-            echo "Weekly latest-Python Pylint job failed. Check the job logs for Python or Pylint compatibility issues. This probe is non-blocking."
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/python-check
+        with:
+          python-version: '3.x'
+          suite: lint

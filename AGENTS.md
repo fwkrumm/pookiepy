@@ -150,6 +150,7 @@ grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psuti
 
 ## Latest Python CI probes
 
+- CI structure and helper ownership: `.github/readme.md`. Keep workflow matrices and policies in callers; reuse `.github/actions/python-check` for Python suites and `.github/actions/setup-python` for tooling setup.
 - Treat floating `3.x` jobs as non-blocking compatibility probes, not supported-version guarantees. Keep pinned supported-Python checks mandatory.
 - Before installing dependencies in a latest-Python probe, use `uv pip install --dry-run --only-binary grpcio,grpcio-tools` with the job's actual requirement files. Give the probe step an ID and `continue-on-error: true`.
 - If dependency resolution or required gRPC wheels are unavailable, emit a warning and skip dependency installation, protobuf generation, and tests. Gate those steps on the probe's `outcome == 'success'`; in mixed matrices, let pinned Python versions run normally without this gate.

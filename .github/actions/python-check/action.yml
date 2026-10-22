@@ -1,0 +1,61 @@
+name: Python check
+description: Set up Python, install dependencies, generate protobuf bindings, and run one suite.
+inputs:
+  python-version:
+    description: Python version; floating 3.x enables the optional wheel probe.
+    required: true
+  suite:
+    description: Check suite (unit, examples, integration, unit-integration, or lint).
+    required: true
+  requirements:
+    description: Core requirement file.
+    default: requirements.txt
+  extra-requirements:
+    description: Optional additional requirement file (example dependencies are automatic).
+    default: ''
+  include-custom:
+    description: Generate custom integration bindings even for a unit-only suite.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Set up Python and uv
+      id: setup
+      uses: ./.github/actions/setup-python
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache-suffix: ${{ inputs.suite }}-py${{ inputs.python-version }}-${{ runner.os }}-${{ runner.arch }}
+    - name: Prepare dependencies
+      id: dependencies
+      uses: ./.github/actions/install-dependencies
+      with:
+        python-path: ${{ steps.setup.outputs.python-path }}
+        probe: ${{ inputs.python-version == '3.x' }}
+        requirements: |
+          ${{ inputs.requirements }}
+          ${{ inputs.extra-requirements }}
+          ${{ inputs.suite == 'examples' && 'requirements_examples.txt' || '' }}
+        packages: ${{ startsWith(inputs.suite, 'unit') && 'coverage' || inputs.suite == 'lint' && 'pylint' || '' }}
+    - name: Generate protobuf interfaces
+      if: steps.dependencies.outputs.ready == 'true'
+      shell: bash
+      env:
+        UV_PYTHON: ${{ steps.setup.outputs.python-path }}
+        INCLUDE_CUSTOM: ${{ inputs.include-custom == 'true' || contains(inputs.suite, 'integration') || inputs.suite == 'lint' }}
+      run: |
+        args=()
+        if [[ "$INCLUDE_CUSTOM" == 'true' ]]; then args+=(--include-custom); fi
+        uv run --no-project python .github/scripts/generate_protobuf.py "${args[@]}"
+    - name: Run checks
+      if: steps.dependencies.outputs.ready == 'true'
+      shell: bash
+      env:
+        UV_PYTHON: ${{ steps.setup.outputs.python-path }}
+        CHECK_SUITE: ${{ inputs.suite }}
+      run: uv run --no-project python .github/scripts/run_checks.py "$CHECK_SUITE"
+    - name: Report latest Python probe failure
+      if: failure() && inputs.python-version == '3.x'
+      shell: bash
+      env:
+        UV_PYTHON: ${{ steps.setup.outputs.python-path }}
+      run: uv run --no-project python .github/scripts/report_probe.py failed

@@ -27,54 +27,38 @@ jobs:
           persist-credentials: false
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        id: setup
+        uses: ./.github/actions/setup-python
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
           cache-suffix: skeleton-py${{ matrix.python-version }}-${{ matrix.os }}
 
       - name: Create isolated environment
-        run: |
-          venv_dir="$RUNNER_TEMP/pookiepy-skeleton-venv"
-          uv venv "$venv_dir" --python python
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            venv_python="$venv_dir/Scripts/python.exe"
-          else
-            venv_python="$venv_dir/bin/python"
-          fi
-          echo "POOKIEPY_VENV_PYTHON=$venv_python" >> "$GITHUB_ENV"
-
-      - name: Check gRPC binary wheels
-        id: wheel-check
-        if: matrix.python-version == '3.x'
-        continue-on-error: true
-        run: uv pip install --python "$POOKIEPY_VENV_PYTHON" --dry-run --only-binary grpcio,grpcio-tools "$GITHUB_WORKSPACE"
-
-      - name: Explain skipped latest Python skeleton tests
-        if: matrix.python-version == '3.x' && steps.wheel-check.outcome != 'success'
-        run: echo "::warning title=Latest Python skeleton tests skipped::Python 3.x has no required gRPC wheels on ${{ matrix.os }}; skeleton test skipped. Stable skeleton tests continue."
+        env:
+          UV_PYTHON: ${{ steps.setup.outputs.python-path }}
+        run: bash .github/scripts/create_smoke_environment.sh
 
       - name: Install pookiepy from checkout
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        run: uv pip install --python "$POOKIEPY_VENV_PYTHON" --only-binary grpcio,grpcio-tools "$GITHUB_WORKSPACE"
+        id: dependencies
+        uses: ./.github/actions/install-dependencies
+        with:
+          python-path: ${{ env.POOKIEPY_VENV_PYTHON }}
+          probe: ${{ matrix.python-version == '3.x' }}
+          requirements: ''
+          packages: ${{ github.workspace }}
 
       - name: Generate and run every skeleton
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
+        if: steps.dependencies.outputs.ready == 'true'
         working-directory: ${{ runner.temp }}
+        env:
+          UV_PYTHON: ${{ env.POOKIEPY_VENV_PYTHON }}
         run: >-
-          "$POOKIEPY_VENV_PYTHON"
+          uv run --no-project python
           "$GITHUB_WORKSPACE/.github/scripts/cli_skeleton_smoke.py"
           --project-root "$GITHUB_WORKSPACE"
 
       - name: Report latest Python probe failure
         if: failure() && matrix.python-version == '3.x'
-        run: |
-          echo "::warning title=Latest Python skeleton probe failed::Python 3.x skeleton job failed on ${{ matrix.os }}. Check for missing gRPC wheels or a Python compatibility issue. Stable skeleton checks remain blocking."
-          {
-            echo "### Latest Python skeleton probe failed"
-            echo "Python 3.x skeleton job failed on ${{ matrix.os }}. Check the job logs for missing gRPC wheels or a Python compatibility issue. This probe is non-blocking."
-          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          UV_PYTHON: ${{ steps.setup.outputs.python-path }}
+        run: uv run --no-project python .github/scripts/report_probe.py failed

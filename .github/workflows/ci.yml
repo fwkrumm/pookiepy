@@ -29,27 +29,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run core unit tests
+        uses: ./.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: py${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py
-
-      - name: Run unit tests with coverage
-        run: |
-          python -m coverage run -m unittest discover -s tests -p "test_*.py"
-          coverage report -m
+          suite: unit
 
   unit-test-examples:
     name: Unit test examples (py${{ matrix.python-version }} / ${{ matrix.os }})
@@ -65,47 +49,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        id: example-python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run example unit tests
+        uses: ./.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: examples-py${{ matrix.python-version }}-${{ matrix.os }}
-
-      - name: Check latest Python dependency wheels
-        if: matrix.python-version == '3.x'
-        id: wheel-check
-        continue-on-error: true
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv pip install --dry-run --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
-
-      - name: Explain skipped latest Python example probe
-        if: matrix.python-version == '3.x' && steps.wheel-check.outcome != 'success'
-        run: echo "::warning title=Latest Python example probe skipped::Required dependencies or gRPC wheels unavailable on ${{ matrix.os }}; example probe skipped. Stable checks continue."
-
-      - name: Install core and example dependencies
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv pip install --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
-
-      - name: Generate protobuf interfaces
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv run --no-project python .github/scripts/generate_protobuf.py
-
-      - name: Run example unit tests
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
+          suite: examples
 
   latest-python-probe:
     name: Latest Python probe (${{ matrix.os }})
@@ -120,40 +68,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run latest Python probe
+        uses: ./.github/actions/python-check
         with:
-          python-version: "3.x"
-
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: latest-${{ matrix.os }}
-
-      - name: Check gRPC binary wheels
-        id: wheel-check
-        continue-on-error: true
-        run: uv pip install --system --dry-run --only-binary grpcio,grpcio-tools -r requirements.txt coverage
-
-      - name: Explain skipped latest Python probe
-        if: steps.wheel-check.outcome != 'success'
-        run: echo "::warning title=Latest Python probe skipped::Python 3.x has no required gRPC wheels on ${{ matrix.os }}; probe skipped. Stable checks continue."
-
-      - name: Install dependencies
-        if: steps.wheel-check.outcome == 'success'
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
-
-      - name: Generate protobuf interfaces
-        if: steps.wheel-check.outcome == 'success'
-        run: python .github/scripts/generate_protobuf.py --include-custom
-
-      - name: Run unit and integration tests
-        if: steps.wheel-check.outcome == 'success'
-        run: |
-          python -m coverage run -m unittest discover -s tests -p "test_*.py"
-          if [[ "${{ matrix.os }}" != ubuntu-22.04-arm && "${{ matrix.os }}" != ubuntu-24.04-arm ]]; then
-            python tests/integration/run_integration_tests.py
-          fi
-          coverage report -m
+          python-version: '3.x'
+          suite: ${{ contains(matrix.os, '-arm') && 'unit' || 'unit-integration' }}
+          include-custom: 'true'
 
   integration-test:
     name: Integration test (py${{ matrix.python-version }} / ${{ matrix.os }})
@@ -168,25 +88,11 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run integration tests
+        uses: ./.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: py${{ matrix.python-version }}-${{ matrix.os }}
-
-      - name: Install dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
-
-      - name: Run integration tests
-        run: python tests/integration/run_integration_tests.py
+          suite: integration
 
   lint:
     name: Pylint
@@ -196,22 +102,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run Pylint
+        uses: ./.github/actions/python-check
         with:
           python-version: "3.14"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: ${{ github.job }}
-
-      - name: Install dependencies
-        run: uv pip install --system -r requirements.txt -r requirements_dev.txt
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
-
-      - name: Run Pylint
-        run: pylint --jobs=1 pookiepy tests examples
+          suite: lint
+          extra-requirements: requirements_dev.txt

@@ -33,38 +33,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run core unit tests
+        uses: ./.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: py${{ matrix.python-version }}
-
-      - name: Install dependencies (wider grpc range)
-        run: |
-          uv pip install --system --only-binary grpcio,grpcio-tools \
-            -r requirements-weekly.txt coverage
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py
-
-      - name: Run unit tests with coverage
-        run: |
-          python -m coverage run -m unittest discover -s tests -p "test_*.py"
-          coverage report -m
-
-      - name: Report latest Python probe failure
-        if: failure() && matrix.python-version == '3.x'
-        run: |
-          echo "::warning title=Latest Python gRPC probe failed::Python 3.x gRPC compatibility job failed. Check this run for a Python compatibility issue or missing gRPC wheel."
-          {
-            echo "### Latest Python gRPC probe failed"
-            echo "Python 3.x gRPC compatibility job failed on ${{ matrix.os }}. Check the job logs for a Python compatibility issue or missing gRPC wheel. This probe is non-blocking."
-          } >> "$GITHUB_STEP_SUMMARY"
+          suite: unit
+          requirements: requirements-weekly.txt
 
   unit-test-examples:
     name: Unit test examples (py${{ matrix.python-version }} / ${{ matrix.os }})
@@ -80,51 +54,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        id: example-python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run example unit tests
+        uses: ./.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: examples-py${{ matrix.python-version }}-${{ matrix.os }}
-
-      - name: Check latest Python dependency wheels
-        if: matrix.python-version == '3.x'
-        id: wheel-check
-        continue-on-error: true
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv pip install --dry-run --only-binary grpcio,grpcio-tools -r requirements-weekly.txt -r requirements_examples.txt
-
-      - name: Explain skipped latest Python example probe
-        if: matrix.python-version == '3.x' && steps.wheel-check.outcome != 'success'
-        run: echo "::warning title=Latest Python example probe skipped::Required dependencies or gRPC wheels unavailable on ${{ matrix.os }}; example probe skipped. Stable checks continue."
-
-      - name: Install core and example dependencies (wider grpc range)
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv pip install --only-binary grpcio,grpcio-tools -r requirements-weekly.txt -r requirements_examples.txt
-
-      - name: Generate protobuf interfaces
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv run --no-project python .github/scripts/generate_protobuf.py
-
-      - name: Run example unit tests
-        if: matrix.python-version != '3.x' || steps.wheel-check.outcome == 'success'
-        env:
-          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
-        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
-
-      - name: Report latest Python example probe failure
-        if: failure() && matrix.python-version == '3.x'
-        run: echo "::warning title=Latest Python example probe failed::Example unit-test job failed on ${{ matrix.os }}. Check logs for compatibility issues or missing dependency wheels. This probe is non-blocking."
+          suite: examples
+          requirements: requirements-weekly.txt
 
   integration-test:
     name: gRPC compat integration (${{ matrix.os }})
@@ -139,33 +74,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up latest stable Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.x"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: ${{ github.job }}
-
-      - name: Install dependencies (wider grpc range)
-        run: |
-          uv pip install --system --only-binary grpcio,grpcio-tools \
-            -r requirements-weekly.txt
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
-
       - name: Run integration tests
-        run: python tests/integration/run_integration_tests.py
-
-      - name: Report latest Python integration probe failure
-        if: failure()
-        run: |
-          echo "::warning title=Latest Python gRPC integration probe failed::Python 3.x gRPC integration job failed. Check this run for a Python compatibility issue or missing gRPC wheel."
-          {
-            echo "### Latest Python gRPC integration probe failed"
-            echo "Python 3.x gRPC integration job failed on ${{ matrix.os }}. Check the job logs for a Python compatibility issue or missing gRPC wheel. This probe is non-blocking."
-          } >> "$GITHUB_STEP_SUMMARY"
+        uses: ./.github/actions/python-check
+        with:
+          python-version: '3.x'
+          suite: integration
+          requirements: requirements-weekly.txt
