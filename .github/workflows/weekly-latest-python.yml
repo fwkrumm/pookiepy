@@ -16,9 +16,10 @@ permissions:
 
 jobs:
   test:
-    # Run tests against the newest stable Python to catch upstream compatibility issues early.
+    # Non-blocking probe for the newest stable Python release.
     name: Test (latest Python / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -50,9 +51,77 @@ jobs:
           python -m coverage run -m unittest discover -s tests -p "test_*.py"
           coverage report -m
 
+      - name: Report latest Python probe failure
+        if: failure()
+        run: |
+          echo "::warning title=Latest Python probe failed::Weekly latest-Python unit-test job failed. Check this run for a new Python compatibility issue or missing dependency wheel."
+          {
+            echo "### Latest Python probe failed"
+            echo "Weekly latest-Python unit-test job failed on ${{ matrix.os }}. Check the job logs for a new Python compatibility issue or missing dependency wheel. This probe is non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  unit-test-examples:
+    name: Unit test examples (latest Python / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest, ubuntu-22.04-arm, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up latest stable Python
+        id: example-python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.x"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-suffix: examples-${{ matrix.os }}
+
+      - name: Check latest Python dependency wheels
+        id: wheel-check
+        continue-on-error: true
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv pip install --dry-run --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
+
+      - name: Explain skipped latest Python example probe
+        if: steps.wheel-check.outcome != 'success'
+        run: echo "::warning title=Latest Python example probe skipped::Required dependencies or gRPC wheels unavailable on ${{ matrix.os }}; example probe skipped. Stable checks continue."
+
+      - name: Install core and example dependencies
+        if: steps.wheel-check.outcome == 'success'
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv pip install --only-binary grpcio,grpcio-tools -r requirements.txt -r requirements_examples.txt
+
+      - name: Generate protobuf interfaces
+        if: steps.wheel-check.outcome == 'success'
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv run --no-project python .github/scripts/generate_protobuf.py
+
+      - name: Run example unit tests
+        if: steps.wheel-check.outcome == 'success'
+        env:
+          UV_PYTHON: ${{ steps.example-python.outputs.python-path }}
+        run: uv run --no-project python -m unittest discover -s tests/examples -p "test_*.py"
+
+      - name: Report latest Python example probe failure
+        if: failure()
+        run: echo "::warning title=Latest Python example probe failed::Example unit-test job failed on ${{ matrix.os }}. Check logs for compatibility issues or missing dependency wheels. This probe is non-blocking."
+
   lint:
     name: Pylint (latest Python)
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -76,4 +145,13 @@ jobs:
         run: python .github/scripts/generate_protobuf.py --include-custom
 
       - name: Run Pylint
-        run: pylint pookiepy tests examples
+        run: pylint --jobs=1 pookiepy tests examples
+
+      - name: Report latest Python lint probe failure
+        if: failure()
+        run: |
+          echo "::warning title=Latest Python lint probe failed::Weekly latest-Python Pylint job failed. Check this run for Python or Pylint compatibility issues."
+          {
+            echo "### Latest Python lint probe failed"
+            echo "Weekly latest-Python Pylint job failed. Check the job logs for Python or Pylint compatibility issues. This probe is non-blocking."
+          } >> "$GITHUB_STEP_SUMMARY"

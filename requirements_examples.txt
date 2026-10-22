@@ -2,13 +2,13 @@
 # The core framework (requirements.txt) does NOT need these.
 #
 # Install with:
-#   pip install -r requirements.txt -r requirements_examples.txt
+#   uv pip install -r requirements_examples.txt
 
 # interactive_streaming and mcp_server examples
 requests>=2.31.0
 pyttsx3>=2.98
 edge-tts>=7.0.2
-pygame>=2.6.1
+pygame-ce>=2.5.8
 
 # watchdog Aero dashboard (tests/integration/watchdog/watchdog_ui.py)
 # and mcp_server UI task (examples/mcp_server/_task.py)

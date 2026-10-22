@@ -140,6 +140,22 @@ with TimedEvent(s=0.01, n=100) as te:
 grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psutil>=5.0.0
 ```
 
+## Test boundaries
+
+- Core framework unit tests belong directly in `tests/`; do not import or test `examples/` components there.
+- Unit tests for `examples/` belong in `tests/examples/`. Keep this directory without `__init__.py` so core `unittest` discovery does not recurse into it.
+- Core suite: `uv run python -m unittest discover -s tests -p "test_*.py"`.
+- Example suite: `uv run python -m unittest discover -s tests/examples -p "test_*.py"`. Keep external services mocked; install optional dependencies from `requirements_examples.txt` only for example jobs.
+- CI, weekly gRPC compatibility, and weekly latest-Python workflows run examples in separate `Unit test examples` jobs. Keep framework integration scenarios in `tests/integration/`.
+
+## Latest Python CI probes
+
+- Treat floating `3.x` jobs as non-blocking compatibility probes, not supported-version guarantees. Keep pinned supported-Python checks mandatory.
+- Before installing dependencies in a latest-Python probe, use `uv pip install --dry-run --only-binary grpcio,grpcio-tools` with the job's actual requirement files. Give the probe step an ID and `continue-on-error: true`.
+- If dependency resolution or required gRPC wheels are unavailable, emit a warning and skip dependency installation, protobuf generation, and tests. Gate those steps on the probe's `outcome == 'success'`; in mixed matrices, let pinned Python versions run normally without this gate.
+- Use the same setup-python interpreter for probing, installation, and execution: set step `env.UV_PYTHON` from the setup-python step's `outputs.python-path`. Never interpolate step outputs directly into shell `run` commands.
+- Apply this pattern to new latest-Python jobs, including example tests. Do not loosen dependency pins or enable gRPC source builds to make a probe pass.
+
 ## TODOs
 
 - `wait_done()` = yielded to gRPC, not server ACK.

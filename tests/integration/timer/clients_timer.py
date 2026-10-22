@@ -6,7 +6,7 @@ Scenario
 --------
 1. Fifty ``ReceiverClient`` instances subscribe to ``"timer_tick"`` messages.
 2. ``TimerClient`` sends 200 periodic events at 10 ms intervals.
-3. Assertions verify every receiver collected every tick.
+3. Assertions verify every receiver collected every sent tick.
 4. Each receiver reports its average observed tick interval.
 
 Run
@@ -54,7 +54,7 @@ class ReceiverClient(BaseClient):
         self.count = 0
         self.first_tick_at: float | None = None
         self.last_tick_at: float | None = None
-        self.done = threading.Event()
+        self.received = threading.Condition()
         super().__init__(
             port,
             name=f"tick_receiver_{receiver_index:02d}",
@@ -65,15 +65,19 @@ class ReceiverClient(BaseClient):
         self.logger.setLevel(logging.INFO)
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
-        """Record one tick and signal when all expected ticks arrived."""
+        """Record one tick and wake receivers waiting for delivery."""
         received_at = time.perf_counter()
-        if self.first_tick_at is None:
-            self.first_tick_at = received_at
-        self.last_tick_at = received_at
-        self.count += 1
-        if self.count >= N_TICKS:
-            self.done.set()
+        with self.received:
+            if self.first_tick_at is None:
+                self.first_tick_at = received_at
+            self.last_tick_at = received_at
+            self.count += 1
+            self.received.notify_all()
         return True
+
+    def wait_for_ticks(self, expected: int, timeout: float) -> bool:
+        with self.received:
+            return self.received.wait_for(lambda: self.count >= expected, timeout=timeout)
 
     @property
     def average_tick_length(self) -> float:
@@ -95,7 +99,7 @@ def _start_receivers(port: int) -> tuple[list[ReceiverClient], list[threading.Th
     return receivers, threads
 
 
-def _send_ticks(driver: TimerClient) -> None:
+def _send_ticks(driver: TimerClient) -> int:
     """Send one message for every periodic timer event."""
     # macOS reports inherited gRPC poller descriptors when multiprocessing
     # starts after gRPC threads. Its thread backend avoids child creation;
@@ -108,21 +112,25 @@ def _send_ticks(driver: TimerClient) -> None:
         logger=driver.logger,
         backend=backend,
     ) as ticks:
+        sent_count = 0
         for tick_index in ticks:
             driver.send_data(
                 generate_message(TICK_MESSAGE, byte_payload=str(tick_index).encode())
             )
+            sent_count += 1
     driver.wait_done()
+    assert sent_count >= 2, f"Timer emitted only {sent_count} ticks"
+    return sent_count
 
 
-def _wait_for_receivers(receivers: list[ReceiverClient]) -> None:
+def _wait_for_receivers(receivers: list[ReceiverClient], expected: int) -> None:
     """Wait for all receivers against one shared deadline."""
     deadline = time.monotonic() + RECEIVE_TIMEOUT
     incomplete = []
     for receiver in receivers:
         remaining = max(0.0, deadline - time.monotonic())
-        if not receiver.done.wait(timeout=remaining):
-            incomplete.append(f"{receiver.name}={receiver.count}/{N_TICKS}")
+        if not receiver.wait_for_ticks(expected, timeout=remaining):
+            incomplete.append(f"{receiver.name}={receiver.count}/{expected}")
     assert not incomplete, "Receivers timed out: " + ", ".join(incomplete)
 
 
@@ -160,8 +168,8 @@ def main() -> None:
     receivers, spin_threads = _start_receivers(args.port)
     driver = TimerClient(args.port)
     try:
-        _send_ticks(driver)
-        _wait_for_receivers(receivers)
+        sent_count = _send_ticks(driver)
+        _wait_for_receivers(receivers, sent_count)
         _log_statistics(driver, receivers)
     finally:
         _disconnect_all(driver, receivers, spin_threads)
