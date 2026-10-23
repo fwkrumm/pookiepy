@@ -2,7 +2,6 @@
 __pycache__
 .venv/*
 .coverage
-.coverage.server
 uv.lock
 .lurus
 
