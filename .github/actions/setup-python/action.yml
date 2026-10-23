@@ -1,0 +1,29 @@
+name: Set up Python and uv
+description: Install pinned CI tooling and expose the selected Python interpreter.
+inputs:
+  python-version:
+    description: Python version requested from actions/setup-python.
+    required: true
+  cache-suffix:
+    description: Cache namespace for this job.
+    default: ${{ github.job }}
+  enable-cache:
+    description: Whether uv should cache dependencies.
+    default: 'true'
+outputs:
+  python-path:
+    description: Absolute path to the selected Python interpreter.
+    value: ${{ steps.python.outputs.python-path }}
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      id: python
+      uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Set up uv
+      uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+      with:
+        enable-cache: ${{ inputs.enable-cache }}
+        cache-suffix: ${{ inputs.cache-suffix }}
