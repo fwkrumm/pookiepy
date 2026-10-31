@@ -39,7 +39,8 @@ Regen custom integration fixture with runtime-compatible pins:
 ```python
 BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None,
            proto_interface=None)
-# config = ServerConfig(max_workers, max_queue_elements, shutdown_poll_interval, schema_version, server_options)
+# config: max_workers, max_queue_elements=0, shutdown_poll_interval, schema_version,
+#         server_options
 ```
 
 Connect flow: `Peer` created → `notification_queue` registered → `_receive_thread()` starts → first msg: `on_client_connect()` + register `requires` in `DataRegister` + enqueue welcome → subsequent msgs: `on_receive()` → main thread yields queue → disconnect: remove from `DataRegister`.
@@ -55,6 +56,8 @@ Schema check: compares `ClientConfig.schema_version` vs `ServerConfig.schema_ver
 | `on_client_accepted` | `(peer, request)` | --- |
 | `on_client_disconnect` | `(peer)` | --- |
 | `on_receive` | `(peer, request)` | `bool` True=fan-out |
+
+**Lifecycle:** idle senders retain one-second queue polling; each `shutdown()` invokes `on_shutdown`. RPC admission is capped at effective worker count; excess clients raise `GrpcResourceExhaustedError`. Queue bounds are opt-in; full bounded queues drop newest. Manual routing returns `DeliveryResult`; warnings are rate-limited. Hooks must cooperate with shutdown.
 
 **Other:** `serve_forever()`, `shutdown()`, `_add_static_data(name, msg)`, `_get_static_data(name)`
 
@@ -102,7 +105,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 |---|---|
 | `GrpcTimeoutError` | `DEADLINE_EXCEEDED` |
 | `GrpcConnectionError` | channel/connect failure |
-| `GrpcResourceExhaustedError` | msg exceeds size limit |
+| `GrpcResourceExhaustedError` | resource limit, including excess concurrent RPCs or message size |
 | `GrpcServerNoAnswerReceivedError` | no server response |
 | `GrpcValueError` | bad arg types |
 | `GrpcCustomInterfaceError` | helper expects bundled payload field names but active custom proto differs |
@@ -112,7 +115,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 ## pookiepy Utils
 
-**Logger** (`pookiepy/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console `coloredlogs` default `INFO`. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d at `INTERNAL_DEBUG`.
+**Logger** (`pookiepy/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console defaults to `INFO`; file retains `INTERNAL_DEBUG` tracing. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d. Reduced file tracing is opt-in before constructing server/client; cached loggers keep their first configuration.
 
 **Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `PookieMessage`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 

@@ -11,6 +11,7 @@ import sys
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
@@ -168,6 +169,64 @@ class TestAddDataFanOut(unittest.TestCase):
         msg = _msg()
         self.dr.add_data_for_message_name("sender", "topic", msg)
         self.assertIs(q.get_nowait(), msg)
+
+    def test_slow_consumer_drops_newest_without_blocking_healthy_queue(self):
+        """Both routing modes throttle full-queue logs without hiding delivery results."""
+        logger = MagicMock()
+        register = DataRegister(logger)
+        slow = queue.Queue(maxsize=1)
+        healthy = queue.Queue()
+        original = _msg()
+        slow.put_nowait(original)
+        register.add_notification_queue_for_message_name("slow", "topic", slow)
+        register.add_notification_queue_for_message_name("healthy", "topic", healthy)
+        with patch("pookiepy.data_register.time.monotonic", side_effect=[0, 1, 5]):
+            first = register.add_data_for_message_name("sender", "topic", _msg())
+            second = register.add_data_for_message_name(
+                "sender", "topic", _msg(), target_client_id="slow"
+            )
+            register.add_data_for_message_name("sender", "topic", _msg())
+        self.assertEqual(first, DeliveryResult(delivered=("healthy",), dropped=("slow",)))
+        self.assertEqual(second.dropped, ("slow",))
+        self.assertIs(slow.get_nowait(), original)
+        self.assertEqual(healthy.qsize(), 2)
+        self.assertEqual(logger.warning.call_count, 2)
+
+    def test_growth_warnings_are_rate_limited(self):
+        """An unbounded queue crossing its threshold cannot log for every message."""
+        logger = MagicMock()
+        register = DataRegister(logger, queue_warning_threshold=0)
+        notifications = queue.Queue()
+        register.add_notification_queue_for_message_name("slow", "topic", notifications)
+        with patch("pookiepy.data_register.time.monotonic", return_value=0):
+            for _ in range(10):
+                register.add_data_for_message_name("sender", "topic", _msg())
+        logger.warning.assert_called_once()
+
+    def test_queue_warnings_share_one_cooldown(self):
+        """Different queues and warning types share a cooldown, not delivery outcomes."""
+        logger = MagicMock()
+        register = DataRegister(logger, queue_warning_threshold=0)
+        full = queue.Queue(maxsize=1)
+        full.put_nowait(_msg())
+        register.add_notification_queue_for_message_name("full", "topic", full)
+        register.add_notification_queue_for_message_name("growing", "topic", queue.Queue())
+        with patch("pookiepy.data_register.time.monotonic", side_effect=[0, 1, 5, 6]):
+            first = register.add_data_for_message_name("sender", "topic", _msg())
+            second = register.add_data_for_message_name("sender", "topic", _msg())
+        expected = DeliveryResult(delivered=("growing",), dropped=("full",))
+        self.assertEqual(first, expected)
+        self.assertEqual(second, expected)
+        self.assertEqual(logger.warning.call_count, 2)
+
+    def test_unreachable_warning_threshold_skips_queue_size_lock(self):
+        """Bounded queues cannot exceed a threshold above their capacity."""
+        register = DataRegister(MagicMock(), queue_warning_threshold=100_000)
+        notifications = queue.Queue(maxsize=1024)
+        register.add_notification_queue_for_message_name("client", "topic", notifications)
+        with patch.object(notifications, "qsize") as size:
+            register.add_data_for_message_name("sender", "topic", _msg())
+        size.assert_not_called()
 
 
 class TestRemoveClient(unittest.TestCase):

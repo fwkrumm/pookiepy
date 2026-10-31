@@ -1,111 +1,118 @@
 # Threading & Scaling Considerations
 
-## The core constraint
+## Current execution model
 
-`BaseServer` uses a `ThreadPoolExecutor`. Each connected client occupies **one thread for its
-entire connection lifetime** --- the `DataChannel` generator holds the thread until the client
-disconnects. Additionally, `_handle_client_receive` spawns a second daemon thread per client.
+`BaseServer` remains synchronous. Each serviced `DataChannel` occupies an executor worker
+and a receive thread. Application thread usage is approximately twice the active stream
+count, plus gRPC/native and application support threads. Existing synchronous subclass
+hooks need no asyncio integration.
 
-$$\text{threads} = \text{clients} \times 2$$
+Set `ServerConfig.max_workers` explicitly for the expected peak connection count and
+headroom. The default is `min(32, (available_cpu_count or 1) + 4)`, using
+`os.process_cpu_count()` when available and `os.cpu_count()` otherwise.
 
-The default `ServerConfig(max_workers=None)` resolves to `min(32, os.cpu_count() + 4)`.
-On a typical 8-core machine: **12 workers = hard cap of 12 simultaneous clients**.
-The 13th client does not get refused --- it silently stalls at `_check_connection()` and times
-out after `connection_check_timeout` (default 5 s) with a `GrpcConnectionError`. No server-side
-warning is emitted.
+gRPC admission capacity equals the worker count. Excess RPCs receive
+`RESOURCE_EXHAUSTED` instead of waiting indefinitely for an executor slot. `BaseClient`
+propagates this as `GrpcResourceExhaustedError`, including before the welcome message.
+Retry with bounded backoff or increase capacity; do not retry in a tight loop.
 
-**Minimum fix:** Always set `max_workers` explicitly:
+## Logging and routing overhead
 
-```python
-ServerConfig(max_workers=200)  # set to expected peak concurrent clients
-```
-
----
-
-## Thread cost breakdown
-
-Threads blocked on `queue.get()` release the GIL and consume near-zero CPU.
-The real cost is **memory** (stack) and **OS scheduler slots**.
-
-| Platform | Default stack/thread | 1000 clients (×2 threads) |
-|---|---|---|
-| Linux (default) | 8 MB | ~16 GB --- not viable |
-| Linux (`ulimit -s 256`) | 256 KB | ~500 MB --- acceptable |
-| Windows | ~1 MB | ~2 GB --- marginal |
-| Windows (reduced) | ~256 KB | ~500 MB --- acceptable |
-
-**Correction:** the previous `ulimit -s 64` (64 KB) recommendation is risky for CPython.
-The C stack backs interpreter recursion, exception handling, and calls into gRPC's C core ---
-64 KB can trigger stack-overflow crashes (segfault, not a catchable Python exception) under
-deeper call chains, e.g. logging formatting, nested exception handling, or gRPC callbacks.
-Use **256 KB** as a tested floor and validate under the app's actual worst-case call depth
-before deploying a reduced stack size in production; the "1000 clients" column above has been
-adjusted accordingly (128 MB → 500 MB estimate).
-
-```bash
-ulimit -s 256   # 256 KB stack; set in the launch script or systemd unit
-```
-
----
-
-## Scaling tiers
-
-| Client count | Recommended approach |
-|---|---|
-| < 100 | Current threading model. Set `max_workers` explicitly. |
-| 100–500 | Same + reduce thread stack size on Linux (test at 256 KB first). |
-| 500–5000 | Migrate `BaseServer` to `grpc.aio` + `asyncio.Queue`. Keep sync hooks via `asyncio.to_thread()`. |
-| 5000+ | Python as leaf client only. Use Go or C++ for the fan-out broker. |
-
-Event at 100 threads, when using one timer with 10ms tick size, the Python GIL can become a
-bottleneck at least on Windows.
-
----
-
-## Path to `grpc.aio` (500–5000 clients)
-
-`grpcio` ships `grpc.aio` --- same library, no new dependency. The servicer becomes an async
-coroutine; concurrent streams share one event loop instead of one thread each. The exact
-number of OS threads used internally depends on the async gRPC C-core executor and is not a
-fixed "2–4" --- treat that as "a small, roughly constant number" rather than a guaranteed count,
-and verify via profiling for the target deployment.
-
-User-facing hook signatures stay **synchronous**. Sync hooks are dispatched via
-`asyncio.to_thread()` so user subclasses require no changes:
+Console logging defaults to `INFO`; rotating-file logging retains `INTERNAL_DEBUG`
+for early-release diagnostics. No default diagnostic coverage has been removed.
+To explicitly reduce tracing for a performance experiment, configure the logger
+before constructing the server/client:
 
 ```python
-# server side --- internal change only
-async def DataChannel(self, request_iterator, context):
-    # Incoming side: dispatch each request to a worker thread so sync hooks don't
-    # block the event loop.
-    async for request in request_iterator:
-        result = await asyncio.to_thread(self.on_receive, peer, request)
+import logging
+from pookiepy.logger import get_logger
 
-    # Outgoing side (not shown above, but required): the current sync implementation
-    # concurrently reads request_iterator AND yields from notification_queue in the
-    # same generator via a background thread. In grpc.aio this requires two
-    # concurrently-running coroutines (e.g. asyncio.gather of a receive-loop task and
-    # a send-loop task pulling from an asyncio.Queue) since a single async generator
-    # cannot both consume request_iterator and yield outgoing messages independently.
+get_logger(name="broker", file_log_level=logging.INFO)
 ```
 
-Required internal changes:
-- `DataRegister`: `threading.Lock` → `asyncio.Lock`, `queue.Queue` → `asyncio.Queue`
-- `BaseServer.serve_forever()`: `grpc.server(...)` → `grpc.aio.server(...)`
-- `BaseServer.DataChannel`: `def` → `async def`, split into a concurrent receive task and
-  send task (the current single-generator structure that both reads `request_iterator` and
-  yields from `notification_queue` cannot be ported as-is --- see caveat above)
-- `BaseClient` is unaffected --- it runs in its own process/thread already
+The logger name must match the server name; client logger names use `Client-<name>`.
+Cached loggers retain their first configuration. Handler levels filter output, but
+the logger remains at `INTERNAL_DEBUG`, so trace records are still created. Enabled
+file tracing writes synchronously and can limit throughput.
 
-`BaseClient` does **not** need to change for the `grpc.aio` server migration. This migration
-is a genuine rewrite of the streaming loop, not a mechanical `def`→`async def` swap --- scope
-the effort accordingly.
+`DataRegister` snapshots subscribers under a per-topic lock, then performs nonblocking
+queue writes outside that lock. Broadcast cost remains linear in subscriber count.
+Queue-depth checks are skipped when the configured threshold cannot be exceeded by a
+bounded queue. Full-queue and queue-growth warnings share one five-second cooldown per
+register. Logs sample affected subscribers; delivery results still report every dropped
+recipient.
 
----
+## Queue policy
 
-## Why not `grpclib`?
+Per-client notification queues remain **unbounded by default** (`max_queue_elements=0`).
+Choose a finite limit explicitly to protect memory against slow subscribers. When a
+bounded queue is full, the newest message for that subscriber is dropped; other
+subscribers continue receiving. This is load shedding, not publisher backpressure,
+reliable delivery, or a normal-path throughput optimization.
 
-`grpclib` is a third-party pure-Python asyncio gRPC implementation (no C core).
-It requires the same asyncio migration as `grpc.aio` but loses the C-core performance
-advantage of `grpcio`. Not recommended --- `grpc.aio` gives asyncio scalability with
-the same C-core throughput.
+```python
+from pookiepy.baseserver import BaseServer, ServerConfig
+
+server = BaseServer(port=50051, name="broker", config=ServerConfig(
+    max_workers=200,
+    max_queue_elements=1024,
+))
+```
+
+Manual calls to `add_data_for_message_name()` return `DeliveryResult` with delivered
+and dropped recipient IDs. Automatic fan-out does not expose a new delivery hook.
+Enqueue results are not client acknowledgements. Reliable workflows need application-level
+acknowledgements/retries or a durable broker.
+
+Size queues for payload size and acceptable subscriber lag. An element limit is not a
+byte limit; shared references, protobuf objects, transport buffers, and native memory also
+contribute to process memory. The default unbounded queues retain their memory-growth risk.
+
+## Stream lifecycle
+
+Idle senders retain `queue.get(timeout=1)`: roughly one timeout wakeup per idle stream
+per second. This does not impose a one-second message delivery delay. Exit detection can
+take up to that polling interval; no exit registry or configurable receive-thread join
+has been added.
+
+A shared registration/cleanup lock prevents acceptance hooks returning late from
+recreating subscriptions after disconnection. Receive-hook failures produce gRPC
+`INTERNAL`. Transport stop and executor cleanup run even when startup or the shutdown
+hook fails. These are correctness improvements, not throughput gains.
+
+Each `shutdown()` call invokes `on_shutdown()`, including the cleanup call from
+`serve_forever()`, preserving the existing contract. Hooks should tolerate repeated
+cleanup and use bounded I/O. Disconnect hooks can overlap receive hooks still finishing.
+The server watchdog checks the global exit event every `shutdown_poll_interval` seconds.
+
+## Measure before changing concurrency models
+
+No significant throughput or latency gain has been established for these changes.
+Admission control improves overload errors, queue bounds are optional memory protection,
+and warning throttling limits log storms. Compare throughput with identical logging and
+queue settings before attributing a speedup to threading or routing changes.
+
+Blocked threads release the GIL and use little CPU. Thread-stack virtual reservations are
+not equivalent to resident RAM. Measure resident/private memory, virtual memory, thread
+count, context switches, queue drops, throughput, and p50/p95/p99 latency on the deployment
+OS. No universally safe reduced stack size or client-count migration threshold exists.
+
+Compare idle connections, busy fan-out, slow subscribers, blocking hooks, and CPU-heavy
+hooks with identical logging, payloads, TLS, compression, and buffering. Test connection
+churn and shutdown as well as steady-state throughput. Timer jitter alone does not prove
+GIL contention.
+
+Only prototype an optional `grpc.aio` backend if connection-long workers dominate measured
+resource use. Async tasks can reduce thread count for mostly idle connections, but do not
+remove fan-out CPU cost, serialization, or the GIL. Per-message executor dispatch can add
+overhead for short synchronous hooks. Preserve the existing synchronous backend and API.
+
+An async implementation needs concurrent receive/send tasks, bounded hook admission,
+ordered per-stream dispatch, and thread-safe bridges for external publishers. A blanket
+`asyncio.to_thread()` wrapper does not preserve thread affinity or synchronous context
+methods such as `context.abort()`. Async gRPC contexts must stay on their owning thread.
+Native async consumers should have explicit async hooks; legacy subclasses must not be
+silently moved onto a different execution contract.
+
+Neither shared C-core usage nor switching to `grpclib`, Go, or C++ establishes a throughput
+gain by itself. Require matched benchmarks and a clear resource/SLO win before migration.
