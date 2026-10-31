@@ -19,6 +19,8 @@ class TestServerLifecycle(unittest.TestCase):
 
     def test_overload_slot_reuse_and_shutdown(self):
         """Excess clients fail promptly; finished streams release workers and capacity."""
+        # Keep setup and teardown together for this single transport lifecycle scenario.
+        # pylint: disable=too-many-locals,too-many-statements,protected-access
         server = BaseServer(port=0, ip="127.0.0.1", config=ServerConfig(max_workers=1))
         server.logger = MagicMock()
         server.on_shutdown = MagicMock()
@@ -43,7 +45,7 @@ class TestServerLifecycle(unittest.TestCase):
         def serve():
             try:
                 server.serve_forever()
-            except Exception as exc:
+            except Exception as exc:  # pylint: disable=broad-exception-caught
                 errors.append(exc)
                 started.set()
 
@@ -66,7 +68,9 @@ class TestServerLifecycle(unittest.TestCase):
                 def generate():
                     yield message_pb2.PookieMessage(
                         metaInfo=message_pb2.MetaInformation(
-                            clientInfo=message_pb2.ClientProvides(uuid=client_id, requires=["topic"])
+                            clientInfo=message_pb2.ClientProvides(
+                                uuid=client_id, requires=["topic"]
+                            )
                         )
                     )
                     while True:
@@ -93,7 +97,7 @@ class TestServerLifecycle(unittest.TestCase):
             requests.put_nowait(None)
             self.assertEqual(list(first), [])
             self.assertEqual(first.code(), grpc.StatusCode.OK)
-            second, _requests = open_stream("second")
+            second, _ = open_stream("second")
             server.shutdown()
             try:
                 list(second)
