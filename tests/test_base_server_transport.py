@@ -66,6 +66,28 @@ class TestStreamLifecycle(unittest.TestCase):
 class TestTransportShutdown(unittest.TestCase):
     """Verify TLS setup, polling, interrupts, and resource release with mocked gRPC."""
 
+    def test_startup_and_shutdown_hook_failures_release_resources(self):
+        """Executor and transport cleanup run even when startup or user cleanup fails."""
+        for failure in ("start", "hook", "bind"):
+            with self.subTest(failure=failure):
+                server = BaseServer(port=50099)
+                server.logger = MagicMock()
+                server.global_exit_event.set()
+                with patch("pookiepy.baseserver.futures.ThreadPoolExecutor") as executor, patch(
+                    "pookiepy.baseserver.grpc.server"
+                ) as transport, patch.object(message_pb2_grpc, "add_StreamServicer_to_server"):
+                    transport.return_value.add_insecure_port.return_value = (
+                        0 if failure == "bind" else 50099
+                    )
+                    if failure == "start":
+                        transport.return_value.start.side_effect = RuntimeError("start failed")
+                    elif failure == "hook":
+                        server.on_shutdown = MagicMock(side_effect=RuntimeError("hook failed"))
+                    with self.assertRaises(RuntimeError):
+                        server.serve_forever()
+                    transport.return_value.stop.assert_called_once_with(grace=None)
+                    executor.return_value.shutdown.assert_called_once_with(wait=True)
+
     def test_tls_interrupt_and_stop_timeout_release_resources(self):
         """Keyboard interruption stops TLS transport and joins its worker executor."""
         exit_event = MagicMock()
@@ -90,7 +112,8 @@ class TestTransportShutdown(unittest.TestCase):
 
         executor.assert_called_once_with(max_workers=3)
         transport.assert_called_once_with(
-            executor.return_value, options=config.server_options, compression=config.compression
+            executor.return_value, options=config.server_options, compression=config.compression,
+            maximum_concurrent_rpcs=3,
         )
         transport.return_value.add_secure_port.assert_called_once_with(
             "localhost:50099", credentials
@@ -112,13 +135,27 @@ class TestTransportShutdown(unittest.TestCase):
         server.on_shutdown = MagicMock()
         server.global_exit_event.set()
         server.shutdown()
+        server.shutdown()
         self.assertTrue(server.global_exit_event.is_set())
-        server.on_shutdown.assert_called_once_with()
-        server.logger.idebug.assert_called_once_with("global exit event already set")
+        self.assertEqual(server.on_shutdown.call_count, 2)
+        self.assertEqual(server.logger.idebug.call_count, 2)
 
 
 class TestServerConfigurationEdges(unittest.TestCase):
     """Cover explicit interface defaults and inspectable server identities."""
+
+    def test_queue_bound_remains_opt_in(self):
+        """Default buffering remains unbounded; finite queue limits are explicit."""
+        self.assertEqual(ServerConfig().max_queue_elements, 0)
+        self.assertEqual(ServerConfig(max_queue_elements=1024).max_queue_elements, 1024)
+
+    def test_worker_default_uses_process_cpu_availability(self):
+        """CPU affinity-aware counts control both executor size and admission capacity."""
+        with patch("pookiepy.baseserver.os.process_cpu_count", return_value=2, create=True), patch(
+            "pookiepy.baseserver.os.cpu_count", return_value=64
+        ):
+            self.assertEqual(ServerConfig().effective_max_workers, 6)
+            self.assertEqual(ServerConfig(max_workers=10).effective_max_workers, 10)
 
     def test_injected_interface_without_schema_defaults_to_empty(self):
         """Injected interfaces do not inherit the bundled schema version."""

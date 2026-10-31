@@ -101,13 +101,24 @@ self._data_register.add_data_for_message_name("", "my_topic", msg)
 ```python
 config = ServerConfig(
     max_workers=10,            # thread pool size (>= expected concurrent clients)
-    max_queue_elements=0,      # per-client queue depth (0 = unlimited; no backpressure)
+    max_queue_elements=0,      # unlimited by default; finite bounds drop newest when full
     queue_warning_threshold=100_000,  # warn when subscribers fall behind; None disables
     shutdown_poll_interval=0.1,
     schema_version="chat-v1", # optional manual schema/version string
 )
 BaseServer(port=50051, config=config)
 ```
+
+Excess RPCs are rejected with `RESOURCE_EXHAUSTED`; clients raise
+`GrpcResourceExhaustedError`, including during connection setup. Retry with bounded
+backoff. Manual routing returns `DeliveryResult` directly; `result.dropped` lists
+recipients whose queues were full. This does not confirm client receipt.
+Full-queue and queue-growth warnings share one five-second cooldown per register.
+Logs sample affected subscribers; use `DeliveryResult` for individual routing outcomes.
+
+`shutdown()` sets the global exit event and invokes `on_shutdown()` on every call.
+Idle streams check for exit using the existing one-second queue polling timeout.
+Hooks remain synchronous; use bounded I/O and make cleanup tolerate repeated calls.
 
 ### `Peer` fields
 

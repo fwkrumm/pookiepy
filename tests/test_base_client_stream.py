@@ -84,6 +84,17 @@ class TestClientStream(unittest.TestCase):
                     with self.assertRaisesRegex(error_type, "stream failed"):
                         self.client.get_data(timeout=0)
 
+    def test_rejection_before_welcome_reaches_connection_check(self):
+        """Admission failures surface immediately, before any welcome message."""
+        def rejected():
+            yield from ()
+            raise _RpcFailure(grpc.StatusCode.RESOURCE_EXHAUSTED)
+
+        self.client.stream = rejected()
+        self.client._receive_loop()  # pylint: disable=protected-access
+        with patch.object(self.client, "disconnect"), self.assertRaises(GrpcResourceExhaustedError):
+            self.client._check_connection()  # pylint: disable=protected-access
+
     def test_hook_exception_reaches_blocking_get_data_unchanged(self):
         """Application errors retain their identity when transferred to the main thread."""
         failure = StopSpin("stop processing")

@@ -33,7 +33,7 @@ class ServerConfig():
 
     # max elements for per-client notification queue (0 = unlimited)
     max_queue_elements: int = 0
-    # worker threads for the gRPC executor; None = Python default (min(32, cpu+4)).
+    # worker threads for the gRPC executor; None = min(32, available CPUs + 4).
     # Each connected client occupies one thread for the full connection lifetime.
     # Set to at least the expected number of concurrent clients.
     max_workers: int | None = None
@@ -69,11 +69,14 @@ class ServerConfig():
         """Resolve the effective thread-pool size.
 
         Returns ``max_workers`` when set explicitly, otherwise mirrors
-        ``ThreadPoolExecutor``'s own default: ``min(32, cpu_count + 4)``.
+        ``ThreadPoolExecutor``'s CPU-based default, using process CPU availability
+        on Python versions that provide ``os.process_cpu_count``.
         """
         if self.max_workers is not None:
             return self.max_workers
-        return min(32, (os.cpu_count() or 1) + 4)
+        # Match CPU-constrained executor defaults without requiring newer Python APIs.
+        cpu_count = getattr(os, "process_cpu_count", os.cpu_count)
+        return min(32, (cpu_count() or 1) + 4)
 
 
 @dataclass
@@ -189,6 +192,9 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         try:
             for request in request_iterator:
                 request: PookieMessage
+                # The iterator may unblock after cancellation or shutdown has begun.
+                if exit_event.is_set() or self._global_exit_event.is_set():
+                    return
 
                 if request.history:
                     request.history.append(
@@ -252,14 +258,19 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
                         )
                     )
                     tools.set_metadata(welcome_message)
-                    notification_queue.put(welcome_message)
-
-                    for require in requires:
-                        self._data_register.add_notification_queue_for_message_name(
-                            peer.client_id,
-                            require,
-                            notification_queue,
-                        )
+                    # Serialize with disconnect cleanup: acceptance hooks may return late.
+                    with self.__connected_clients_lock:
+                        # Do not restore subscriptions after disconnect cleanup.
+                        if exit_event.is_set() or self._global_exit_event.is_set():
+                            return
+                        # Never block disconnect cleanup while holding this lock.
+                        notification_queue.put_nowait(welcome_message)
+                        for require in requires:
+                            self._data_register.add_notification_queue_for_message_name(
+                                peer.client_id,
+                                require,
+                                notification_queue,
+                            )
 
                     continue
 
@@ -281,6 +292,11 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         except grpc.RpcError:
             # probably ok (disconnect)
             pass
+        except Exception:  # pylint: disable=broad-exception-caught
+            # A receive-thread failure must not look like a successful RPC completion.
+            self.logger.exception("%s: error in receive worker", peer)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("server receive worker failed")
         finally:
             exit_event.set()
             self.logger.idebug("%s: exit event set", peer)
@@ -311,7 +327,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
             # this is an important warning; make it more prominent in the logs?
             self.logger.warning(
                 "!!! Connected clients (%d) reached max_workers (%d). "
-                "The next client will stall until a slot opens. "
+                "Additional RPCs will be rejected with RESOURCE_EXHAUSTED until a slot opens. "
                 "Set ServerConfig.max_workers explicitly to handle more concurrent clients.",
                 current_count, self.__config.effective_max_workers
             )
@@ -322,6 +338,13 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         )
 
         try:
+            # Track cancellation even while the receive worker is blocked in a user hook.
+            if context.add_callback(exit_event.set) is False:
+                # Registration fails when the RPC has already terminated.
+                exit_event.set()
+            # Skip schema checks and worker startup for an already-stopped stream.
+            if exit_event.is_set() or self._global_exit_event.is_set():
+                return
             # Verify application-managed schema compatibility before processing any messages.
             metadata = dict(context.invocation_metadata())
             client_schema = metadata.get(SCHEMA_VERSION_METADATA_KEY, "")
@@ -353,7 +376,8 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
                 while not (exit_event.is_set() or self._global_exit_event.is_set()):
                     self.logger.idebug("%s: main thread running", connection_peer)
                     try:
-                        data =  notification_queue.get(timeout=1)  # wait for data to send to client
+                        # Periodic polling lets idle streams observe shutdown.
+                        data = notification_queue.get(timeout=1)
                         if data.history:
                             data.history[-1].perfCounter = (
                                 time.perf_counter() - data.history[-1].perfCounter
@@ -374,9 +398,12 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
                     except queue.Empty:
                         continue
             finally:
-                self._data_register.remove_notification_queues_for_client(
-                    connection_peer.client_id
-                )
+                # Mark exit under the registration lock before removing subscriptions.
+                with self.__connected_clients_lock:
+                    exit_event.set()
+                    self._data_register.remove_notification_queues_for_client(
+                        connection_peer.client_id
+                    )
                 self.on_client_disconnect(connection_peer)
                 self.logger.iinfo("%s: disconnected", connection_peer)
         finally:
@@ -384,6 +411,7 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
                 self.__connected_clients -= 1
 
     def shutdown(self):
+        """Set the global exit event and invoke the synchronous shutdown hook."""
         if not self._global_exit_event.is_set():
             self.logger.iinfo("setting global exit event for server shutdown")
             self._global_exit_event.set()
@@ -406,46 +434,58 @@ class BaseServer:  # pylint: disable=too-many-instance-attributes
         if self.__config.max_queue_elements == 0:
             self.logger.iinfo(
                 "Per-client notification queues are unbounded. queue.Full will never fire; "
-                "set ServerConfig.max_queue_elements > 0 to enable backpressure."
+                "set ServerConfig.max_queue_elements > 0 to bound buffering and drop newest "
+                "messages when full."
             )
-        server = grpc.server(
-            executor,
-            options=self.__config.server_options,
-            compression=self.__config.compression,
-        )
-        self._message_pb2_grpc.add_StreamServicer_to_server(self, server)
-        if self.__ssl_credentials is None:
-            bound_port = server.add_insecure_port(f"{self._ip}:{self._port}")
-        else:
-            self.logger.iinfo("Using SSL credentials for server")
-            bound_port = server.add_secure_port(
-                f"{self._ip}:{self._port}", self.__ssl_credentials
-            )
-        server.start()
-        self.logger.info(
-            "server %s started (bound_port=%d, schema=%s)",
-            self,
-            bound_port,
-            self.__config.schema_version,
-        )
+        # Server creation may fail before there is a transport to stop.
+        server = None
+        # Include binding/startup in cleanup so failures cannot leak the executor.
         try:
+            server = grpc.server(
+                executor,
+                options=self.__config.server_options,
+                compression=self.__config.compression,
+                # Reject excess streams before they queue behind connection-long workers.
+                maximum_concurrent_rpcs=self.__config.effective_max_workers,
+            )
+            self._message_pb2_grpc.add_StreamServicer_to_server(self, server)
+            if self.__ssl_credentials is None:
+                bound_port = server.add_insecure_port(f"{self._ip}:{self._port}")
+            else:
+                self.logger.iinfo("Using SSL credentials for server")
+                bound_port = server.add_secure_port(
+                    f"{self._ip}:{self._port}", self.__ssl_credentials
+                )
+            if not bound_port:
+                # A zero result means no listener was bound.
+                raise RuntimeError("gRPC server failed to bind its listening port")
+            server.start()
+            self.logger.info(
+                "server %s started (bound_port=%d, schema=%s)",
+                self,
+                bound_port,
+                self.__config.schema_version,
+            )
             while not self._global_exit_event.is_set():
                 self._global_exit_event.wait(timeout=self.__config.shutdown_poll_interval)
-            # usually this was:
-            # server.wait_for_termination()
         except KeyboardInterrupt:
             pass
         finally:
             self.logger.iinfo("shutting down server")
-            self.shutdown()
-            stop_event = server.stop(grace=None)
-            if not stop_event.wait(timeout=10):
-                self.logger.warning(
-                    "gRPC server stop did not complete within 10s; continuing shutdown"
-                )
-            server = None
-            # shutdown executor i.e. wait for all DataChannel threads to finish
-            executor.shutdown(wait=True)
+            # User cleanup failures must not prevent transport and executor teardown.
+            try:
+                self.shutdown()
+            finally:
+                try:
+                    if server is not None:
+                        stop_event = server.stop(grace=None)
+                        if not stop_event.wait(timeout=10):
+                            self.logger.warning(
+                                "gRPC server stop did not complete within 10s; continuing shutdown"
+                            )
+                finally:
+                    # Release workers even if stopping the transport fails.
+                    executor.shutdown(wait=True)
         self.logger.iinfo("server stopped")
 
 

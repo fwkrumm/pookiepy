@@ -20,7 +20,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))  # pylint: disable=wrong-import-position
 
-from pookiepy.logger import GrpcLogger, get_logger
+from pookiepy.logger import GrpcLogger, INTERNAL_DEBUG, get_logger
 
 
 def _unique(prefix: str = "test") -> str:
@@ -63,6 +63,38 @@ class TestGrpcLoggerSetLevel(unittest.TestCase):
 
 class TestGetLoggerCustomDir(unittest.TestCase):
     """Tests for get_logger log_dir parameter (the else-branch)."""
+
+    def test_explicit_info_file_handler_filters_trace_records(self):
+        """An INFO file handler filters trace output without raising the logger level."""
+        with tempfile.TemporaryDirectory() as log_dir:
+            logger = get_logger(name=_unique(), log_dir=log_dir, console_log_level=None,
+                                file_log_level=logging.INFO)
+            try:
+                with patch.object(logger.handlers[0], "emit") as emit:
+                    logger.idebug("message")
+                    logger.debug("message")
+                    emit.assert_not_called()
+                    logger.info("visible message")
+                emit.assert_called_once()
+                self.assertEqual(emit.call_args.args[0].getMessage(), "visible message")
+                self.assertEqual(logger.handlers[0].level, logging.INFO)
+                self.assertEqual(logger.level, INTERNAL_DEBUG)
+            finally:
+                _close_handlers(logger)
+
+    def test_default_trace_logging_is_preserved(self):
+        """Default file tracing preserves early-release diagnostics."""
+        with tempfile.TemporaryDirectory() as log_dir:
+            logger = get_logger(
+                name=_unique(), log_dir=log_dir, console_log_level=logging.WARNING,
+                use_colored_output=False,
+            )
+            try:
+                self.assertTrue(logger.isEnabledFor(INTERNAL_DEBUG))
+                self.assertEqual([handler.level for handler in logger.handlers],
+                                 [logging.WARNING, INTERNAL_DEBUG])
+            finally:
+                _close_handlers(logger)
 
     def test_custom_log_dir_creates_file_handler_in_that_dir(self):
         """File handler base path is inside the provided log_dir."""
