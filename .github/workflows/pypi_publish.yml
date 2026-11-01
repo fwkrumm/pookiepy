@@ -39,7 +39,7 @@ jobs:
         # Configure the trusted publisher once at:
         # https://pypi.org/manage/project/<your-package>/settings/publishing/
         # Exact release tag pins v1.14.2; its published GHCR image is tag-based.
-        uses: pypa/gh-action-pypi-publish@v1.14.2 # zizmor: ignore[unpinned-uses] exact release tag intentionally used
+        uses: pypa/gh-action-pypi-publish@v1.14.3 # zizmor: ignore[unpinned-uses] exact release tag intentionally used
         with:
           # repository-url: https://test.pypi.org/legacy/ # for testing
           packages-dir: dist
