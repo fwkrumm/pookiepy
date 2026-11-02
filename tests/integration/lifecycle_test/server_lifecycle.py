@@ -12,6 +12,7 @@ from pookiepy.baseclient import BaseClient, ClientConfig
 from pookiepy.baseserver import BaseServer, ServerConfig
 from pookiepy.exceptions import GrpcResourceExhaustedError
 from pookiepy.schema_version import DEFAULT_SCHEMA_VERSION, SCHEMA_VERSION_METADATA_KEY
+from tests.integration._interface import get_args
 
 
 class TestServerLifecycle(unittest.TestCase):
@@ -120,3 +121,8 @@ class TestServerLifecycle(unittest.TestCase):
         self.assertEqual(errors, [])
         server.on_shutdown.assert_called_with()
         self.assertEqual(server._data_register.remove_notification_queues_for_client("second"), 0)
+
+
+if __name__ == "__main__":
+    get_args("Server lifecycle integration test")
+    unittest.main(argv=[__file__])
