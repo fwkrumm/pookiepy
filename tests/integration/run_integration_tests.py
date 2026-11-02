@@ -259,8 +259,6 @@ def run_example_pair(name: str, server_path: Path | None, client_path: Path | No
             return
 
         srv, port = _start_server_with_retry(server_path)
-    else:
-        print("(no server process started)")
 
     cli = None
     if client_path is not None:
