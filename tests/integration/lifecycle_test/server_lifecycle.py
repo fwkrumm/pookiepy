@@ -2,8 +2,6 @@
 
 import queue
 import threading
-import unittest
-from unittest.mock import MagicMock
 
 import grpc
 
@@ -15,114 +13,115 @@ from pookiepy.schema_version import DEFAULT_SCHEMA_VERSION, SCHEMA_VERSION_METAD
 from tests.integration._interface import get_args
 
 
-class TestServerLifecycle(unittest.TestCase):
-    """Use ephemeral ports and bounded waits without external services."""
+class LifecycleServer(BaseServer):
+    """Record receive workers and shutdown hooks for lifecycle assertions."""
 
-    def test_overload_slot_reuse_and_shutdown(self):
-        """Excess clients fail promptly; finished streams release workers and capacity."""
-        # Keep setup and teardown together for this single transport lifecycle scenario.
-        # pylint: disable=too-many-locals,too-many-statements,protected-access
-        server = BaseServer(port=0, ip="127.0.0.1", config=ServerConfig(max_workers=1))
-        server.logger = MagicMock()
-        server.on_shutdown = MagicMock()
-        started = threading.Event()
-        port = []
-        errors = []
-        receive_workers = []
-        original_receive = server._handle_client_receive
+    def on_init(self):
+        """Initialize lifecycle observations before serving clients."""
+        self.receive_workers = []
+        self.shutdown_calls = 0
 
-        def record_receive(*args):
-            receive_workers.append(threading.current_thread())
-            original_receive(*args)
+    def _handle_client_receive(self, *args):
+        self.receive_workers.append(threading.current_thread())
+        super()._handle_client_receive(*args)
 
-        server._handle_client_receive = record_receive
+    def on_shutdown(self):
+        """Record each shutdown hook invocation."""
+        self.shutdown_calls += 1
 
-        def record_start(_message, _server, bound_port, _schema):
-            port.append(bound_port)
-            started.set()
 
-        server.logger.info.side_effect = record_start
+def main():
+    """Excess clients fail promptly; finished streams release workers and capacity."""
+    # pylint: disable=too-many-locals,too-many-statements,protected-access
+    args = get_args("Server lifecycle integration test")
+    server = LifecycleServer(
+        port=args.port, ip=args.ip, config=ServerConfig(max_workers=1)
+    )
+    errors = []
 
-        def serve():
-            try:
-                server.serve_forever()
-            except Exception as exc:  # pylint: disable=broad-exception-caught
-                errors.append(exc)
-                started.set()
-
-        worker = threading.Thread(target=serve, daemon=True)
-        worker.start()
-        channel = None
-        streams = []
-        request_queues = []
+    def serve():
         try:
-            self.assertTrue(started.wait(5), "server did not start")
-            self.assertEqual(errors, [])
-            channel = grpc.insecure_channel(f"127.0.0.1:{port[0]}")
-            grpc.channel_ready_future(channel).result(timeout=5)
-            stub = message_pb2_grpc.StreamStub(channel)
+            server.serve_forever()
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            errors.append(exc)
 
-            def open_stream(client_id):
-                requests = queue.Queue()
-                request_queues.append(requests)
+    worker = threading.Thread(target=serve, daemon=True)
+    worker.start()
+    channel = None
+    streams = []
+    request_queues = []
+    try:
+        channel = grpc.insecure_channel(f"{args.ip}:{args.port}")
+        grpc.channel_ready_future(channel).result(timeout=args.timeout)
+        assert not errors, errors
+        stub = message_pb2_grpc.StreamStub(channel)
 
-                def generate():
-                    yield message_pb2.PookieMessage(
-                        metaInfo=message_pb2.MetaInformation(
-                            clientInfo=message_pb2.ClientProvides(
-                                uuid=client_id, requires=["topic"]
-                            )
+        def open_stream(client_id):
+            requests = queue.Queue()
+            request_queues.append(requests)
+
+            def generate():
+                yield message_pb2.PookieMessage(
+                    metaInfo=message_pb2.MetaInformation(
+                        clientInfo=message_pb2.ClientProvides(
+                            uuid=client_id, requires=["topic"]
                         )
                     )
-                    while True:
-                        request = requests.get()
-                        if request is None:
-                            return
-                        yield request
-
-                stream = stub.DataChannel(
-                    generate(), timeout=10,
-                    metadata=[(SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION)],
                 )
-                streams.append(stream)
-                self.assertEqual(next(stream).metaInfo.serverInfo.name, server.name)
-                return stream, requests
+                while True:
+                    request = requests.get()
+                    if request is None:
+                        return
+                    yield request
 
-            first, requests = open_stream("first")
-            with self.assertRaises(GrpcResourceExhaustedError):
-                BaseClient(
-                    port=port[0], ip="127.0.0.1", name="overloaded", requires=["topic"],
-                    config=ClientConfig(connection_check_timeout=2),
-                )
+            stream = stub.DataChannel(
+                generate(), timeout=10,
+                metadata=[(SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION)],
+            )
+            streams.append(stream)
+            assert next(stream).metaInfo.serverInfo.name == server.name
+            return stream, requests
 
+        first, requests = open_stream("first")
+        try:
+            overloaded = BaseClient(
+                port=args.port, ip=args.ip, name="overloaded", requires=["topic"],
+                config=ClientConfig(connection_check_timeout=2),
+            )
+        except GrpcResourceExhaustedError:
+            pass
+        else:
+            overloaded.disconnect()
+            raise AssertionError("excess client was accepted")
+
+        requests.put_nowait(None)
+        assert list(first) == []
+        assert first.code() == grpc.StatusCode.OK
+        second, _ = open_stream("second")
+        server.shutdown()
+        try:
+            list(second)
+        except grpc.RpcError as exc:
+            assert exc.code() in (grpc.StatusCode.CANCELLED, grpc.StatusCode.UNAVAILABLE)
+    finally:
+        for requests in request_queues:
             requests.put_nowait(None)
-            self.assertEqual(list(first), [])
-            self.assertEqual(first.code(), grpc.StatusCode.OK)
-            second, _ = open_stream("second")
-            server.shutdown()
-            try:
-                list(second)
-            except grpc.RpcError as exc:
-                self.assertIn(exc.code(), (grpc.StatusCode.CANCELLED, grpc.StatusCode.UNAVAILABLE))
-        finally:
-            for requests in request_queues:
-                requests.put_nowait(None)
-            for stream in streams:
-                stream.cancel()
-            if channel is not None:
-                channel.close()
-            server.shutdown()
-            worker.join(timeout=5)
-            for receiver in receive_workers:
-                receiver.join(timeout=2)
+        for stream in streams:
+            stream.cancel()
+        if channel is not None:
+            channel.close()
+        server.shutdown()
+        worker.join(timeout=5)
+        for receiver in server.receive_workers:
+            receiver.join(timeout=2)
 
-        self.assertFalse(worker.is_alive(), "server worker leaked")
-        self.assertTrue(all(not receiver.is_alive() for receiver in receive_workers))
-        self.assertEqual(errors, [])
-        server.on_shutdown.assert_called_with()
-        self.assertEqual(server._data_register.remove_notification_queues_for_client("second"), 0)
+    assert not worker.is_alive(), "server worker leaked"
+    assert all(not receiver.is_alive() for receiver in server.receive_workers)
+    assert not errors, errors
+    assert server.shutdown_calls > 0, "shutdown hook was not called"
+    assert server._data_register.remove_notification_queues_for_client("second") == 0
+    print("Server lifecycle integration test passed.")
 
 
 if __name__ == "__main__":
-    get_args("Server lifecycle integration test")
-    unittest.main(argv=[__file__])
+    main()
