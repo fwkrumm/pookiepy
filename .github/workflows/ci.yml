@@ -17,11 +17,29 @@ defaults:
 
 jobs:
   test:
-    # if: false  # disabled --- tests already passing; re-enable when needed
     name: Test (py${{ matrix.python-version }} / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
-      # Report all matrix failures, not just the first.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest, ubuntu-22.04-arm, ubuntu-24.04-arm]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Run core unit tests
+        uses: $/.github/actions/python-check
+        with:
+          python-version: ${{ matrix.python-version }}
+          suite: unit
+
+  unit-test-examples:
+    name: Unit test examples (py${{ matrix.python-version }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.python-version == '3.x' }}
+    strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest, ubuntu-22.04-arm, ubuntu-24.04-arm]
@@ -31,60 +49,50 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run example unit tests
+        uses: $/.github/actions/python-check
         with:
           python-version: ${{ matrix.python-version }}
+          suite: examples
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: py${{ matrix.python-version }}
-
-      - name: Install dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py
-
-      - name: Run unit tests with coverage
-        run: |
-          python -m coverage run -m unittest discover -s tests -p "test_*.py"
-          coverage report -m
-
-  integration-test:
-    name: Integration test (${{ matrix.os }})
+  latest-python-probe:
+    name: Latest Python probe (${{ matrix.os }})
+    continue-on-error: true
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest, ubuntu-22.04-arm, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run latest Python probe
+        uses: $/.github/actions/python-check
         with:
-          python-version: "3.x"
+          python-version: '3.x'
+          suite: ${{ contains(matrix.os, '-arm') && 'unit' || 'unit-integration' }}
+          include-custom: 'true'
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+  integration-test:
+    name: Integration test (py${{ matrix.python-version }} / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.14"]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          enable-cache: true
-          cache-suffix: ${{ matrix.os }}
-
-      - name: Install dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
+          persist-credentials: false
 
       - name: Run integration tests
-        run: python tests/integration/run_integration_tests.py
-
+        uses: $/.github/actions/python-check
+        with:
+          python-version: ${{ matrix.python-version }}
+          suite: integration
 
   lint:
     name: Pylint
@@ -94,22 +102,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.x"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: ${{ github.job }}
-
-      - name: Install dependencies
-        run: uv pip install --system -r requirements.txt -r requirements_dev.txt
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
-
       - name: Run Pylint
-        run: pylint pookiepy tests examples
+        uses: $/.github/actions/python-check
+        with:
+          python-version: "3.14"
+          suite: lint
+          extra-requirements: requirements_dev.txt

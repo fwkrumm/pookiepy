@@ -16,9 +16,10 @@ permissions:
 
 jobs:
   test:
-    # Run tests against the newest stable Python to catch upstream compatibility issues early.
+    # Non-blocking probe for the newest stable Python release.
     name: Test (latest Python / ${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
@@ -28,52 +29,42 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up latest stable Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run core unit tests
+        uses: $/.github/actions/python-check
         with:
-          python-version: "3.x"
+          python-version: '3.x'
+          suite: unit
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: true
-          cache-suffix: ${{ matrix.os }}
-
-      - name: Install dependencies
-        run: uv pip install --system --only-binary grpcio,grpcio-tools -r requirements.txt coverage
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py
-
-      - name: Run unit tests with coverage
-        run: |
-          python -m coverage run -m unittest discover -s tests -p "test_*.py"
-          coverage report -m
-
-  lint:
-    name: Pylint (latest Python)
-    runs-on: ubuntu-latest
+  unit-test-examples:
+    name: Unit test examples (latest Python / ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest, ubuntu-22.04-arm, ubuntu-24.04-arm]
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
 
-      - name: Set up latest stable Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+      - name: Run example unit tests
+        uses: $/.github/actions/python-check
         with:
-          python-version: "3.x"
+          python-version: '3.x'
+          suite: examples
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+  lint:
+    name: Pylint (latest Python)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
-          enable-cache: true
-          cache-suffix: ${{ github.job }}
-
-      - name: Install dependencies
-        run: uv pip install --system -r requirements.txt pylint
-
-      - name: Generate protobuf interfaces
-        run: python .github/scripts/generate_protobuf.py --include-custom
+          persist-credentials: false
 
       - name: Run Pylint
-        run: pylint pookiepy tests examples
+        uses: $/.github/actions/python-check
+        with:
+          python-version: '3.x'
+          suite: lint

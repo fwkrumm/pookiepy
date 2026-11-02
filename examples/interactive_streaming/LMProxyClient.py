@@ -11,28 +11,24 @@ from examples.interactive_streaming._lm_http import (
 )
 
 
-try:
-    import requests
-except ImportError:
-    requests = None
-
-
 class LMProxyClient(BaseClient):
     """Proxy: receives lm_request, queries LM Studio, streams lm_response_stream chunks."""
 
     def __init__(self, name: str, port: int, lmstudio_base: str | None = None,
                  model: str = "gemma-4e2b"):
+        if _lm_http.requests is None:
+            raise RuntimeError(
+                "LM proxy requires requests; run with 'uv run --with requests python "
+                "examples/interactive_streaming/run_server_proxy.py'"
+            )
         super().__init__(port, name=name, provides=["lm_response_stream"], requires=["lm_request"])
         self.lmstudio_base = lmstudio_base or "http://127.0.0.1:1234/v1"
         self.model = model
 
-        if requests:
-            sess = make_http_session()
-            if sess:
-                _lm_http._session = sess
-                self.logger.debug("persistent HTTP session created")
-        else:
-            self.logger.warning("requests not installed --- HTTP calls will fail")
+        sess = make_http_session()
+        if sess:
+            _lm_http._session = sess
+            self.logger.debug("persistent HTTP session created")
 
         threading.Thread(target=self.spin_forever, daemon=True).start()
 

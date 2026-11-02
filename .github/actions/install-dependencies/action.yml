@@ -1,0 +1,46 @@
+name: Install CI dependencies
+description: Probe optional latest-Python jobs before installing binary gRPC dependencies.
+inputs:
+  python-path:
+    description: Interpreter selected by setup-python, or the isolated smoke environment.
+    required: true
+  requirements:
+    description: Requirement files, one per line.
+    default: requirements.txt
+  packages:
+    description: Additional packages or local project paths, one per line.
+    default: ''
+  probe:
+    description: Skip checks when latest-Python dependencies cannot resolve.
+    default: 'false'
+outputs:
+  ready:
+    description: String true when checks can run; false when the probe was skipped.
+    value: ${{ inputs.probe != 'true' || steps.wheel-check.outcome == 'success' }}
+runs:
+  using: composite
+  steps:
+    - name: Check latest Python dependency wheels
+      id: wheel-check
+      if: inputs.probe == 'true'
+      continue-on-error: true
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-path }}
+        CI_REQUIREMENTS: ${{ inputs.requirements }}
+        CI_PACKAGES: ${{ inputs.packages }}
+      run: uv run --no-project python .github/scripts/install_dependencies.py --dry-run
+    - name: Explain skipped latest Python probe
+      if: inputs.probe == 'true' && steps.wheel-check.outcome != 'success'
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-path }}
+      run: uv run --no-project python .github/scripts/report_probe.py skipped
+    - name: Install dependencies
+      if: inputs.probe != 'true' || steps.wheel-check.outcome == 'success'
+      shell: bash
+      env:
+        UV_PYTHON: ${{ inputs.python-path }}
+        CI_REQUIREMENTS: ${{ inputs.requirements }}
+        CI_PACKAGES: ${{ inputs.packages }}
+      run: uv run --no-project python .github/scripts/install_dependencies.py

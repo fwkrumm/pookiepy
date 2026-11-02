@@ -25,15 +25,10 @@ jobs:
           persist-credentials: true # zizmor: ignore[artipacked] required for release tag push
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: $/.github/actions/setup-python
         with:
           python-version: "3.x"
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
-        with:
-          enable-cache: false
-          cache-suffix: ${{ github.job }}
+          enable-cache: 'false'
 
       - name: Build distribution packages (sdist + wheel)
         # The PDM build hook generates bundled protobuf bindings in isolation.
@@ -44,7 +39,7 @@ jobs:
         # Configure the trusted publisher once at:
         # https://pypi.org/manage/project/<your-package>/settings/publishing/
         # Exact release tag pins v1.14.2; its published GHCR image is tag-based.
-        uses: pypa/gh-action-pypi-publish@v1.14.2 # zizmor: ignore[unpinned-uses] exact release tag intentionally used
+        uses: pypa/gh-action-pypi-publish@v1.14.3 # zizmor: ignore[unpinned-uses] exact release tag intentionally used
         with:
           # repository-url: https://test.pypi.org/legacy/ # for testing
           packages-dir: dist
