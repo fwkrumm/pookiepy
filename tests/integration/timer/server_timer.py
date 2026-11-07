@@ -19,4 +19,6 @@ if __name__ == "__main__":
     # Exclude synchronous per-message debug file writes from timing results;
     # slow CI storage otherwise measures logging throughput instead of delivery.
     s.logger.setLevel(logging.INFO)
+    for handler in s.logger.handlers:
+        handler.setLevel(logging.INFO)
     s.serve_forever()

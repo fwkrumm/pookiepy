@@ -18,6 +18,8 @@ class TextClient(BaseClient):
                          provides=["lm_request"],
                          requires=["lm_response_stream"])
         self.logger.setLevel("WARNING")
+        for handler in self.logger.handlers:
+            handler.setLevel("WARNING")
 
     def interactive_loop(self):
         """

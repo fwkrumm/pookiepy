@@ -445,7 +445,7 @@ Contributions are welcome. Please open an issue first for major changes so the a
 
 ## Compatibility Adjustments
 
-Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.16 adjustment notes](docs/required_adjustments/0.0.16.md) when upgrading from 0.0.15.
+Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.21 adjustment notes](docs/required_adjustments/0.0.21.md) when upgrading from 0.0.20.
 
 ---
 <a name="license"></a>
@@ -484,3 +484,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.18                     | Correct on_init position, hopefully fix publish pipeline, correct on_receive hook position. |
 | 0.0.19                     | Minor bug fixes and improvements to the publish pipeline. |
 | 0.0.20                     | Harden stream lifecycle and shutdown handling; reject excess connections promptly and improve queue-drop reporting. |
+| 0.0.21                     | Replace bespoke logging/timing with jacl4py and SimPyTick; remove local logger/timer modules and duplicate tests. Direct package imports replace old paths; logger handler levels, file paths, timer compensation and worker-error handling follow package APIs. See [migration notes](docs/required_adjustments/0.0.21.md). |
