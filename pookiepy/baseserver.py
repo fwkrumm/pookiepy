@@ -20,10 +20,10 @@ from typing import Iterator
 
 import grpc
 from google.protobuf.message import Message as PookieMessage
+from jacl4py.logger import get_logger
 
 from pookiepy import tools
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
-from pookiepy.logger import get_logger
 from pookiepy.data_register import DataRegister
 from pookiepy.schema_version import SCHEMA_VERSION_METADATA_KEY, DEFAULT_SCHEMA_VERSION
 

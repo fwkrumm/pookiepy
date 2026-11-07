@@ -4,5 +4,5 @@
 grpcio>=1.81,<2
 grpcio-tools>=1.81,<2
 protobuf>=6.33
-coloredlogs>=15.0
-psutil>=5.0.0
+jacl4py>=0.0.1
+SimPyTick>=0.0.2

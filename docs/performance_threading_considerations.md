@@ -25,7 +25,7 @@ before constructing the server/client:
 
 ```python
 import logging
-from pookiepy.logger import get_logger
+from jacl4py.logger import get_logger
 
 get_logger(name="broker", file_log_level=logging.INFO)
 ```
