@@ -113,17 +113,13 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 ## pookiepy Utils
 
-**Logger** (`jacl4py.logger`): use `get_logger(name)` directly; returns `JacLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console defaults to `INFO`; file retains `INTERNAL_DEBUG` tracing. Files use `%TEMP%/<safe-name><uuid8>/<safe-name>.log`, daily rotation with up to 30 backups per writer. `setLevel()` changes only the logger threshold; set handler levels explicitly when needed. `log_dir=None` disables file logging. Cached loggers keep their first configuration; package registry is separate from standard logging. No local logger module.
+**Logger**: use `jacl4py.logger.get_logger` directly; prefer `self.logger` in client/server hooks. `setLevel()` changes only the logger threshold; do not add handler-level loops merely to suppress lower-level records. No local logging wrappers.
 
 **Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `PookieMessage`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
-**Timer** (`simpytick.timer`): use `TimedEvent` and low-level `timer` directly. Monotonic drift compensation, normal OS priority, process/thread backends. First tick immediate; slow consumers may miss ticks; worker failures raise `RuntimeError`. Spawn processes from guarded importable scripts; prefer threads after starting gRPC. No local timer module.
-```python
-from simpytick.timer import TimedEvent
+**Timer**: import `TimedEvent` or low-level `timer` from `simpytick.timer` directly. Prefer `backend="thread"` after starting gRPC; guard process startup with `if __name__ == "__main__":` in an importable script. No local timing wrappers.
 
-with TimedEvent(s=0.01, n=100) as te:
-    for tick in te: ...
-```
+Logging/timing API details: [HOW_TO.md](pookiepy/assets/HOW_TO.md); upgrade differences: [0.0.21 migration notes](docs/required_adjustments/0.0.21.md).
 
 **Schema version** (`pookiepy/schema_version.py`): metadata-key constant only. Actual schema/version string comes from `ClientConfig.schema_version` / `ServerConfig.schema_version`.
 
