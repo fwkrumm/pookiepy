@@ -71,8 +71,6 @@ class VoiceClient(BaseClient):
         self._speech_rate = speech_rate
         super().__init__(port, name=identifier, requires=["lm_response_stream"])
         self.logger.setLevel("WARNING")
-        for handler in self.logger.handlers:
-            handler.setLevel("WARNING")
 
     def on_init(self):
         """Create and start configured German speech backend."""

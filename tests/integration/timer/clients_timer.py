@@ -46,8 +46,6 @@ class TimerClient(BaseClient):
         )
         # Exclude synchronous per-message debug file writes from timing results.
         self.logger.setLevel(logging.INFO)
-        for handler in self.logger.handlers:
-            handler.setLevel(logging.INFO)
 
 
 class ReceiverClient(BaseClient):
@@ -66,8 +64,6 @@ class ReceiverClient(BaseClient):
         )
         # Exclude synchronous per-message debug file writes from timing results.
         self.logger.setLevel(logging.INFO)
-        for handler in self.logger.handlers:
-            handler.setLevel(logging.INFO)
 
     def on_receive(self, data: message_pb2.PookieMessage) -> bool:
         """Record one tick and wake receivers waiting for delivery."""
