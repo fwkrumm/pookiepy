@@ -395,16 +395,14 @@ class BaseClient:  # pylint: disable=too-many-instance-attributes
         the client should be disconnected or not.
         """
         self.logger.iinfo("Waiting for server welcome message")
-        for response in self.stream:
-            # explicitly prevent calling on_receive() here so that _check_connection()
-            # does properly handle the checks if server responds.
-            # the alternative (and potentially more elegant) solution would be to call
-            # do the checks here and propagate the status back to main thread
-            self.receive_queue.put(response)
-            break
-
-        self.logger.iinfo("Receive loop started")
         try:
+            # Admission/schema failures can arrive before welcome; use the same error path.
+            for response in self.stream:
+                # Let _check_connection() validate welcome before on_receive() runs.
+                self.receive_queue.put(response) # server welcome message
+                break
+
+            self.logger.iinfo("Receive loop started")
             for response in self.stream:
                 if response.history:
                     response.history.append(self._message_pb2.DataPoint(

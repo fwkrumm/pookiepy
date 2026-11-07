@@ -111,6 +111,20 @@ class TestClientReceive(unittest.TestCase):
         self.assertTrue(forwarded.history[-1].HasField("receiveTimestamp"))
         self.assertTrue(self.exit_event.is_set())
 
+    def test_exit_before_request_skips_hooks_and_routing(self):
+        """Both stop signals reject new work at the receive-loop boundary."""
+        self.peer.client_id = "client-1"
+        self.server.on_receive = MagicMock()
+        for signal in (self.exit_event, self.server.global_exit_event):
+            with self.subTest(signal=signal):
+                self.exit_event.clear()
+                self.server.global_exit_event.clear()
+                signal.set()
+                with patch.object(self.server, "_data_register") as register:
+                    self.receive([self.server.generate_message("output", None, b"payload")])
+                register.add_data_for_message_name.assert_not_called()
+        self.server.on_receive.assert_not_called()
+
     def test_rpc_error_signals_worker_exit(self):
         """Transport disconnects are swallowed but always signal stream completion."""
         def disconnected_requests():
@@ -121,9 +135,18 @@ class TestClientReceive(unittest.TestCase):
         self.assertTrue(self.exit_event.is_set())
 
     def test_hook_failure_propagates_and_signals_worker_exit(self):
-        """Application hook failures still release the stream's waiting sender."""
+        """Application failures report INTERNAL and release the stream's waiting sender."""
         self.peer.client_id = "client-1"
         self.server.on_receive = MagicMock(side_effect=RuntimeError("hook failed"))
-        with self.assertRaisesRegex(RuntimeError, "hook failed"):
-            self.receive([self.server.generate_message("output", None, b"payload")])
+        self.receive([self.server.generate_message("output", None, b"payload")])
+        self.context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
+        self.server.logger.exception.assert_called_once()
         self.assertTrue(self.exit_event.is_set())
+
+    def test_disconnect_during_acceptance_cannot_register_late_subscriptions(self):
+        """Acceptance hooks returning after exit cannot recreate subscriptions."""
+        self.server.on_client_accepted = MagicMock(side_effect=lambda *_args: self.exit_event.set())
+        with patch.object(self.server, "_data_register") as register:
+            self.receive([self.handshake])
+        register.add_notification_queue_for_message_name.assert_not_called()
+        self.assertTrue(self.notifications.empty())

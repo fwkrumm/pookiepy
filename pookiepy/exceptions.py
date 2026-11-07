@@ -11,7 +11,7 @@ class GrpcConnectionError(ConnectionError):
     """custom ConnectionError for gRPC connection issues."""
 
 class GrpcResourceExhaustedError(Exception):
-    """custom exception for gRPC resource exhaustion if auto chunking is disabled."""
+    """gRPC resource exhaustion, including RPC admission and message-size limits."""
 class GrpcServerNoAnswerReceivedError(Exception):
     """custom exception for empty gRPC answer from server."""
 

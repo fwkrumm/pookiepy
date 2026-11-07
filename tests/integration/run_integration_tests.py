@@ -1,7 +1,6 @@
 """
-this is a helper script to execute the integration tests. It will sequentially run the
-server and client scripts for each example. You can stop each example by pressing Ctrl+C,
-which will terminate both the server and client processes before moving on to the next example.
+This helper runs registered integration server and client scripts sequentially.
+Either script can be omitted for self-contained scenarios. You can stop with Ctrl+C.
 
 NOTE that this is just a helper script and if there are errors there might be dangling processes.
 NOTE that logs will be scrambled due to subprocess usage. You can however still run the examples
@@ -30,8 +29,13 @@ EXAMPLE_TIMEOUT_S = 120
 SERVER_STARTUP_WAIT_S = 1.0
 SERVER_STARTUP_RETRIES = 5
 
-# examples/integration tests to execute
+# Integration scenarios to execute
 EXAMPLES = [
+    {
+        "name": "server_lifecycle",
+        "server": ROOT / "lifecycle_test" / "server_lifecycle.py",
+        "client": None,
+    },
     {
         "name": "basic",
         "server": ROOT / "basic" / "server_basic.py",
@@ -193,7 +197,7 @@ def _wait_for_server_startup(server_path: Path, srv: subprocess.Popen, port: int
     failure instead of a downstream client error.
     """
     time.sleep(SERVER_STARTUP_WAIT_S)
-    if srv.poll() is not None:
+    if srv.poll() is not None and srv.returncode != 0:
         raise RuntimeError(
             f"Server '{server_path.name}' exited during startup with code {srv.returncode} "
             f"on port {port}."
@@ -231,19 +235,20 @@ def _start_server_with_retry(server_path: Path) -> tuple[subprocess.Popen, int]:
     )
 
 
-def run_example_pair(server_path: Path, client_path: Path):
+def run_example_pair(name: str, server_path: Path | None, client_path: Path | None):
     """
-    run examples and check if they terminate cleanly. If one example
-    fails we immediately exit to not waste pipeline time.
+    Run an integration scenario and fail immediately if it does not finish cleanly.
 
     Parameters
     ----------
+    name : str
+        scenario name
     server_path : Path or None
         path to the server script, or None for client-only tests
-    client_path : Path
-        path to the client script
+    client_path : Path or None
+        path to the client script, or None for server-only tests
     """
-    print(f"\n=== Example: {client_path.parent.name} ===")
+    print(f"\n=== Integration: {name} ===")
 
     srv = None
     port = _pick_unused_port()
@@ -254,23 +259,20 @@ def run_example_pair(server_path: Path, client_path: Path):
             return
 
         srv, port = _start_server_with_retry(server_path)
-    else:
-        print("(client-only test --- no server started)")
 
-    if not _exists(client_path):
-        # usually should not happen
-        print(f"Client script not found: {client_path}, skipping client startup "\
-              "(server kept running).")
-        _terminate(srv, "server")
-        return
-
-    cli_cmd = [sys.executable, str(client_path), "--ip", "127.0.0.1", "--port", str(port)]
-    print(f"Starting client: {cli_cmd}")
-    cli = subprocess.Popen(  # pylint: disable=consider-using-with
-        cli_cmd,
-        cwd=str(ROOT),
-        env=_env,
-    )
+    cli = None
+    if client_path is not None:
+        if not _exists(client_path):
+            print(f"Client script not found: {client_path}, skipping client startup.")
+            _terminate(srv, "server")
+            return
+        cli_cmd = [sys.executable, str(client_path), "--ip", "127.0.0.1", "--port", str(port)]
+        print(f"Starting client: {cli_cmd}")
+        cli = subprocess.Popen(  # pylint: disable=consider-using-with
+            cli_cmd,
+            cwd=str(ROOT),
+            env=_env,
+        )
 
     try:
         print("Press Ctrl+C to stop this example and move to the next one.")
@@ -283,14 +285,14 @@ def run_example_pair(server_path: Path, client_path: Path):
                 _terminate(cli, "client")
                 _terminate(srv, "server")
                 sys.exit(
-                    f"ERROR: Example '{client_path.parent.name}' did not finish within "
+                    f"ERROR: Example '{name}' did not finish within "
                     f"{EXAMPLE_TIMEOUT_S}s; treating it as a hang."
                 )
 
             # check if server and client processes terminated CLEANLY without errors
             # server_done starts True when there is no server process (client-only test)
             server_done = srv is None
-            client_done = False
+            client_done = cli is None
 
             # check if server process is still alive
             if srv is not None and srv.poll() is not None:
@@ -305,7 +307,7 @@ def run_example_pair(server_path: Path, client_path: Path):
                 server_done = True
 
             # check client process
-            if cli.poll() is not None:
+            if cli is not None and cli.poll() is not None:
                 if cli.returncode != 0:
                     # exit early and terminate server if client failed
                     _terminate(srv, "server")
@@ -328,7 +330,7 @@ def run_example_pair(server_path: Path, client_path: Path):
 def main():
     print("run_examples.py --- sequentially runs bundled examples")
     for ex in EXAMPLES:
-        run_example_pair(ex.get("server"), ex["client"])
+        run_example_pair(ex["name"], ex["server"], ex["client"])
 
     print("All examples processed. Exiting.")
 

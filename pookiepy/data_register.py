@@ -8,6 +8,7 @@ fan-outs incoming data to all subscribed clients (excluding the sender).
 import threading
 import queue
 import logging
+import time
 from dataclasses import dataclass
 
 from google.protobuf.message import Message as PookieMessage
@@ -42,6 +43,7 @@ class DataRegister:
 
         self._logger = logger
         self._queue_warning_threshold = queue_warning_threshold
+        self._last_queue_warning: float | None = None
         if message_type is None:
             from pookiepy import message_pb2  # pylint: disable=import-outside-toplevel
             message_type = message_pb2.PookieMessage
@@ -185,11 +187,7 @@ class DataRegister:
             try:
                 q.put(data, block=False)
             except queue.Full:
-                self._logger.error(
-                    "Queue full for target client %s for message_name %s. Data not added.",
-                    target_client_id,
-                    message_name,
-                )
+                self._warn_queue_full(target_client_id, message_name)
                 return DeliveryResult(dropped=(target_client_id,))
 
             self._warn_if_queue_growing(target_client_id, message_name, q)
@@ -215,8 +213,7 @@ class DataRegister:
                 q.put(data, block=False)
                 return_ok.append(name)
             except queue.Full:
-                self._logger.error("Queue full for client %s for message_name "\
-                                    "%s. Data not added.", name, message_name)
+                self._warn_queue_full(name, message_name)
                 return_nok.append(name)
                 continue
 
@@ -237,20 +234,53 @@ class DataRegister:
 
         Unbounded queues (maxsize=0) can never raise ``queue.Full``. In that
         default mode this warning is the only built-in signal that consumers are
-        falling behind. Bounded queues are required for actual backpressure.
+        falling behind. Bounded queues shed newest messages instead of blocking publishers.
         """
         threshold = self._queue_warning_threshold
-        if threshold is None:
+        # Avoid taking the queue-size lock when a finite queue cannot exceed the threshold.
+        if threshold is None or 0 < notification_queue.maxsize <= threshold:
             return
 
         current_size = notification_queue.qsize()
-        if current_size > threshold:
+        if current_size > threshold and self._should_warn():
             self._logger.warning(
                 "Queue size for client %s for message_name %s is %s, which is above the "
-                "warning threshold of %s. Bounded queues are required for backpressure; "
+                "warning threshold of %s. Bounded queues drop newest messages when full; "
                 "unbounded queues only emit this warning.",
                 client_id,
                 message_name,
                 current_size,
                 threshold,
             )
+
+    def _warn_queue_full(self, client_id: str, message_name: str):
+        """Log a dropped message if the shared queue-warning cooldown permits.
+
+        Args:
+            client_id: Subscriber whose queue is full.
+            message_name: Routing key of the dropped message.
+        """
+        if self._should_warn():
+            self._logger.warning(
+                "Queue full for client %s for message_name %s. Newest message dropped; "
+                "queue warnings share a register-wide 5-second cooldown.",
+                client_id, message_name,
+            )
+
+    def _should_warn(self) -> bool:
+        """Atomically reserve the next register-wide queue-warning slot.
+
+        Full-queue and queue-growth warnings share a five-second cooldown,
+        measured with the monotonic clock and guarded by ``_meta_lock``.
+
+        Returns:
+            True for the first warning or after the cooldown has elapsed,
+            updating the last-warning timestamp; False otherwise.
+        """
+        # Sample queue warnings across all subscribers without tracking individual queues.
+        with self._meta_lock:
+            now = time.monotonic()
+            if self._last_queue_warning is not None and now - self._last_queue_warning < 5:
+                return False
+            self._last_queue_warning = now
+            return True
