@@ -16,9 +16,10 @@ Run
 ---
     python tests/integration/password/clients_password.py
 """
+from jacl4py.logger import get_logger
+
 from pookiepy.baseclient import BaseClient, ClientConfig
 from pookiepy.exceptions import GrpcConnectionError
-from jacl4py.logger import get_logger
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 

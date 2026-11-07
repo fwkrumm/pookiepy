@@ -18,9 +18,10 @@ import sys
 import threading
 import time
 
+from simpytick.timer import TimedEvent
+
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient
-from simpytick.timer import TimedEvent
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
