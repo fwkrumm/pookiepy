@@ -16,9 +16,10 @@ Run
 ---
     python tests/integration/password/clients_password.py
 """
+from jacl4py.logger import get_logger
+
 from pookiepy.baseclient import BaseClient, ClientConfig
 from pookiepy.exceptions import GrpcConnectionError
-from pookiepy.logger import get_logger as _get_logger
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
@@ -56,7 +57,7 @@ class PasswordClient(BaseClient):
 if __name__ == "__main__":
     args = get_args("Password auth test: gRPC call-metadata password check")
 
-    _log = _get_logger("password")
+    _log = get_logger("password")
     _log.warning(
         "Plaintext password in gRPC metadata is NOT best practice. "
         "Use TLS certificate-based auth for production workloads."

@@ -13,9 +13,10 @@ Run
 
 import sys
 
+from jacl4py.logger import get_logger
+
 from pookiepy.baseclient import BaseClient
 from pookiepy.exceptions import GrpcConnectionError
-from pookiepy.logger import get_logger
 
 # Use a dedicated port that the test runner will never start a server on.
 # The point is that *nothing* is listening here.

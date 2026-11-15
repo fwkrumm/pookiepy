@@ -9,9 +9,7 @@ pookiepy/baseserver.py       # server base (StreamServicer)
 pookiepy/baseclient.py       # client base
 pookiepy/data_register.py         # server-side msg routing: messageName→clientId→queue
 pookiepy/exceptions.py            # exception hierarchy
-pookiepy/logger.py                # GrpcLogger + rotating file logger
 pookiepy/tools.py                 # set_metadata, generate_message, evaluate_history
-pookiepy/timer.py                 # high-precision periodic timer (multiprocessing)
 pookiepy/schema_version.py        # schema-version metadata key for compat check
 pookiepy/custom_interface.py      # validated precompiled protobuf module injection
 pookiepy/message.proto         # proto source (one service, one bidirectional RPC)
@@ -115,15 +113,13 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 ## pookiepy Utils
 
-**Logger** (`pookiepy/logger.py`): `get_logger(name)` → `GrpcLogger`. Custom levels `INTERNAL_INFO=7`, `INTERNAL_DEBUG=5`. Console defaults to `INFO`; file retains `INTERNAL_DEBUG` tracing. File `%TEMP%/grpcLogs/<name>_YYYYMMDD.log` daily rotation 30d. Reduced file tracing is opt-in before constructing server/client; cached loggers keep their first configuration.
+**Logger**: use `jacl4py.logger.get_logger` directly; prefer `self.logger` in client/server hooks. `setLevel()` changes only the logger threshold; do not add handler-level loops merely to suppress lower-level records. No local logging wrappers.
 
 **Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `PookieMessage`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
-**Timer** (`pookiepy/timer.py`): `TimedEvent` context manager (canonical) + `timedevent(s, n)` alias (compat) --- drift-compensated, RT priority.
-```python
-with TimedEvent(s=0.01, n=100) as te:
-    for tick in te: ...
-```
+**Timer**: import `TimedEvent` or low-level `timer` from `simpytick.timer` directly. Prefer `backend="thread"` after starting gRPC; guard process startup with `if __name__ == "__main__":` in an importable script. No local timing wrappers.
+
+Logging/timing API details: [HOW_TO.md](pookiepy/assets/HOW_TO.md); upgrade differences: [0.0.21 migration notes](docs/required_adjustments/0.0.21.md).
 
 **Schema version** (`pookiepy/schema_version.py`): metadata-key constant only. Actual schema/version string comes from `ClientConfig.schema_version` / `ServerConfig.schema_version`.
 
@@ -140,7 +136,7 @@ with TimedEvent(s=0.01, n=100) as te:
 ## Dependencies
 
 ```
-grpcio>=1.76.0  grpcio-tools>=1.73.1  protobuf>=6.31.0  coloredlogs>=15.0  psutil>=5.0.0
+grpcio>=1.81.0  grpcio-tools>=1.81.0  protobuf>=6.0.0  jacl4py>=0.0.1  SimPyTick>=0.0.2
 ```
 
 ## Test boundaries

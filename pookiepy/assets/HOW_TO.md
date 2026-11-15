@@ -261,15 +261,20 @@ evaluate_history(reply, lambda point: print(point))
 
 ### Timers
 
-`TimedEvent` provides drift-compensated periodic scheduling.
+SimPyTick's `TimedEvent` provides drift-compensated periodic scheduling at normal OS priority.
 
 ```python
-from pookiepy.timer import TimedEvent
+from simpytick.timer import TimedEvent
 
 with TimedEvent(s=0.01, n=100) as te:
     for tick in te:
         ...
 ```
+
+The first tick is immediate. Process-backed timers use `spawn`; put process creation
+behind `if __name__ == "__main__":` in an importable script. Use `backend="thread"`
+after starting gRPC threads to avoid child creation. Slow consumers may miss ticks;
+worker failures raise `RuntimeError` during iteration or normal context exit.
 
 ### Schema compatibility
 
@@ -281,7 +286,7 @@ Framework auto-attaches `ClientConfig.schema_version` as gRPC metadata on each s
 
 ### Logging
 
-Prefer `self.logger` in `BaseServer`/`BaseClient` subclasses. Built-in logger supports console + rotating file logs and custom levels: `INTERNAL_INFO`, `INTERNAL_DEBUG`.
+Prefer `self.logger` in `BaseServer`/`BaseClient` subclasses. The jacl4py logger supports console + rotating file logs and custom levels: `INTERNAL_INFO`, `INTERNAL_DEBUG`.
 
 ## Custom Interface
 
@@ -471,11 +476,19 @@ class MyServer(BaseServer):
 Use `get_logger(...)` mainly in static methods/helper modules where `self` is unavailable:
 
 ```python
-from pookiepy.logger import get_logger
-logger = get_logger(name="MyComponent")   # returns GrpcLogger
-logger.setLevel("DEBUG")                   # syncs console + file handler; keep "INFO" default
+import logging
+from jacl4py.logger import get_logger
+
+logger = get_logger(name="MyComponent", console_log_level=logging.DEBUG)
 ```
 
 Defaults:
 - Console level: `INFO`.
-- File logs: `INTERNAL_DEBUG` (level 5), path `%TEMP%/grpcLogs/<name>_YYYYMMDD.log`.
+- File logs: `INTERNAL_DEBUG` (level 5), path `%TEMP%/<safe-name><uuid8>/<safe-name>.log`.
+- Daily rotation retains up to 30 backups per writer; previous run directories are not pruned.
+
+`logger.setLevel(...)` changes only the logger threshold. To change handler output
+levels on an existing logger, set each handler's level explicitly. Configure named
+loggers before constructing clients/servers; cached names retain their first settings.
+Use `reinit_if_exists=True` to replace a cached logger, and use the newly returned object.
+`log_dir=None` disables file logging; omit it (or use `LogDir.DEFAULT`) for temporary files.

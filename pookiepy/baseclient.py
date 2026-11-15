@@ -17,10 +17,10 @@ from datetime import datetime, timezone
 
 import grpc
 from google.protobuf.message import Message as PookieMessage
+from jacl4py.logger import get_logger
 
 from pookiepy import tools
 from pookiepy.custom_interface import ProtoInterface, _bundled_interface
-from pookiepy.logger import get_logger
 from pookiepy.exceptions import GrpcConnectionError, \
                               GrpcTimeoutError, \
                               GrpcResourceExhaustedError, \

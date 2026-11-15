@@ -13,7 +13,7 @@ except ImportError:
     requests = None
     _HTTPAdapter = None
 
-from pookiepy.logger import get_logger
+from jacl4py.logger import get_logger
 
 SYSTEM_PROMPT = os.environ.get(
     "LMSTUDIO_SYSTEM_PROMPT",

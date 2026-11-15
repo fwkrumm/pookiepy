@@ -1,6 +1,6 @@
 """Timer Test --- Clients
 ======================
-Shows how ``pookiepy/timer.py``'s ``TimedEvent`` drives gRPC clients.
+Shows how ``simpytick.timer.TimedEvent`` drives gRPC clients.
 
 Scenario
 --------
@@ -18,9 +18,10 @@ import sys
 import threading
 import time
 
+from simpytick.timer import TimedEvent
+
 from pookiepy import message_pb2
 from pookiepy.baseclient import BaseClient
-from pookiepy.timer import TimedEvent as timer
 from pookiepy.tools import generate_message
 from tests.integration._interface import get_args
 
@@ -106,7 +107,7 @@ def _send_ticks(driver: TimerClient) -> int:
     # other platforms retain process-isolated timing.
     backend = "thread" if sys.platform == "darwin" else "process"
     driver.logger.info("Using %s timer backend on %s", backend, sys.platform)
-    with timer(
+    with TimedEvent(
         s=TICK_INTERVAL,
         n=N_TICKS,
         logger=driver.logger,
