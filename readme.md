@@ -132,7 +132,10 @@ pip install -e .
 
 ## Quick Start
 
-Refer to [HOW_TO.md](pookiepy/assets/HOW_TO.md) for the full API reference and code examples.
+Refer to the [pookiepy skill](pookiepy/assets/skills/pookiepy/SKILL.md) for the
+development workflow and runnable request/response example. The detailed
+[API reference](pookiepy/assets/skills/pookiepy/references/API_REFERENCE.md)
+contains hook, configuration, and feature examples.
 Alternatively run
 
 ```bash
@@ -170,39 +173,61 @@ Pookiepy performs no runtime compilation or global module registration. Omitting
 
 ## Parameters
 
-You can print the following text via `python -m pookiepy --help`:
+Run `python -m pookiepy --help` for all options. Generation writes under the current
+working directory; run these commands from the intended project root.
 
-```bash
-usage: python -m pookiepy [-h] [--generate] [--generate-skeletons] [--generate-server] [--generate-client] [--generate-how-to] [--generate-interface] [--generate-interface-with-skeletons]
-
-pookiepy scaffolding tool.
-
-Generates skeleton server/client files and the HOW_TO reference
-document into the current working directory.
-
-options:
-  -h, --help            show this help message and exit
-  --generate            Generate server_skeleton.py, client_skeleton.py, and HOW_TO.md
-  --generate-skeletons  Generate server_skeleton.py and client_skeleton.py
-  --generate-server     Generate server_skeleton.py only
-  --generate-client     Generate client_skeleton.py only
-  --generate-how-to     Copy HOW_TO.md into the current directory
-  --generate-interface  Copy message.proto into the current directory and print customisation instructions
-  --generate-interface-with-skeletons
-                        Copy message.proto and write server_skeleton.py + client_skeleton.py that inject precompiled custom protobuf modules
-
-examples:
-  python -m pookiepy --generate                          # skeleton + HOW_TO
-  python -m pookiepy --generate-skeletons                  # server + client only
-  python -m pookiepy --generate-server                   # server only
-  python -m pookiepy --generate-client                   # client only
-  python -m pookiepy --generate-how-to                   # HOW_TO.md only
-  python -m pookiepy --generate-interface                # message.proto + instructions
-  python -m pookiepy --generate-interface-with-skeletons  # proto + matching skeletons
+```text
+python -m pookiepy --generate                           # skeletons + all skills
+python -m pookiepy --generate-skeletons                 # server + client only
+python -m pookiepy --generate-server                    # server only
+python -m pookiepy --generate-client                    # client only
+python -m pookiepy --install-skills                     # all four skill targets
+python -m pookiepy --install-skills-github              # GitHub Copilot only
+python -m pookiepy --install-skills-claude              # Claude Code only
+python -m pookiepy --install-skills-cursor              # Cursor only
+python -m pookiepy --install-skills-codex               # Codex only
+python -m pookiepy --generate-interface                 # message.proto + instructions
+python -m pookiepy --generate-interface-with-skeletons  # proto + matching skeletons
 ```
 
+### Agent skill installation
 
+| Command | Project-relative destination |
+|---|---|
+| `--install-skills-github` | `.github/skills/pookiepy/` |
+| `--install-skills-claude` | `.claude/skills/pookiepy/` |
+| `--install-skills-cursor` | `.cursor/skills/pookiepy/` |
+| `--install-skills-codex` | `.agents/skills/pookiepy/` |
 
+`--install-skills` installs all four targets. Each contains
+`SKILL.md` and `references/API_REFERENCE.md`. Per-tool flags may be combined, for
+example `python -m pookiepy --install-skills-github --install-skills-claude`.
+
+The CLI creates required parent directories, without IDE detection, network
+access, user-global writes, Git-root discovery, or IDE settings changes. No empty
+optional skill directories are created. Existing identical assets are left
+untouched; conflicting files, non-directory parents, or destination symlinks
+produce a nonzero exit before any skill writes. Review and move conflicts before
+retrying. Runtime write failures may leave a partial install; fix the filesystem
+problem and rerun. Scaffold files retain their existing skip-without-overwrite
+behavior. With `--generate`, skill preflight runs before skeleton generation;
+`--generate` still takes precedence over other scaffold-generation flags.
+
+**Compatibility:** the former guide-export flag remains a hidden deprecated
+alias that warns and installs all skills; it no longer exports a root-level guide.
+See the [migration notes](docs/required_adjustments/0.0.22.md#agent-skill-cli-migration).
+
+**Discovery assumptions:** these are project-scoped locations documented by
+[GitHub Copilot](https://docs.github.com/en/copilot/concepts/customizations/agent-skills),
+[Claude Code](https://code.claude.com/docs/en/skills),
+[Cursor](https://cursor.com/docs/skills), and
+[Codex](https://learn.chatgpt.com/docs/build-skills).
+Some tools recognize several roots and may list duplicates; prefer a per-tool flag
+when using one environment. Tool version, active harness, and organizational
+policy govern discovery. Start a fresh session and verify the skill in the tool's
+skill picker, then try a pookiepy-specific prompt. Installation alone does not
+guarantee activation. Commit project skill files for remote/cloud agents that need
+them; local user files are not automatically available remotely.
 
 ---
 <a name="minimal-examples"></a>
@@ -445,7 +470,7 @@ Contributions are welcome. Please open an issue first for major changes so the a
 
 ## Compatibility Adjustments
 
-Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.21 adjustment notes](docs/required_adjustments/0.0.21.md) when upgrading from 0.0.20.
+Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.22 adjustment notes](docs/required_adjustments/0.0.22.md) when upgrading from 0.0.21. Earlier logging/timing migrations remain documented in the [0.0.21 adjustment notes](docs/required_adjustments/0.0.21.md).
 
 ---
 <a name="license"></a>
@@ -485,3 +510,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.19                     | Minor bug fixes and improvements to the publish pipeline. |
 | 0.0.20                     | Harden stream lifecycle and shutdown handling; reject excess connections promptly and improve queue-drop reporting. |
 | 0.0.21                     | Replace bespoke logging/timing with jacl4py and SimPyTick; remove local logger/timer modules and duplicate tests. Direct package imports replace old paths; logger handler levels, file paths, timer compensation and worker-error handling follow package APIs. See [migration notes](docs/required_adjustments/0.0.21.md). |
+| 0.0.22                     | Replace guide export with an agent skill and API reference; add `--install-skills` and per-tool installers for GitHub Copilot, Claude Code, Cursor, and Codex. Validate packaged skills and runnable examples in CLI smoke checks. See [migration notes](docs/required_adjustments/0.0.22.md). |

@@ -1,4 +1,4 @@
-name: CLI Skeleton Smoke
+name: CLI Skeleton and Skill Smoke
 
 on: [push, pull_request]
 
@@ -47,7 +47,7 @@ jobs:
           requirements: ''
           packages: ${{ github.workspace }}
 
-      - name: Generate and run every skeleton
+      - name: Validate every skill target and run skeletons and skill examples
         if: steps.dependencies.outputs.ready == 'true'
         working-directory: ${{ runner.temp }}
         env:

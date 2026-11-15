@@ -10,6 +10,7 @@
 - `scripts/run_checks.py`: core unit, example unit, integration, combined, and lint commands.
 - `scripts/report_probe.py`: cross-platform warnings and job summaries.
 - `scripts/create_smoke_environment.sh`: isolated installed-package smoke environment.
+- `scripts/cli_skeleton_smoke.py`: installed CLI generation, skill assets, and runtime examples.
 
 ## Changing checks
 
@@ -24,6 +25,16 @@ calling workflows so supported platforms and required checks remain visible.
 Publishing uses only shared setup, with caching disabled; smoke checks use shared
 dependency installation but retain a separate environment outside the checkout.
 
+The CLI smoke workflow runs on Windows, macOS, and Linux. It validates every
+per-tool skill command plus the all-tool installation command, checks exact installed paths
+and byte-for-byte bundled content, validates metadata and resource links, and
+requires reinstalling identical assets to preserve timestamps. It executes the
+two Python examples from the installed skill as a correlated request/response.
+Core unit jobs also run `tests/test_cli_installed.py` (including conflicts,
+combined flags, rejected superseded names, and the deprecated guide alias) and `tests/test_cli_skills.py`
+(missing assets and explicit filesystem error reporting). Pinned smoke jobs are
+mandatory; floating latest-Python jobs remain non-blocking probes.
+
 ## Latest Python policy
 
 Floating `3.x` jobs must remain non-blocking. The dependency action probes the
@@ -35,6 +46,8 @@ commands use that same interpreter through `UV_PYTHON`.
 
 ## Local validation
 
+- CLI smoke workflow syntax (no diagnostic suppression):
+  `uvx --from actionlint-py actionlint .github/workflows/cli-skeleton-smoke.yml`
 - Workflow syntax: `uvx --from actionlint-py actionlint -ignore '^specifying action \x22\$/\.github/actions/[a-z-]+\x22 in invalid format because ref is missing\.'`
 - Workflow and composite-action security: `uvx zizmor .github`
 

@@ -5,17 +5,21 @@ pookiepy CLI --- project scaffolding tool.
 Invoked as:
     python -m pookiepy [OPTIONS]
 
-Generates skeleton server/client files and the HOW_TO reference document into
-the current working directory, giving you a ready-to-edit starting point.
+Generates skeleton server/client files and installs project-local agent skills
+under the current working directory.
 
 Options
 -------
 --generate-skeletons    Write server_skeleton.py + client_skeleton.py
 --generate-server       Write server_skeleton.py only
 --generate-client       Write client_skeleton.py only
---generate-how-to       Write HOW_TO.md (API reference for AI / human use)
+--install-skills        Install skills for all supported tools
+--install-skills-github Install the GitHub Copilot skill
+--install-skills-claude Install the Claude Code skill
+--install-skills-cursor Install the Cursor skill
+--install-skills-codex  Install the Codex skill
 --generate-interface    Copy the default message.proto so you can customise the Payload
---generate              Equivalent to --generate-skeletons + --generate-how-to
+--generate              Equivalent to --generate-skeletons + --install-skills
 """
 
 import argparse
@@ -31,31 +35,13 @@ from pathlib import Path
 # Directory that contains this __main__.py (i.e. the pookiepy package dir).
 _PACKAGE_DIR = Path(__file__).parent
 
-
-def _locate_how_to() -> Path:
-    """
-    Return the path to HOW_TO.md, searching in two locations:
-
-    1. Inside the installed package directory (pookiepy/HOW_TO.md).
-       This is the path used when pookiepy is installed via pip/pdm.
-    2. Inside the assets directory one level above the package directory (assets/HOW_TO.md).
-       This is the path used when running directly from the source tree
-       (e.g. ``python -m pookiepy`` from the project root).
-
-    Raises FileNotFoundError if neither location contains the file.
-    """
-    bundled = _PACKAGE_DIR / "assets" / "HOW_TO.md"
-    if bundled.exists():
-        return bundled
-
-    source_tree = _PACKAGE_DIR.parent / "assets" / "HOW_TO.md"
-    if source_tree.exists():
-        return source_tree
-
-    raise FileNotFoundError(
-        "HOW_TO.md not found. "
-        "Re-install the pookiepy package or run from the project root."
-    )
+_SKILL_TARGETS = {
+    "github": Path(".github") / "skills" / "pookiepy",
+    "claude": Path(".claude") / "skills" / "pookiepy",
+    "cursor": Path(".cursor") / "skills" / "pookiepy",
+    "codex": Path(".agents") / "skills" / "pookiepy",
+}
+_SKILL_FILES = (Path("SKILL.md"), Path("references") / "API_REFERENCE.md")
 
 
 def _locate_proto() -> Path:
@@ -480,15 +466,45 @@ def generate_skeleton(output_dir: Path) -> None:
     generate_client(output_dir)
 
 
-def generate_how_to(output_dir: Path) -> None:
-    """Copy HOW_TO.md into *output_dir*."""
-    try:
-        source = _locate_how_to()
-    except FileNotFoundError as exc:
-        print(f"  [error] {exc}", file=sys.stderr)
-        sys.exit(1)
+def install_skill(output_dir: Path, targets: tuple[str, ...]) -> None:
+    """Install bundled skill files after preflighting all selected destinations.
 
-    _copy_file(source, output_dir / "HOW_TO.md")
+    Identical files are left untouched. Conflicts, symlinks, missing assets and
+    filesystem errors raise OSError; existing content is never overwritten.
+    """
+    source_dir = _PACKAGE_DIR / "assets" / "skills" / "pookiepy"
+    contents = {relative: (source_dir / relative).read_bytes() for relative in _SKILL_FILES}
+    pending: list[tuple[Path, bytes]] = []
+    for target in targets:
+        for relative, content in contents.items():
+            destination = output_dir / _SKILL_TARGETS[target] / relative
+            for path in (destination, *destination.parents):
+                if path == output_dir:
+                    break
+                if path.is_symlink():
+                    raise OSError(f"Refusing to install through symbolic link: {path}")
+                if path.exists() and path != destination and not path.is_dir():
+                    raise NotADirectoryError(f"Skill destination parent is not a directory: {path}")
+            if destination.exists():
+                if not destination.is_file() or destination.read_bytes() != content:
+                    raise FileExistsError(
+                        f"Skill file conflicts with bundled content: {destination}. "
+                        "Review and move the existing file before retrying."
+                    )
+            else:
+                pending.append((destination, content))
+
+    for destination, content in pending:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with destination.open("xb") as stream:
+            stream.write(content)
+        print(f"  [ok]    {destination} written.")
+    if not pending:
+        print("  [skip]  Selected skill files are already up to date.")
+    print(
+        "  Skills are project-local. Start a fresh agent session to verify discovery.\n"
+        "  Tools may discover multiple copies; use a per-tool flag to install only one."
+    )
 
 
 # The instructions printed after a successful --generate-interface run.
@@ -560,17 +576,21 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="python -m pookiepy",
         description=(
             "pookiepy scaffolding tool.\n\n"
-            "Generates skeleton server/client files and the HOW_TO reference\n"
-            "document into the current working directory."
+            "Generates skeleton server/client files and installs agent skills\n"
+            "under the current working directory."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  python -m pookiepy --generate                          # skeleton + HOW_TO\n"
+            "  python -m pookiepy --generate                          # skeletons + all skills\n"
             "  python -m pookiepy --generate-skeletons                  # server + client only\n"
             "  python -m pookiepy --generate-server                   # server only\n"
             "  python -m pookiepy --generate-client                   # client only\n"
-            "  python -m pookiepy --generate-how-to                   # HOW_TO.md only\n"
+            "  python -m pookiepy --install-skills                    # all supported tools\n"
+            "  python -m pookiepy --install-skills-github             # GitHub Copilot only\n"
+            "  python -m pookiepy --install-skills-claude             # Claude Code only\n"
+            "  python -m pookiepy --install-skills-cursor             # Cursor only\n"
+            "  python -m pookiepy --install-skills-codex              # Codex only\n"
             "  python -m pookiepy --generate-interface"
             "                # message.proto + instructions\n"
             "  python -m pookiepy --generate-interface-with-skeletons"
@@ -581,7 +601,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--generate",
         action="store_true",
-        help="Generate server_skeleton.py, client_skeleton.py, and HOW_TO.md",
+        help="Generate server_skeleton.py, client_skeleton.py, and all agent skills",
     )
     parser.add_argument(
         "--generate-skeletons",
@@ -599,9 +619,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Generate client_skeleton.py only",
     )
     parser.add_argument(
+        "--install-skills",
+        action="store_true",
+        help="Install project-local skills for GitHub Copilot, Claude Code, Cursor, and Codex",
+    )
+    for target, path in _SKILL_TARGETS.items():
+        parser.add_argument(
+            f"--install-skills-{target}",
+            action="store_true",
+            help=f"Install only the {target} skill in {path.as_posix()}",
+        )
+    parser.add_argument(
         "--generate-how-to",
         action="store_true",
-        help="Copy HOW_TO.md into the current directory",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--generate-interface",
@@ -633,10 +664,27 @@ def main() -> None:
     output_dir = Path.cwd()
     print(f"pookiepy --- writing files to: {output_dir}\n")
 
-    # --generate expands to --generate-skeletons + --generate-how-to
+    if args.generate_how_to:
+        print(
+            "  [warning] --generate-how-to is deprecated; use --install-skills. "
+            "Installs project-local skills, not HOW_TO.md.",
+            file=sys.stderr,
+        )
+    targets = tuple(
+        target for target in _SKILL_TARGETS
+        if args.generate or args.install_skills or args.generate_how_to
+        or getattr(args, f"install_skills_{target}")
+    )
+    if targets:
+        try:
+            install_skill(output_dir, targets)
+        except OSError as exc:
+            print(f"  [error] Skill installation failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    # --generate retains precedence over other scaffold-generation flags.
     if args.generate:
         generate_skeleton(output_dir)
-        generate_how_to(output_dir)
         return
 
     # Individual flags --- execute each that was requested.
@@ -649,9 +697,6 @@ def main() -> None:
 
     if args.generate_client:
         generate_client(output_dir)
-
-    if args.generate_how_to:
-        generate_how_to(output_dir)
 
     if args.generate_interface:
         generate_interface(output_dir)
