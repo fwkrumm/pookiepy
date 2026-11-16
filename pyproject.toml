@@ -6,7 +6,7 @@ build-backend = "pdm.backend"
 name = "pookiepy"
 dynamic = ["version"]
 description = "pookiepy (grpc + hook) is an asynchronous Python gRPC bidirectional-streaming framework. Subclass BaseServer/BaseClient, override hooks --- the base handles all gRPC plumbing."
-readme = "readme.md"
+readme = "README.md"
 requires-python = ">=3.10"
 authors = [
     { name = "Fabian Krumm", email = "ghub_fk@gmx.de" },
