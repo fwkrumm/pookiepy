@@ -132,70 +132,90 @@ pip install -e .
 
 ## Quick Start
 
-With pookiepy installed, save these two files in the same directory. The server
-echoes each `echo` message directly back to the client that sent it.
+With pookiepy installed, save these two files in the same directory. Each client
+sends a greeting when it joins, then keeps listening. The server forwards each
+greeting to all other subscribed clients, never back to its sender.
+
+### 1. Start a plain server
 
 **`server.py`**
 
 ```python
 from pookiepy.baseserver import BaseServer
-from pookiepy.tools import generate_message
-
-
-class EchoServer(BaseServer):
-    def __init__(self):
-        super().__init__(port=50051, name="echo-server")
-
-    def on_receive(self, peer, request):
-        reply = generate_message("echo", byte_payload=request.payload.bytePayload)
-        self._data_register.add_data_for_message_name(
-            peer.client_id, "echo", reply, target_client_id=peer.client_id
-        )
-        return False
 
 
 if __name__ == "__main__":
-    EchoServer().serve_forever()
+    BaseServer(port=50051).serve_forever()
 ```
 
-**`client.py`**
-
-```python
-from pookiepy.baseclient import BaseClient
-from pookiepy.tools import generate_message
-
-
-client = BaseClient(
-    port=50051,
-    name="echo-client",
-    provides=["echo"],
-    requires=["echo"],
-)
-try:
-    client.send_data(generate_message("echo", byte_payload=b"hello, pookiepy!"))
-    reply = client.get_data(timeout=5.0)
-    print(f"Echo: {reply.payload.bytePayload.decode()}")
-finally:
-    client.disconnect()
-```
-
-Start the server in terminal 1:
+In terminal 1, run:
 
 ```bash
 python server.py
 ```
 
-Then run the client in terminal 2:
+Leave it running. No subclass or hook is needed for default message forwarding.
+
+### 2. Connect clients
+
+**`client.py`**
+
+```python
+from pookiepy.baseclient import BaseClient
+from pookiepy.exceptions import ClientExit
+from pookiepy.tools import generate_message
+
+
+client = BaseClient(
+    port=50051,
+    name=input("Your name: "),
+    provides=["greeting"],
+    requires=["greeting"],
+)
+try:
+    client.send_data(
+        generate_message("greeting", byte_payload=f"Hello from {client.name}!".encode())
+    )
+    print("Listening for other clients. Press Ctrl+C to stop.")
+    while True:
+        message = client.get_data()
+        print(message.payload.bytePayload.decode())
+except (KeyboardInterrupt, ClientExit):
+    print("Client stopped.")
+finally:
+    client.disconnect()
+```
+
+In terminal 2, run this and enter `Alice` when prompted:
 
 ```bash
 python client.py
 ```
 
-The client prints:
+In terminal 3, run the same command and enter `Bob`:
+
+```bash
+python client.py
+```
+
+Alice's terminal now shows this greeting, alongside connection logs:
 
 ```text
-Echo: hello, pookiepy!
+Hello from Bob!
 ```
+
+Open another terminal, run `python client.py`, and enter `Charlie`. Both Alice
+and Bob now see `Hello from Charlie!`. Repeat with more clients as needed
+(up to the server's worker limit).
+
+Each client sends **one** greeting on startup. Messages are not replayed, so Bob
+does not see Alice's earlier greeting, and nobody sees their own. The first client
+will simply wait until another joins.
+
+`provides=["greeting"]` allows sending that message name;
+`requires=["greeting"]` subscribes to it. `get_data()` has no timeout here, so all
+clients keep listening until stopped. Press **Ctrl+C** in a client terminal to
+disconnect it cleanly; stop the server with Ctrl+C when finished.
 
 ### Generate starter files
 
@@ -206,7 +226,7 @@ python -m pookiepy --generate-skeletons
 ```
 
 This creates `server_skeleton.py` and `client_skeleton.py`. They are starting
-points to adapt, not a preconfigured echo app. For a custom protobuf schema, see
+points to adapt, not the ready-to-run greeting demo above. For a custom protobuf schema, see
 the [custom interface guide](pookiepy/assets/skills/pookiepy/references/API_REFERENCE.md#custom-interface).
 
 For more examples and the development workflow, see the
@@ -559,3 +579,4 @@ BSD 3-Clause --- see [LICENSE.txt](https://github.com/fwkrumm/pookiepy/blob/mast
 | 0.0.21                     | Replace bespoke logging/timing with jacl4py and SimPyTick; remove local logger/timer modules and duplicate tests. Direct package imports replace old paths; logger handler levels, file paths, timer compensation and worker-error handling follow package APIs. See [migration notes](docs/required_adjustments/0.0.21.md). |
 | 0.0.22                     | Replace guide export with an agent skill and API reference; add `--install-skills` and per-tool installers for GitHub Copilot, Claude Code, Cursor, and Codex. Validate packaged skills and runnable examples in CLI smoke checks. See [migration notes](docs/required_adjustments/0.0.22.md). |
 | 0.0.23                     | Add a runnable echo walkthrough to the README Quick Start, including run instructions and expected output. |
+| 0.0.24                     | Simplify Quick Start to a plain server and multiple persistent clients using default fan-out, without self-notification; document Ctrl+C cleanup and expected output. No upgrade adjustments required; see [upgrade notes](docs/required_adjustments/0.0.24.md). |
