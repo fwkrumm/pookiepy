@@ -132,39 +132,86 @@ pip install -e .
 
 ## Quick Start
 
-Refer to the [pookiepy skill](pookiepy/assets/skills/pookiepy/SKILL.md) for the
-development workflow and runnable request/response example. The detailed
-[API reference](pookiepy/assets/skills/pookiepy/references/API_REFERENCE.md)
-contains hook, configuration, and feature examples.
-Alternatively run
+With pookiepy installed, save these two files in the same directory. The server
+echoes each `echo` message directly back to the client that sent it.
+
+**`server.py`**
+
+```python
+from pookiepy.baseserver import BaseServer
+from pookiepy.tools import generate_message
+
+
+class EchoServer(BaseServer):
+    def __init__(self):
+        super().__init__(port=50051, name="echo-server")
+
+    def on_receive(self, peer, request):
+        reply = generate_message("echo", byte_payload=request.payload.bytePayload)
+        self._data_register.add_data_for_message_name(
+            peer.client_id, "echo", reply, target_client_id=peer.client_id
+        )
+        return False
+
+
+if __name__ == "__main__":
+    EchoServer().serve_forever()
+```
+
+**`client.py`**
+
+```python
+from pookiepy.baseclient import BaseClient
+from pookiepy.tools import generate_message
+
+
+client = BaseClient(
+    port=50051,
+    name="echo-client",
+    provides=["echo"],
+    requires=["echo"],
+)
+try:
+    client.send_data(generate_message("echo", byte_payload=b"hello, pookiepy!"))
+    reply = client.get_data(timeout=5.0)
+    print(f"Echo: {reply.payload.bytePayload.decode()}")
+finally:
+    client.disconnect()
+```
+
+Start the server in terminal 1:
+
+```bash
+python server.py
+```
+
+Then run the client in terminal 2:
+
+```bash
+python client.py
+```
+
+The client prints:
+
+```text
+Echo: hello, pookiepy!
+```
+
+### Generate starter files
+
+To scaffold your own project instead, run this from its root:
 
 ```bash
 python -m pookiepy --generate-skeletons
 ```
 
-to generate a very basic server and client skeleton in the current directory.
-Use
+This creates `server_skeleton.py` and `client_skeleton.py`. They are starting
+points to adapt, not a preconfigured echo app. For a custom protobuf schema, see
+the [custom interface guide](pookiepy/assets/skills/pookiepy/references/API_REFERENCE.md#custom-interface).
 
-```bash
-python -m pookiepy --generate-interface-with-skeletons
-```
-
-to generate the skeletons along with a copy of the `message.proto` interface file in the current directory to modify which is then used by the skeletons.
-
-### Custom protobuf interface
-
-Pookiepy accepts precompiled protobuf modules through one explicit interface object. Compile the schema outside pookiepy, import both generated modules, then inject the same object into each matching client and server:
-
-```python
-from my_proto import message_pb2, message_pb2_grpc
-from pookiepy.custom_interface import ProtoInterface
-
-proto_interface = ProtoInterface(message_pb2, message_pb2_grpc)
-server = MyServer(port=50051, proto_interface=proto_interface)
-client = MyClient(port=50051, proto_interface=proto_interface)
-```
-
-Pookiepy performs no runtime compilation or global module registration. Omitting `proto_interface` uses the bundled schema. Custom client and server schemas must be wire-compatible.
+For more examples and the development workflow, see the
+[pookiepy skill](pookiepy/assets/skills/pookiepy/SKILL.md) and
+[API reference](pookiepy/assets/skills/pookiepy/references/API_REFERENCE.md).
 
 ---
 
