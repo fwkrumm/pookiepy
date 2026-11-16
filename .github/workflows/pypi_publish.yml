@@ -25,6 +25,8 @@ jobs:
           persist-credentials: true # zizmor: ignore[artipacked] required for release tag push
 
       - name: Set up Python
+        # Keep $/: GitHub resolves this action from the same repository at the running commit.
+        # Do not replace with ./, which resolves from the checked-out workspace instead.
         uses: $/.github/actions/setup-python
         with:
           python-version: "3.x"

@@ -470,7 +470,7 @@ Contributions are welcome. Please open an issue first for major changes so the a
 
 ## Compatibility Adjustments
 
-Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/). See the [0.0.22 adjustment notes](docs/required_adjustments/0.0.22.md) when upgrading from 0.0.21. Earlier logging/timing migrations remain documented in the [0.0.21 adjustment notes](docs/required_adjustments/0.0.21.md).
+Version-specific migration notes for breaking API and behavior changes are maintained in [docs/required_adjustments/](docs/required_adjustments/).
 
 ---
 <a name="license"></a>
