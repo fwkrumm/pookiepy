@@ -1,6 +1,10 @@
-# HOW_TO.md - Developer API Reference (LLM-Optimized)
+# Pookiepy API Reference
 
-Purpose: hand to LLM for pookiepy project generation/scaffolding. Contains supported API surface, lifecycle hooks, patterns.
+Detailed API patterns for the pookiepy release that bundles this skill. Read the
+skill's procedure first; load individual sections here when needed. Examples use
+the bundled protobuf interface unless explicitly stated otherwise. Sections with
+`self`, `request`, `reply`, credentials, or `...` are contextual snippets, not
+standalone programs.
 
 ## Core Concept
 
@@ -13,6 +17,8 @@ Server routes by `messageName` (no extra RPC methods needed).
 ## Imports
 
 ```python
+from typing import Any
+
 from pookiepy.baseserver import BaseServer, Peer, ServerConfig
 from pookiepy.baseclient import BaseClient, ClientConfig
 from pookiepy.tools import generate_message, struct_to_json, json_to_struct, evaluate_history
@@ -30,7 +36,7 @@ class MyServer(BaseServer):
         super().__init__(port=port, name="MyServer")
 
     def on_init(self):
-        # once after __init__; safe place for state setup
+        # during BaseServer construction, after core server state is initialized
         self.my_cache = {}
 
     def on_client_connect(self, request: message_pb2.PookieMessage, context) -> bool:
@@ -64,10 +70,13 @@ class MyServer(BaseServer):
 
     def _handle_request(self, peer: Peer, request: message_pb2.PookieMessage):
         response = generate_message("my_response", struct_payload={"result": 42})
+        response.metaInfo.responseToId = request.metaInfo.messageId
         # unicast to requester
-        self._data_register.add_data_for_message_name(
+        result = self._data_register.add_data_for_message_name(
             peer.client_id, "my_response", response, target_client_id=peer.client_id
         )
+        if result.dropped:
+            self.logger.warning("Response not queued for %s", result.dropped)
 
     def on_shutdown(self):
         # shutdown cleanup
@@ -92,7 +101,9 @@ server.shutdown()        # sets exit event; serve_forever() returns
 ```python
 # send to all clients requiring "my_topic"
 msg = generate_message("my_topic", struct_payload={"value": 1.0})
-self._data_register.add_data_for_message_name("", "my_topic", msg)
+result = self._data_register.add_data_for_message_name("", "my_topic", msg)
+if result.dropped:
+    self.logger.warning("Push not queued for %s", result.dropped)
 # "" clientId => no sender to skip; reaches all requiring "my_topic"
 ```
 
@@ -111,8 +122,9 @@ BaseServer(port=50051, config=config)
 
 Excess RPCs are rejected with `RESOURCE_EXHAUSTED`; clients raise
 `GrpcResourceExhaustedError`, including during connection setup. Retry with bounded
-backoff. Manual routing returns `DeliveryResult` directly; `result.dropped` lists
-recipients whose queues were full. This does not confirm client receipt.
+backoff only when the application permits retries. Manual routing returns
+`DeliveryResult` directly; `result.dropped` lists recipients whose queues were full
+or a missing unicast target. `result.delivered` means enqueued, not client receipt.
 Full-queue and queue-growth warnings share one five-second cooldown per register.
 Logs sample affected subscribers; use `DeliveryResult` for individual routing outcomes.
 
@@ -135,16 +147,18 @@ Subclass `BaseClient`; set `provides` and `requires`.
 
 ```python
 class MyClient(BaseClient):
-    def __init__(self, port):
+    def __init__(self, port, *, config=None):
         super().__init__(
             name="my-client",
             port=port,
             provides=["my_request"],      # message names client sends
             requires=["my_response"],     # message names client receives
+            config=config,
         )
 
     def on_init(self):
-        # after each connection (initial + reconnect)
+        # before channel/queue/handshake setup on each connection attempt
+        # initialize state here; do not send messages from this hook
         pass
 
     def on_receive(self, data: message_pb2.PookieMessage) -> Any:
@@ -209,10 +223,15 @@ BaseClient(..., config=config)
 Auth token injection without subclassing:
 
 ```python
+import os
+
 client = MyClient(port=50051, config=ClientConfig(
-    ext_metadata=[("x-api-key", "my-secret")]
+    ext_metadata=[("x-api-key", os.environ["POOKIEPY_API_KEY"])]
 ))
 ```
+
+The server must validate this metadata in its connection hook. Metadata injection
+alone does not enforce authentication. Use TLS outside trusted local development.
 
 ### Key client methods
 
@@ -266,7 +285,7 @@ SimPyTick's `TimedEvent` provides drift-compensated periodic scheduling at norma
 ```python
 from simpytick.timer import TimedEvent
 
-with TimedEvent(s=0.01, n=100) as te:
+with TimedEvent(s=0.01, n=100, backend="thread") as te:
     for tick in te:
         ...
 ```
@@ -280,6 +299,8 @@ worker failures raise `RuntimeError` during iteration or normal context exit.
 
 Framework auto-attaches `ClientConfig.schema_version` as gRPC metadata on each stream call. Server compares it against `ServerConfig.schema_version` during connect.
 
+- With the bundled interface and `schema_version=None`, both endpoints use
+  `DEFAULT_SCHEMA_VERSION` from pookiepy. Custom interfaces resolve `None` to `""`.
 - If both values are empty strings, connection continues and server logs `cannot check schema because empty`.
 - If either side sets a value, both values must match exactly or server aborts with `FAILED_PRECONDITION`.
 - Prefer human-managed labels such as `chat-v1`, `2026-08-proto`, or package release versions.
@@ -376,7 +397,8 @@ self.send_data(reply)
 ```
 
 Rules:
-- Keep `reply.metaInfo.messageId` as new message id.
+- Let the send path assign a new `reply.metaInfo.messageId`, or request metadata
+  during message creation with `add_metadata=True`.
 - Copy original request id into `reply.metaInfo.responseToId`.
 - Do not overwrite `messageId` with request id.
 - For streaming replies, every chunk uses same `responseToId`.
@@ -391,7 +413,8 @@ Why:
 - Works for mixed traffic (request/response + fire-and-forget) using the same hook/polling loop.
 
 Recommended approach:
-- Sender stores `request_id = request.metaInfo.messageId`.
+- Sender creates the request with `add_metadata=True`, then stores
+  `request_id = request.metaInfo.messageId` before sending.
 - Responder sets `reply.metaInfo.responseToId = request_id`.
 - Requester matches with `reply.metaInfo.responseToId == request_id`.
 - Non-matching messages continue through normal hook/polling flow.
@@ -399,13 +422,21 @@ Recommended approach:
 ### Match response on requester side
 
 ```python
+import time
+from pookiepy.exceptions import GrpcTimeoutError
+
 request = generate_message("my_request", struct_payload={"text": "hello"}, add_metadata=True)
 request_id = request.metaInfo.messageId
 self.send_data(request)
 
+deadline = time.monotonic() + 5.0
 while True:
-    reply = self.get_data(timeout=5.0)
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise GrpcTimeoutError("Timed out waiting for the matching response")
+    reply = self.get_data(timeout=remaining)
     if reply.metaInfo.responseToId != request_id:
+        self.on_receive(reply)
         continue
     break
 ```
@@ -413,6 +444,9 @@ while True:
 Rules:
 - Compare `reply.metaInfo.responseToId` with original request id.
 - Do not correlate via `reply.metaInfo.messageId`.
+- `get_data` can raise `GrpcEmpty` when the remaining timeout expires. Dispatch
+  unrelated messages normally; do not discard them or restart the total deadline.
+- Use one receive consumer for this pattern; do not run it alongside `spin_forever`.
 
 ## Routing Rules
 
@@ -423,7 +457,10 @@ Rules:
 | Unicast to one client | `self._data_register.add_data_for_message_name(sender_id, name, msg, target_client_id=target_id)` |
 | Server push (no sender) | `self._data_register.add_data_for_message_name("", name, msg)` |
 
-Delivery only to clients whose `requires` contains `messageName`. If none require it, message is silently dropped.
+Delivery only to clients whose `requires` contains `messageName`. Fan-out skips the
+sender. Explicit unicast can target the sender if it subscribes to the response.
+With no subscribers, nothing is enqueued; manual routing returns empty result
+tuples. Handle missing subscribers according to the application's delivery needs.
 
 ## Exceptions
 
@@ -434,11 +471,15 @@ Delivery only to clients whose `requires` contains `messageName`. If none requir
 | `StopSpin` | Stop `spin_forever()` without disconnecting. |
 | `GrpcConnectionError` | Connection failed, or `wait_done()` called while disconnected. |
 | `GrpcTimeoutError` | RPC `DEADLINE_EXCEEDED`. |
+| `GrpcResourceExhaustedError` | RPC resource limits, including excess concurrent streams or message size. |
+| `GrpcCustomInterfaceError` | Invalid injected interface or a helper requiring absent payload fields. |
 | `GrpcValueError` | `messageName` not in `provides`, or wrong type passed to `send_data`. |
 
 ## SSL / TLS (optional)
 
 ```python
+import grpc
+
 # server
 creds = grpc.ssl_server_credentials([(private_key_bytes, cert_chain_bytes)])
 BaseServer(port=50051, ssl_credentials=creds)
@@ -487,8 +528,10 @@ Defaults:
 - File logs: `INTERNAL_DEBUG` (level 5), path `%TEMP%/<safe-name><uuid8>/<safe-name>.log`.
 - Daily rotation retains up to 30 backups per writer; previous run directories are not pruned.
 
-`logger.setLevel(...)` changes only the logger threshold. To change handler output
-levels on an existing logger, set each handler's level explicitly. Configure named
-loggers before constructing clients/servers; cached names retain their first settings.
+`logger.setLevel(...)` changes only the logger threshold. Do not add handler-level
+loops just to suppress lower-level records. Configure output levels through
+`get_logger` before constructing clients/servers; cached names retain their first
+settings. Change individual handler thresholds only when deliberately configuring
+different destinations, not as a substitute for the logger threshold.
 Use `reinit_if_exists=True` to replace a cached logger, and use the newly returned object.
 `log_dir=None` disables file logging; omit it (or use `LogDir.DEFAULT`) for temporary files.

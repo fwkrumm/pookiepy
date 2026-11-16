@@ -1,4 +1,4 @@
-name: CLI Skeleton Smoke
+name: CLI Skeleton and Skill Smoke
 
 on: [push, pull_request]
 
@@ -28,6 +28,8 @@ jobs:
 
       - name: Set up Python ${{ matrix.python-version }}
         id: setup
+        # Keep $/: GitHub resolves this action from the same repository at the running commit.
+        # Do not replace with ./, which resolves from the checked-out workspace instead.
         uses: $/.github/actions/setup-python
         with:
           python-version: ${{ matrix.python-version }}
@@ -47,7 +49,7 @@ jobs:
           requirements: ''
           packages: ${{ github.workspace }}
 
-      - name: Generate and run every skeleton
+      - name: Validate every skill target and run skeletons and skill examples
         if: steps.dependencies.outputs.ready == 'true'
         working-directory: ${{ runner.temp }}
         env:

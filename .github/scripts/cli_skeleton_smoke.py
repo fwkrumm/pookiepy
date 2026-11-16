@@ -133,14 +133,44 @@ def generate(
 
 
 def assert_files(output_dir: Path, expected_names: set[str]) -> None:
-    """Require exact top-level files produced by one generation action."""
-    actual_names = {path.name for path in output_dir.iterdir() if path.is_file()}
+    """Require exact relative files, including hidden skill directories."""
+    actual_names = {
+        path.relative_to(output_dir).as_posix()
+        for path in output_dir.rglob("*") if path.is_file()
+    }
     if actual_names != expected_names:
         raise AssertionError(
             f"Generated files differ in {output_dir}: "
             f"expected={sorted(expected_names)}, actual={sorted(actual_names)}"
         )
     print(f"[ok] Generated files: {', '.join(sorted(actual_names))}", flush=True)
+
+
+def assert_skills(output_dir: Path, targets: tuple[str, ...]) -> set[str]:
+    """Check installed skill metadata, reference content, links, and example syntax."""
+    import pookiepy  # pylint: disable=import-outside-toplevel
+
+    bundled = Path(pookiepy.__file__).parent / "assets" / "skills" / "pookiepy"
+    expected_names = set()
+    for target in targets:
+        skill_root = f"{target}/skills/pookiepy"
+        for relative in ("SKILL.md", "references/API_REFERENCE.md"):
+            name = f"{skill_root}/{relative}"
+            expected_names.add(name)
+            actual = (output_dir / name).read_bytes()
+            if actual != (bundled / relative).read_bytes():
+                raise AssertionError(f"Installed skill differs from bundled asset: {name}")
+        skill = (output_dir / skill_root / "SKILL.md").read_text(encoding="utf-8")
+        if not skill.startswith("---\nname: pookiepy\n") or "\ndescription: " not in skill:
+            raise AssertionError(f"Missing skill frontmatter in {skill_root}")
+        if len(skill.splitlines()) >= 500:
+            raise AssertionError(f"Skill exceeds recommended line limit: {skill_root}")
+        for link in re.findall(r"\]\(([^)]+)\)", skill):
+            if not (output_dir / skill_root / link.split("#", 1)[0]).is_file():
+                raise AssertionError(f"Broken skill resource link: {link}")
+        for code in re.findall(r"```python\n(.*?)```", skill, re.DOTALL):
+            compile(code, f"{skill_root}/SKILL.md", "exec")
+    return expected_names
 
 
 def compile_python_files(paths: Iterable[Path]) -> None:
@@ -280,8 +310,9 @@ def run_generated_pair(
     environment: dict[str, str],
     *,
     custom_interface: bool = False,
+    skill_example: bool = False,
 ) -> None:
-    """Start generated server on an OS-assigned port, then run client."""
+    """Run a skeleton or documented skill example on an OS-assigned port."""
     pair_environment = environment.copy()
     pair_environment["POOKIEPY_SMOKE_PORT"] = "0"
     server_command = [
@@ -308,8 +339,13 @@ def run_generated_pair(
             try:
                 port = wait_for_server(server, server_log)
                 pair_environment["POOKIEPY_SMOKE_PORT"] = str(port)
+                script = (
+                    "import os; from client_skeleton import request_once; "
+                    "request_once(port=int(os.environ['POOKIEPY_SMOKE_PORT']))"
+                    if skill_example else client_code(custom_interface)
+                )
                 run_checked(
-                    [sys.executable, "-c", client_code(custom_interface)],
+                    [sys.executable, "-c", script],
                     cwd=client_dir,
                     environment=pair_environment,
                     label="Start generated client and send one message",
@@ -350,6 +386,39 @@ def make_case_dir(root: Path, name: str) -> Path:
     return path
 
 
+def run_skill_smoke(root: Path, environment: dict[str, str]) -> None:
+    """Validate all skill commands and execute the installed request/response example."""
+    all_targets = (".github", ".claude", ".cursor", ".agents")
+    skill_cases = {
+        "--install-skills": all_targets,
+        "--install-skills-github": (".github",),
+        "--install-skills-claude": (".claude",),
+        "--install-skills-cursor": (".cursor",),
+        "--install-skills-codex": (".agents",),
+    }
+    for flag, targets in skill_cases.items():
+        skill_dir = make_case_dir(root, flag.removeprefix("--"))
+        generate(flag, skill_dir, environment)
+        assert_files(skill_dir, assert_skills(skill_dir, targets))
+        before = {
+            path: (path.read_bytes(), path.stat().st_mtime_ns)
+            for path in skill_dir.rglob("*") if path.is_file()
+        }
+        generate(flag, skill_dir, environment)
+        for path, state in before.items():
+            if (path.read_bytes(), path.stat().st_mtime_ns) != state:
+                raise AssertionError(f"Reinstall modified existing skill: {path}")
+
+    example_dir = make_case_dir(root, "skill-example")
+    skill = (
+        root / "install-skills" / ".github" / "skills" / "pookiepy" / "SKILL.md"
+    ).read_text(encoding="utf-8")
+    server_code, example_client = re.findall(r"```python\n(.*?)```", skill, re.DOTALL)
+    (example_dir / "server_skeleton.py").write_text(server_code, encoding="utf-8")
+    (example_dir / "client_skeleton.py").write_text(example_client, encoding="utf-8")
+    run_generated_pair(example_dir, example_dir, environment, skill_example=True)
+
+
 def run_smoke_suite(project_root: Path) -> None:
     """Exercise every generation parameter and generated runtime path."""
     environment = clean_environment()
@@ -379,20 +448,18 @@ def run_smoke_suite(project_root: Path) -> None:
 
         generate_all_dir = make_case_dir(root, "generate")
         generate("--generate", generate_all_dir, environment)
+        all_targets = (".github", ".claude", ".cursor", ".agents")
         assert_files(
             generate_all_dir,
-            {"server_skeleton.py", "client_skeleton.py", "HOW_TO.md"},
+            {"server_skeleton.py", "client_skeleton.py"}
+            | assert_skills(generate_all_dir, all_targets),
         )
         compile_python_files(
             [generate_all_dir / "server_skeleton.py", generate_all_dir / "client_skeleton.py"]
         )
         run_generated_pair(generate_all_dir, generate_all_dir, environment)
 
-        how_to_dir = make_case_dir(root, "generate-how-to")
-        generate("--generate-how-to", how_to_dir, environment)
-        assert_files(how_to_dir, {"HOW_TO.md"})
-        if not (how_to_dir / "HOW_TO.md").read_text(encoding="utf-8").strip():
-            raise AssertionError("Generated HOW_TO.md is empty")
+        run_skill_smoke(root, environment)
 
         interface_dir = make_case_dir(root, "generate-interface")
         generate("--generate-interface", interface_dir, environment)
@@ -419,7 +486,7 @@ def run_smoke_suite(project_root: Path) -> None:
         )
         run_generated_pair(custom_dir, custom_dir, environment, custom_interface=True)
 
-    print("\nAll installed skeleton smoke checks passed.", flush=True)
+    print("\nAll installed skeleton and skill smoke checks passed.", flush=True)
 
 
 def main() -> None:

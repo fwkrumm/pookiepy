@@ -25,23 +25,23 @@ Regen custom integration fixture with runtime-compatible pins:
 
 | Field | Type | Purpose |
 |---|---|---|
-| `messageId` | `string` | correlation ID (optional) |
-| `messageName` | `string` | routing key via `provides`/`requires` |
-| `clientInfo` | `ClientProvides` | first msg on connect: UUID, `provides`, `requires` |
-| `serverInfo` | `ServerProvides` | welcome reply: server UUID |
+| `metaInfo.messageId` | `string` | unique message ID; replies correlate through `responseToId` |
+| `metaInfo.messageName` | `string` | routing key via `provides`/`requires` |
+| `metaInfo.clientInfo` | `ClientProvides` | first msg on connect: UUID, `provides`, `requires` |
+| `metaInfo.serverInfo` | `ServerProvides` | welcome reply: server UUID |
 | `payload` | `Payload` | `bytes bytePayload` or `Struct structPayload` |
 | `history` | `repeated DataPoint` | per-hop timestamps + perf_counter |
 
-## BaseServer --- [pookiepy/BaseServer.py](pookiepy/BaseServer.py)
+## BaseServer --- [pookiepy/baseserver.py](pookiepy/baseserver.py)
 
 ```python
-BaseServer(port, name, ip="[::]" global_exit_event=None, ssl_credentials=None, config=None,
+BaseServer(port, *, name="server", ip="[::]", global_exit_event=None, ssl_credentials=None, config=None,
            proto_interface=None)
 # config: max_workers, max_queue_elements=0, shutdown_poll_interval, schema_version,
 #         server_options
 ```
 
-Connect flow: `Peer` created → `notification_queue` registered → `_receive_thread()` starts → first msg: `on_client_connect()` + register `requires` in `DataRegister` + enqueue welcome → subsequent msgs: `on_receive()` → main thread yields queue → disconnect: remove from `DataRegister`.
+Connect flow: `Peer` created → notification queue prepared → receive thread starts → first msg: `on_client_connect()` + register `requires` in `DataRegister` + enqueue welcome → subsequent msgs: `on_receive()` → main thread yields queue → disconnect: remove from `DataRegister`.
 
 Schema check: compares `ClientConfig.schema_version` vs `ServerConfig.schema_version` from `SCHEMA_VERSION_METADATA_KEY` metadata. Both empty → warn and allow. Any mismatch → `FAILED_PRECONDITION`.
 
@@ -59,15 +59,15 @@ Schema check: compares `ClientConfig.schema_version` vs `ServerConfig.schema_ver
 
 **Other:** `serve_forever()`, `shutdown()`, `_add_static_data(name, msg)`, `_get_static_data(name)`
 
-## BaseClient --- [pookiepy/BaseClient.py](pookiepy/BaseClient.py)
+## BaseClient --- [pookiepy/baseclient.py](pookiepy/baseclient.py)
 
 ```python
-BaseClient(identifier, port, provides=None, requires=None, ip="localhost",
+BaseClient(port, *, name="client", provides=None, requires=None, ip="localhost",
            config=None, proto_interface=None)
 # config = ClientConfig(receive_queue_maxsize, connection_check_timeout, schema_version, ssl_credentials, grpc_options)
 ```
 
-Init → `_setup_connection()` (new UUID, channel/stub/queues, `run_event`) → `run()` → `_connect()` + `_start_receive_thread()` + `_check_connection()` → `on_init()`.
+Init → `_setup_connection()` → `on_init()` → channel/stub/queues, new UUID and `run_event` → `run()` → `_connect()` + `_start_receive_thread()` + `_check_connection()`.
 
 UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on fast reconnect.
 
@@ -83,7 +83,7 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 | `spin(timeout=None)` | `get_data()` → `on_receive()`; raises on timeout/disconnect |
 | `spin_forever(timeout=None)` | loop `spin()`; stop on timeout/disconnect or `StopSpin` |
 
-**Hooks:** `on_init` (after each `_setup_connection()`), `on_receive(data)`, `on_shutdown`
+**Hooks:** `on_init` (before channel/queue/handshake setup on every connection attempt; do not send here), `on_receive(data)`, `on_shutdown`
 
 **Context manager:** `with client:` → `__enter__` reconnects if disconnected, `__exit__` disconnects. Reusable.
 
@@ -115,13 +115,22 @@ UUID regenerated each `_setup_connection()` → prevents `DataRegister` race on 
 
 **Logger**: use `jacl4py.logger.get_logger` directly; prefer `self.logger` in client/server hooks. `setLevel()` changes only the logger threshold; do not add handler-level loops merely to suppress lower-level records. No local logging wrappers.
 
-**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` auto-sets `messageId`+`timestamp`. `generate_message(name, byte_payload, struct_payload)` → `PookieMessage`. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
+**Tools** (`pookiepy/tools.py`): `set_metadata(msg)` sets missing `messageId`+`timestamp`. `generate_message(name, struct_payload=None, byte_payload=None, add_metadata=False, *, proto_interface=None)` → `PookieMessage`. Set `add_metadata=True` before reading a request ID for correlation. `struct_to_json`/`json_to_struct`. `evaluate_history(data, log_callback)` → per-hop latency.
 
 **Timer**: import `TimedEvent` or low-level `timer` from `simpytick.timer` directly. Prefer `backend="thread"` after starting gRPC; guard process startup with `if __name__ == "__main__":` in an importable script. No local timing wrappers.
 
-Logging/timing API details: [HOW_TO.md](pookiepy/assets/HOW_TO.md); upgrade differences: [0.0.21 migration notes](docs/required_adjustments/0.0.21.md).
+Application-development procedure: [pookiepy skill](pookiepy/assets/skills/pookiepy/SKILL.md).
+Load the [API reference](pookiepy/assets/skills/pookiepy/references/API_REFERENCE.md)
+for detailed hook, logging, timing, configuration and interface examples.
+Install all project-local targets with `python -m pookiepy --install-skills`,
+or select `--install-skills-github`, `--install-skills-claude`,
+`--install-skills-cursor`, or `--install-skills-codex`. Do not duplicate the full skill in
+always-loaded agent instructions. Skill installation migration:
+[0.0.22 migration notes](docs/required_adjustments/0.0.22.md).
+Earlier logging/timing changes:
+[0.0.21 migration notes](docs/required_adjustments/0.0.21.md).
 
-**Schema version** (`pookiepy/schema_version.py`): metadata-key constant only. Actual schema/version string comes from `ClientConfig.schema_version` / `ServerConfig.schema_version`.
+**Schema version** (`pookiepy/schema_version.py`): metadata key plus `DEFAULT_SCHEMA_VERSION` for the bundled interface. Configured `ClientConfig.schema_version` / `ServerConfig.schema_version` overrides it; custom interfaces with no explicit version use an empty string.
 
 **Custom interface** (`pookiepy/custom_interface.py`): compile protobuf modules externally, construct `ProtoInterface(message_pb2, message_pb2_grpc)`, then pass `proto_interface=` to each client/server. No runtime compilation or global module replacement.
 

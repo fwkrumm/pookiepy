@@ -16,8 +16,9 @@ Test coverage
 - ``--generate-server``     produces a syntactically valid server_skeleton.py.
 - ``--generate-client``     produces a syntactically valid client_skeleton.py.
 - ``--generate-skeletons``  produces both skeleton files (and both are valid).
-- ``--generate-how-to``     produces HOW_TO.md whose content matches the bundled source.
-- ``--generate``            produces all three files; skeletons are valid.
+- Skill commands install complete byte-identical assets for all or selected tools.
+- Skill installation is idempotent and rejects conflicts before writing any files.
+- ``--generate`` produces both skeletons and all skills.
 - ``--generate-interface``  produces message.proto and prints
   "Next steps" instructions.
 - ``--generate-interface-with-skeletons`` produces message.proto + skeletons using
@@ -39,6 +40,7 @@ Notes
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -56,9 +58,13 @@ from pathlib import Path
 # Root of the project source tree (two levels above this file).
 _PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-# HOW_TO.md as bundled inside the pookiepy package directory.
-# This is the authoritative source used for byte-for-byte comparison.
-_BUNDLED_HOW_TO = _PROJECT_ROOT / "pookiepy" / "assets" / "HOW_TO.md"
+_BUNDLED_SKILL = _PROJECT_ROOT / "pookiepy" / "assets" / "skills" / "pookiepy"
+_SKILL_TARGETS = {
+    "github": Path(".github") / "skills" / "pookiepy",
+    "claude": Path(".claude") / "skills" / "pookiepy",
+    "cursor": Path(".cursor") / "skills" / "pookiepy",
+    "codex": Path(".agents") / "skills" / "pookiepy",
+}
 
 # The bundled message.proto used for byte-for-byte comparison.
 _BUNDLED_PROTO = _PROJECT_ROOT / "pookiepy" / "message.proto"
@@ -99,7 +105,7 @@ def _find_uv() -> str | None:
 # Test class
 # ---------------------------------------------------------------------------
 
-class TestInstalledCLI(unittest.TestCase):
+class TestInstalledCLI(unittest.TestCase):  # pylint: disable=too-many-public-methods
     """
     Smoke-tests for the ``python -m pookiepy`` CLI, run against an installed
     wheel rather than the source tree.
@@ -281,6 +287,26 @@ class TestInstalledCLI(unittest.TestCase):
                 f"{label} contains a syntax error: {exc}"
             ) from exc
 
+    def _assert_skills(self, targets: tuple[str, ...], *, skeletons: bool = False) -> None:
+        """Check exact installed file paths, content, and absence of other targets."""
+        expected = set()
+        for target in targets:
+            for relative in (Path("SKILL.md"), Path("references") / "API_REFERENCE.md"):
+                destination = _SKILL_TARGETS[target] / relative
+                expected.add(destination)
+                self.assertEqual(
+                    (self._work_dir / destination).read_bytes(),
+                    (_BUNDLED_SKILL / relative).read_bytes(),
+                    msg=str(destination),
+                )
+        if skeletons:
+            expected.update((Path("server_skeleton.py"), Path("client_skeleton.py")))
+        actual = {
+            path.relative_to(self._work_dir)
+            for path in self._work_dir.rglob("*") if path.is_file()
+        }
+        self.assertEqual(actual, expected)
+
     # ------------------------------------------------------------------
     # Test methods
     # ------------------------------------------------------------------
@@ -321,40 +347,162 @@ class TestInstalledCLI(unittest.TestCase):
         self._assert_valid_python(server, label="server_skeleton.py")
         self._assert_valid_python(client, label="client_skeleton.py")
 
-    def test_generate_how_to(self):
-        """
-        --generate-how-to creates HOW_TO.md whose content matches the bundled
-        source file byte-for-byte.
-        """
+    def test_install_skills(self):
+        """All-tool installation provides complete assets with valid local links."""
+        result = self._run("--install-skills")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self._assert_skills(tuple(_SKILL_TARGETS))
+
+        for target in _SKILL_TARGETS.values():
+            skill_file = self._work_dir / target / "SKILL.md"
+            skill = skill_file.read_text(encoding="utf-8")
+            frontmatter = skill.split("---", 2)[1]
+            self.assertRegex(frontmatter, r"(?m)^name: pookiepy$")
+            description = re.search(r"(?m)^description: (.+)$", frontmatter)
+            if description is None:
+                self.fail("Skill description is missing")
+            self.assertLessEqual(len(description.group(1)), 1024)
+            self.assertLess(len(skill.splitlines()), 500)
+            for link in re.findall(r"\]\(([^)]+)\)", skill):
+                reference = skill_file.parent / link.split("#", 1)[0]
+                self.assertTrue(reference.is_file(), msg=link)
+            for code in re.findall(r"```python\n(.*?)```", skill, re.DOTALL):
+                compile(code, str(skill_file), "exec")
+
+    def test_removed_skill_commands(self):
+        """Superseded skill command names fail without writing files."""
+        for flag in ("--generate-skills", "--install-skill", *(
+            f"--generate-{target}" for target in _SKILL_TARGETS
+        )):
+            with self.subTest(flag=flag):
+                result = self._run(flag)
+                self.assertEqual(result.returncode, 2, msg=result.stderr)
+                self.assertEqual(list(self._work_dir.iterdir()), [])
+
+    def test_deprecated_skill_alias(self):
+        """The legacy flag warns and installs skills without creating the old guide."""
         result = self._run("--generate-how-to")
         self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("deprecated", result.stderr)
+        self._assert_skills(tuple(_SKILL_TARGETS))
 
-        generated = self._work_dir / "HOW_TO.md"
-        self.assertTrue(generated.exists(), "HOW_TO.md was not created")
+    def test_install_skills_github(self):
+        """The GitHub flag installs only in Copilot's project directory."""
+        result = self._run("--install-skills-github")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self._assert_skills(("github",))
 
-        # Content must match the HOW_TO.md that is bundled inside the package.
-        expected = _BUNDLED_HOW_TO.read_bytes()
-        actual = generated.read_bytes()
-        self.assertEqual(
-            expected, actual,
-            "Generated HOW_TO.md content does not match pookiepy/HOW_TO.md"
+    def test_install_skills_claude(self):
+        """The Claude flag installs only in Claude Code's project directory."""
+        result = self._run("--install-skills-claude")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self._assert_skills(("claude",))
+
+    def test_install_skills_cursor(self):
+        """The Cursor flag installs only in Cursor's project directory."""
+        result = self._run("--install-skills-cursor")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self._assert_skills(("cursor",))
+
+    def test_install_skills_codex(self):
+        """The Codex flag installs only in the shared agents project directory."""
+        result = self._run("--install-skills-codex")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self._assert_skills(("codex",))
+
+    def test_combining_skill_flags(self):
+        """Combined and repeated per-tool flags install each selected target once."""
+        result = self._run(
+            "--install-skills-github", "--install-skills-cursor", "--install-skills-github"
         )
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(result.stdout.count("[ok]"), 4)
+        self._assert_skills(("github", "cursor"))
+
+    def test_skills_are_idempotent(self):
+        """An identical reinstall leaves every file's content and timestamp intact."""
+        first = self._run("--install-skills")
+        self.assertEqual(first.returncode, 0, msg=first.stderr)
+        before = {
+            path: (path.read_bytes(), path.stat().st_mtime_ns)
+            for path in self._work_dir.rglob("*") if path.is_file()
+        }
+        second = self._run("--install-skills", "--install-skills-cursor")
+        self.assertEqual(second.returncode, 0, msg=second.stderr)
+        self.assertIn("[skip]", second.stdout)
+        self.assertNotIn("[ok]", second.stdout)
+        self._assert_skills(tuple(_SKILL_TARGETS))
+        for path, state in before.items():
+            self.assertEqual((path.read_bytes(), path.stat().st_mtime_ns), state)
+
+    def test_skill_conflict_prevents_partial_generation(self):
+        """A last-target reference conflict blocks other targets and skeletons."""
+        conflict = self._work_dir / _SKILL_TARGETS["codex"] / "references" / "API_REFERENCE.md"
+        conflict.parent.mkdir(parents=True)
+        conflict.write_text("custom reference\n", encoding="utf-8")
+        result = self._run("--generate")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("[error]", result.stderr)
+        self.assertIn(str(conflict), result.stderr)
+        self.assertNotIn("[ok]", result.stdout)
+        self.assertEqual(conflict.read_text(encoding="utf-8"), "custom reference\n")
+        self.assertEqual(
+            [path for path in self._work_dir.rglob("*") if path.is_file()], [conflict]
+        )
+
+    def test_skill_parent_file_conflict(self):
+        """A file blocking a target directory fails before installing any target."""
+        conflict = self._work_dir / ".agents"
+        conflict.write_text("not a directory\n", encoding="utf-8")
+        result = self._run("--install-skills")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("not a directory", result.stderr)
+        self.assertEqual(list(self._work_dir.iterdir()), [conflict])
+
+    def test_skill_symlink_destination(self):
+        """Destination symlinks must not redirect installs outside the project."""
+        with tempfile.TemporaryDirectory(prefix="pookiepy_skill_link_") as raw_target:
+            target = Path(raw_target)
+            link = self._work_dir / ".github"
+            try:
+                link.symlink_to(target, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest(f"Creating symlinks is unavailable: {exc}")
+            result = self._run("--install-skills")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("symbolic link", result.stderr)
+            self.assertEqual(list(target.iterdir()), [])
+            self.assertEqual(list(self._work_dir.iterdir()), [link])
+
+    def test_skill_help(self):
+        """Help exposes supported flags and not the deprecated alias."""
+        result = self._run("--help")
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        for flag in ("--install-skills", *(
+            f"--install-skills-{target}" for target in _SKILL_TARGETS
+        )):
+            self.assertIn(flag, result.stdout)
+        self.assertNotIn("--generate-how-to", result.stdout)
+        options = set(re.findall(r"--[a-z][a-z-]+", result.stdout))
+        self.assertNotIn("--generate-skills", options)
+        self.assertNotIn("--install-skill", options)
+        for target in _SKILL_TARGETS:
+            self.assertNotIn(f"--generate-{target}", options)
 
     def test_generate(self):
         """
-        --generate creates server_skeleton.py, client_skeleton.py, and
-        HOW_TO.md in one call.  Both Python files must be syntactically valid.
+        --generate creates both skeletons and all supported agent skills.
+        Both Python files must be syntactically valid.
         """
         result = self._run("--generate")
         self.assertEqual(result.returncode, 0, msg=result.stderr)
 
         server = self._work_dir / "server_skeleton.py"
         client = self._work_dir / "client_skeleton.py"
-        how_to = self._work_dir / "HOW_TO.md"
 
         self.assertTrue(server.exists(), "server_skeleton.py was not created")
         self.assertTrue(client.exists(), "client_skeleton.py was not created")
-        self.assertTrue(how_to.exists(), "HOW_TO.md was not created")
+        self._assert_skills(tuple(_SKILL_TARGETS), skeletons=True)
 
         self._assert_valid_python(server, label="server_skeleton.py")
         self._assert_valid_python(client, label="client_skeleton.py")
